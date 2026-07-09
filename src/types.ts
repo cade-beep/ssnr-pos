@@ -16,6 +16,12 @@ export interface CartItem {
   discountPercent?: number; // 할인 퍼센트 수치 (예: 10)
 }
 
+export interface CashierUser {
+  email: string;
+  name: string;
+  role: '관리자' | '캐셔';
+}
+
 export type PaymentMethod = 'CARD' | 'TRANSFER';
 
 export interface Receipt {

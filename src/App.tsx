@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Product, CartItem, PaymentMethod, Receipt } from './types';
+import { Product, CartItem, PaymentMethod, Receipt, CashierUser } from './types';
 import POSGrid from './components/POSGrid';
 import Cart from './components/Cart';
 import ReceiptModal from './components/ReceiptModal';
-import LoginOverlay, { CashierUser } from './components/LoginOverlay';
+import LoginOverlay from './components/LoginOverlay';
 import { ShoppingBag, Clock, FileSpreadsheet, RefreshCw, TrendingUp, Coins, Award } from 'lucide-react';
+import { supabase } from './supabase';
 
 const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -18,38 +19,38 @@ const App: React.FC = () => {
   const [discountAmount, setDiscountAmount] = useState<number>(0);
 
   // Cashier Authentication States
-  const [cashierUsers, setCashierUsers] = useState<CashierUser[]>([]);
-  const [currentCashier, setCurrentCashier] = useState<CashierUser | null>({ name: '미지정', role: '캐셔' });
-  const [isCashierLoading, setIsCashierLoading] = useState<boolean>(false);
-  const [cashierError, setCashierError] = useState<string>('');
-
-  const loadCashierUsers = () => {
-    setIsCashierLoading(true);
-    setCashierError('');
-    const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
-    
-    fetch(`${webappUrl}?action=users`)
-      .then((res) => {
-        if (!res.ok) throw new Error('인증 서버로부터 데이터를 읽지 못했습니다.');
-        return res.json();
-      })
-      .then((data) => {
-        if (data && data.success && data.users) {
-          setCashierUsers(data.users);
-          setIsCashierLoading(false);
-        } else {
-          throw new Error(data.message || '캐셔 목록 로드 실패');
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to load cashier list:', err);
-        setCashierError('스프레드시트에 [캐서설정] 시트가 구성되지 않았거나 접근할 수 없습니다.');
-        setIsCashierLoading(false);
-      });
-  };
+  const [currentCashier, setCurrentCashier] = useState<CashierUser | null>(null);
 
   useEffect(() => {
-    loadCashierUsers();
+    // 앱 구동 시 현재 로그인된 세션이 이미 존재하면 로드
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && session.user) {
+        const user = session.user;
+        setCurrentCashier({
+          email: user.email || '',
+          name: user.user_metadata?.name || user.email?.split('@')[0] || '캐셔',
+          role: user.user_metadata?.role === '관리자' ? '관리자' : '캐셔'
+        });
+      } else {
+        setCurrentCashier(null);
+      }
+    });
+
+    // 세션 상태 변경 시 (로그인/로그아웃) 실시간 감지하여 상태 업데이트
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session && session.user) {
+        const user = session.user;
+        setCurrentCashier({
+          email: user.email || '',
+          name: user.user_metadata?.name || user.email?.split('@')[0] || '캐셔',
+          role: user.user_metadata?.role === '관리자' ? '관리자' : '캐셔'
+        });
+      } else {
+        setCurrentCashier(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const loadProducts = () => {
@@ -366,14 +367,10 @@ const App: React.FC = () => {
   if (!currentCashier) {
     return (
       <LoginOverlay
-        users={cashierUsers}
         onLoginSuccess={(user) => {
           setCurrentCashier(user);
           showToast(`🔓 ${user.name} (${user.role}) 근무자 로그인 성공`);
         }}
-        isLoading={isCashierLoading}
-        errorMsg={cashierError}
-        onRetry={loadCashierUsers}
       />
     );
   }
@@ -436,7 +433,8 @@ const App: React.FC = () => {
           <button
             type="button"
             className="btn-refresh btn-shift"
-            onClick={() => {
+            onClick={async () => {
+              await supabase.auth.signOut();
               setCurrentCashier(null);
               showToast('👋 근무자 로그아웃 완료');
             }}
@@ -452,7 +450,7 @@ const App: React.FC = () => {
               transition: 'all 0.2s ease'
             }}
           >
-            근무자 교대
+            로그아웃
           </button>
           <div className="header-time">
             <Clock size={13} style={{ marginRight: '6px', verticalAlign: 'middle' }} />

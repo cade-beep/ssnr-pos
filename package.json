@@ -20,6 +20,7 @@
   "author": "Kyuho Kim",
   "license": "ISC",
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.1",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
