@@ -25,6 +25,16 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
       return;
     }
 
+    // 임시 테스트용 로컬/바이패스 관리자 계정 지원 (admin/admin 입력 시 즉시 로그인)
+    if (email.trim() === 'admin' && password === 'admin') {
+      onLoginSuccess({
+        email: 'admin@ssnr-pos.com',
+        name: '임시관리자',
+        role: '관리자'
+      });
+      return;
+    }
+
     setIsLoggingIn(true);
 
     // 골뱅이(@)가 없는 단순 아이디인 경우, 뒤에 가상 도메인(@ssnr-pos.com)을 자동으로 덧붙여서 처리합니다.
