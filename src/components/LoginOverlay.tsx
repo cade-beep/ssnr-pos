@@ -17,9 +17,9 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
     setLoginError('');
 
     if (!email.trim()) {
-      setLoginError('아이디(이메일)를 입력해 주십시오.');
+      setLoginError('아이디를 입력해 주십시오.');
       return;
-      }
+    }
     if (!password) {
       setLoginError('비밀번호를 입력해 주십시오.');
       return;
@@ -27,10 +27,16 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
 
     setIsLoggingIn(true);
 
+    // 골뱅이(@)가 없는 단순 아이디인 경우, 뒤에 가상 도메인(@ssnr-pos.com)을 자동으로 덧붙여서 처리합니다.
+    let loginEmail = email.trim();
+    if (!loginEmail.includes('@')) {
+      loginEmail = `${loginEmail}@ssnr-pos.com`;
+    }
+
     try {
       // Supabase Auth로 이메일/비밀번호 인증 시도
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: loginEmail,
         password: password
       });
 
@@ -65,7 +71,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
       console.error('로그인 에러:', err);
       // 사용자 이해를 돕기 위한 예외 에러 메시지 맵핑
       if (err.message?.includes('Invalid login credentials')) {
-        setLoginError('아이디(이메일) 또는 비밀번호가 올바르지 않습니다.');
+        setLoginError('아이디 또는 비밀번호가 올바르지 않습니다.');
       } else if (err.message?.includes('Network')) {
         setLoginError('네트워크 연결이 지연되고 있습니다. 인터넷 연결을 확인하세요.');
       } else {
@@ -87,15 +93,15 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
 
         <form onSubmit={handleLogin} className="login-form">
           <div className="form-group">
-            <label>아이디 (이메일)</label>
+            <label>아이디</label>
             <input
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
                 setLoginError('');
               }}
-              placeholder="example@email.com"
+              placeholder="아이디 또는 이메일 입력"
               className="login-input"
               disabled={isLoggingIn}
               required
