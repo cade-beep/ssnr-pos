@@ -435,6 +435,32 @@ const App: React.FC = () => {
           </button>
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {currentCashier.role === '관리자' && (
+            <a
+              href={import.meta.env.VITE_SPREADSHEET_URL || '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                textDecoration: 'none',
+                color: '#34d399',
+                background: 'rgba(52, 211, 153, 0.1)',
+                border: '1px solid rgba(52, 211, 153, 0.2)',
+                borderRadius: '6px',
+                padding: '6px 12px',
+                fontSize: '12.5px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              }}
+            >
+              <FileSpreadsheet size={13} />
+              📊 스프레드시트
+            </a>
+          )}
           <div 
             className="cashier-info"
             style={{ 
