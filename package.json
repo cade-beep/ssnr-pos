@@ -1,0 +1,40 @@
+{
+  "name": "simple-pos-app",
+  "version": "1.0.0",
+  "description": "Simple POS application for Windows notebook",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"npm run dev:vite\" \"npm run dev:electron\"",
+    "dev:vite": "vite",
+    "dev:electron": "tsc && wait-on http://localhost:5173 && electron .",
+    "build:vite": "tsc && vite build",
+    "build": "npm run build:vite",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "pos",
+    "electron",
+    "react",
+    "typescript"
+  ],
+  "author": "Kyuho Kim",
+  "license": "ISC",
+  "dependencies": {
+    "lucide-react": "^0.344.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.56",
+    "@types/react-dom": "^18.2.19",
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^29.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.2.2",
+    "vite": "^5.1.4",
+    "wait-on": "^7.2.0"
+  }
+}
