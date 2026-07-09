@@ -46,3 +46,11 @@ declare global {
     };
   }
 }
+
+export type BusinessState = 'CLOSED' | 'OPENED' | 'FINISHED';
+
+export interface BusinessProductQty {
+  productId: string;
+  name: string;
+  quantity: number;
+}
