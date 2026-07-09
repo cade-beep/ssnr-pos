@@ -40,13 +40,23 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
 
       if (data && data.user) {
         const user = data.user;
-        const displayName = user.user_metadata?.name || user.email?.split('@')[0] || '캐셔';
-        const role = user.user_metadata?.role === '관리자' ? '관리자' : '캐셔';
+        // 메타데이터 이름이 없으면 이메일 ID 앞자리를 이름으로 사용 (rbflrbgh -> rbflrbgh)
+        let displayName = user.user_metadata?.name || user.email?.split('@')[0] || '캐셔';
+        if (user.email?.startsWith('rbflrbgh') && displayName === 'rbflrbgh') {
+          displayName = '김규호';
+        }
+
+        // admin 이메일이거나 김규호 계정이면 자동으로 관리자로 설정
+        const isAdmin = 
+          user.user_metadata?.role === '관리자' || 
+          user.email?.startsWith('admin') || 
+          user.email?.startsWith('rbflrbgh') || 
+          displayName === '김규호';
 
         onLoginSuccess({
           email: user.email || '',
           name: displayName,
-          role: role
+          role: isAdmin ? '관리자' : '캐셔'
         });
       } else {
         throw new Error('사용자 세션 데이터를 찾을 수 없습니다.');

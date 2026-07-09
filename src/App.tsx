@@ -26,10 +26,21 @@ const App: React.FC = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session && session.user) {
         const user = session.user;
+        let displayName = user.user_metadata?.name || user.email?.split('@')[0] || '캐셔';
+        if (user.email?.startsWith('rbflrbgh') && displayName === 'rbflrbgh') {
+          displayName = '김규호';
+        }
+
+        const isAdmin = 
+          user.user_metadata?.role === '관리자' || 
+          user.email?.startsWith('admin') || 
+          user.email?.startsWith('rbflrbgh') || 
+          displayName === '김규호';
+
         setCurrentCashier({
           email: user.email || '',
-          name: user.user_metadata?.name || user.email?.split('@')[0] || '캐셔',
-          role: user.user_metadata?.role === '관리자' ? '관리자' : '캐셔'
+          name: displayName,
+          role: isAdmin ? '관리자' : '캐셔'
         });
       } else {
         setCurrentCashier(null);
@@ -40,10 +51,21 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session && session.user) {
         const user = session.user;
+        let displayName = user.user_metadata?.name || user.email?.split('@')[0] || '캐셔';
+        if (user.email?.startsWith('rbflrbgh') && displayName === 'rbflrbgh') {
+          displayName = '김규호';
+        }
+
+        const isAdmin = 
+          user.user_metadata?.role === '관리자' || 
+          user.email?.startsWith('admin') || 
+          user.email?.startsWith('rbflrbgh') || 
+          displayName === '김규호';
+
         setCurrentCashier({
           email: user.email || '',
-          name: user.user_metadata?.name || user.email?.split('@')[0] || '캐셔',
-          role: user.user_metadata?.role === '관리자' ? '관리자' : '캐셔'
+          name: displayName,
+          role: isAdmin ? '관리자' : '캐셔'
         });
       } else {
         setCurrentCashier(null);
