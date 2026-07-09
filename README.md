@@ -72,7 +72,7 @@ npm install
 ```
 
 ### 2. Environment Variables Setup (설정)
-루트 경로에 `.env` 파일을 생성하고 아래 연동 변수 정보를 입력합니다. (기본 템플릿은 `.env.example`을 참고하세요.)
+루트 경로에 `.env` 파일을 생성하고 아래 연동 변수 정보를 입력합니다.
 
 ```env
 # Google Apps Script Web App Deployment URL
