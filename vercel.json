@@ -1,6 +1,0 @@
-{
-  "name": "ssnr-pos",
-  "cleanUrls": true,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist"
-}

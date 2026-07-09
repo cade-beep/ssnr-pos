@@ -15,8 +15,6 @@ release/
 .env.test.local
 .env.production.local
 
-# Vercel
-.vercel
 
 # IDEs and Editors
 .idea/
