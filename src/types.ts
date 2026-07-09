@@ -54,3 +54,11 @@ export interface BusinessProductQty {
   name: string;
   quantity: number;
 }
+
+export interface DailyClosingItemData {
+  name: string;
+  opening: number;
+  sold: number;
+  waste: number;
+  remaining: number;
+}

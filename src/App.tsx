@@ -26,6 +26,7 @@ const App: React.FC = () => {
   const [isBusinessOpenModalOpen, setIsBusinessOpenModalOpen] = useState<boolean>(false);
   const [isBusinessCloseModalOpen, setIsBusinessCloseModalOpen] = useState<boolean>(false);
   const [openingQtys, setOpeningQtys] = useState<{ [productId: string]: number }>({});
+  const [wasteQtys, setWasteQtys] = useState<{ [productId: string]: number }>({});
   const [closingReport, setClosingReport] = useState<any | null>(null);
 
   const loadBusinessState = () => {
@@ -50,7 +51,8 @@ const App: React.FC = () => {
         if (data && data.success && data.quantities) {
           const initial: { [key: string]: number } = {};
           products.forEach(p => {
-            initial[p.id] = data.quantities[p.id] || 0;
+            const matchedQty = data.quantities[p.name] ?? data.quantities[p.name.trim()] ?? 0;
+            initial[p.id] = matchedQty;
           });
           setOpeningQtys(initial);
         }
@@ -215,7 +217,10 @@ const App: React.FC = () => {
     const payload = {
       action: 'businessOpen',
       cashierName: currentCashier?.name || '관리자',
-      quantities: openingQtys
+      quantitiesList: products.map(p => ({
+        name: p.name,
+        quantity: openingQtys[p.id] || 0
+      }))
     };
 
     fetch(webappUrl, {
@@ -239,104 +244,107 @@ const App: React.FC = () => {
     });
   };
 
+  const getTodayString = () => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   // 영업 마감 결산 데이터 생성 함수
   const prepareBusinessClose = () => {
     const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
     if (!webappUrl) return;
 
-    fetch(`${webappUrl}?action=sales`)
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.success && data.sales) {
-          const allSales = data.sales;
-          const now = new Date();
-          const y = now.getFullYear();
-          const m = now.getMonth() + 1;
-          const d = now.getDate();
-          
-          const todaySales = allSales.filter((s: any) => {
-            try {
-              const dtStr = s.paymentDateTime || "";
-              return dtStr.includes(`${y}.`) && 
-                     (dtStr.includes(`. ${m}.`) || dtStr.includes(`. 0${m}.`) || dtStr.includes(`.${m}.`) || dtStr.includes(`.0${m}.`)) && 
-                     (dtStr.includes(`. ${d}.`) || dtStr.includes(`. 0${d}.`) || dtStr.includes(`.${d}.`) || dtStr.includes(`.0${d}.`) || dtStr.endsWith(`. ${d}`) || dtStr.endsWith(`.${d}`));
-            } catch(e) {
-              return false;
-            }
-          });
+    // 초기 폐기 수량은 모두 0개로 세팅
+    const initialWastes: { [key: string]: number } = {};
+    products.forEach(p => {
+      initialWastes[p.id] = 0;
+    });
+    setWasteQtys(initialWastes);
 
-          const soldCountMap: { [productId: string]: number } = {};
-          let totalSales = 0;
-          let cashSales = 0;
-          let cardSales = 0;
-          let transactionCount = todaySales.length;
+    const todayStr = getTodayString();
 
-          todaySales.forEach((sale: any) => {
-            totalSales += Number(sale.totalAmount) || 0;
-            if (sale.paymentMethod === '계좌이체') {
-              cashSales += Number(sale.totalAmount) || 0;
-            } else if (sale.paymentMethod === '신용카드') {
-              cardSales += Number(sale.totalAmount) || 0;
-            }
+    Promise.all([
+      fetch(`${webappUrl}?action=sales`).then(res => res.json()),
+      fetch(`${webappUrl}?action=orderItems`).then(res => res.json())
+    ])
+    .then(([salesData, orderItemsData]) => {
+      if (salesData.success && orderItemsData.success) {
+        const salesList = salesData.sales || [];
+        const orderItemsList = orderItemsData.orderItems || [];
 
-            const itemsText = sale.items || "";
-            const parts = itemsText.split(',');
-            parts.forEach((part: string) => {
-              const match = part.match(/(.+?)\s+x\s+(\d+)/);
-              if (match) {
-                const rawName = match[1].trim();
-                const name = rawName.split('(')[0].trim();
-                const qty = parseInt(match[2], 10) || 0;
-                
-                const prod = products.find(p => p.name.trim() === name || p.name.replace(/\s/g, '') === name.replace(/\s/g, ''));
-                if (prod) {
-                  soldCountMap[prod.id] = (soldCountMap[prod.id] || 0) + qty;
-                }
-              }
-            });
-          });
+        // 1. 오늘 매출 합계 계산 (Sales 시트 기반)
+        const todaySales = salesList.filter((s: any) => {
+          try {
+            const normalized = s.paymentDateTime.replace(/\./g, '/');
+            const d = new Date(normalized);
+            const today = new Date();
+            return d.getFullYear() === today.getFullYear() &&
+                   d.getMonth() === today.getMonth() &&
+                   d.getDate() === today.getDate();
+          } catch(e) {
+            return false;
+          }
+        });
 
-          const openingQtyTotal = Object.values(openingQtys).reduce((a, b) => a + b, 0);
-          let soldQtyTotal = 0;
-          const itemsReport: any[] = [];
+        let totalSales = 0;
+        let cashSales = 0;
+        let cardSales = 0;
+        let transactionCount = todaySales.length;
 
-          products.forEach(p => {
-            const op = openingQtys[p.id] || 0;
-            const sold = soldCountMap[p.id] || 0;
-            const rem = op - sold;
-            soldQtyTotal += sold;
+        todaySales.forEach((sale: any) => {
+          totalSales += Number(sale.totalAmount) || 0;
+          if (sale.paymentMethod === '계좌이체') {
+            cashSales += Number(sale.totalAmount) || 0;
+          } else if (sale.paymentMethod === '신용카드') {
+            cardSales += Number(sale.totalAmount) || 0;
+          }
+        });
 
-            itemsReport.push({
-              id: p.id,
-              name: p.name,
-              emoji: p.emoji,
-              opening: op,
-              sold: sold,
-              remaining: rem
-            });
-          });
+        // 2. 오늘 품목별 판매수량 합산 (OrderItems 시트 기반)
+        const todayOrderItems = orderItemsList.filter((item: any) => {
+          return item.date === todayStr;
+        });
 
-          const remainingQtyTotal = openingQtyTotal - soldQtyTotal;
+        const soldCountMap: { [productName: string]: number } = {};
+        todayOrderItems.forEach((item: any) => {
+          const name = item.productName || "";
+          soldCountMap[name] = (soldCountMap[name] || 0) + (Number(item.quantity) || 0);
+        });
 
-          setClosingReport({
-            openingQty: openingQtyTotal,
-            soldQty: soldQtyTotal,
-            remainingQty: remainingQtyTotal,
-            totalSales,
-            cashSales,
-            cardSales,
-            transactionCount,
-            items: itemsReport
-          });
-          setIsBusinessCloseModalOpen(true);
-        } else {
-          alert('오늘 매출 내역 로드 실패');
-        }
-      })
-      .catch(err => {
-        console.error('영업 마감 조회 에러:', err);
-        alert('네트워크 연결이 지연되고 있습니다.');
-      });
+        // 3. 결산 최종 산출용 soldMap 저장 (ID 기준 매칭)
+        const soldMapById: { [productId: string]: number } = {};
+        products.forEach(p => {
+          const soldQty = soldCountMap[p.name] ?? soldCountMap[p.name.trim()] ?? 0;
+          soldMapById[p.id] = soldQty;
+        });
+
+        const openingQtyTotal = Object.values(openingQtys).reduce((a, b) => a + b, 0);
+        const soldQtyTotal = Object.values(soldMapById).reduce((a, b) => a + b, 0);
+        const remainingQtyTotal = openingQtyTotal - soldQtyTotal;
+
+        setClosingReport({
+          openingQty: openingQtyTotal,
+          soldQty: soldQtyTotal,
+          remainingQty: remainingQtyTotal,
+          totalSales,
+          cashSales,
+          cardSales,
+          transactionCount,
+          soldMap: soldMapById
+        });
+
+        setIsBusinessCloseModalOpen(true);
+      } else {
+        alert('마감 정산 데이터 로드 실패');
+      }
+    })
+    .catch(err => {
+      console.error('영업 마감 조회 에러:', err);
+      alert('네트워크 연결이 지연되고 있습니다.');
+    });
   };
 
   // 영업 마감 전송 함수
@@ -344,16 +352,33 @@ const App: React.FC = () => {
     const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
     if (!webappUrl || !closingReport) return;
 
+    const totalWaste = Object.values(wasteQtys).reduce((a, b) => a + b, 0);
+    const finalRemaining = closingReport.openingQty - closingReport.soldQty - totalWaste;
+
     const payload = {
       action: 'dailyClosing',
       cashierName: currentCashier?.name || '관리자',
       openingQty: closingReport.openingQty,
       soldQty: closingReport.soldQty,
-      remainingQty: closingReport.remainingQty,
+      wasteQty: totalWaste,
+      remainingQty: finalRemaining,
       totalSales: closingReport.totalSales,
       cashSales: closingReport.cashSales,
       cardSales: closingReport.cardSales,
-      transactionCount: closingReport.transactionCount
+      transactionCount: closingReport.transactionCount,
+      itemsList: products.map(p => {
+        const op = openingQtys[p.id] || 0;
+        const sold = closingReport.soldMap[p.id] || 0;
+        const waste = wasteQtys[p.id] || 0;
+        const rem = Math.max(0, op - sold - waste);
+        return {
+          name: p.name,
+          opening: op,
+          sold: sold,
+          waste: waste,
+          remaining: rem
+        };
+      })
     };
 
     fetch(webappUrl, {
@@ -584,7 +609,15 @@ const App: React.FC = () => {
         totalQuantity: plainReceipt.totalQuantity,
         receivedAmount: plainReceipt.receivedAmount,
         change: plainReceipt.change,
-        cashierName: currentCashier ? currentCashier.name : '시스템'
+        cashierName: currentCashier ? currentCashier.name : '시스템',
+        purchasedItems: receipt.items.map((item: any) => {
+          const itemDiscount = item.discount && item.discountQty ? item.discount * item.discountQty : 0;
+          return {
+            name: item.product.name,
+            quantity: item.quantity,
+            amount: Math.max(0, (item.product.price * item.quantity) - itemDiscount)
+          };
+        })
       };
 
       fetch(webappUrl, {
@@ -974,24 +1007,64 @@ const App: React.FC = () => {
                 <div style={{ fontSize: '15px', fontWeight: '700' }}>{closingReport.soldQty}개</div>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px 12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>최종 남은 수량</div>
-                <div style={{ fontSize: '15px', fontWeight: '700', color: '#34d399' }}>{closingReport.remainingQty}개</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>최종 남은 실재고</div>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: '#34d399' }}>
+                  {closingReport.openingQty - closingReport.soldQty - Object.values(wasteQtys).reduce((a, b) => a + b, 0)}개
+                </div>
               </div>
             </div>
 
-            {/* 품목별 수량 비교 리스트 */}
-            <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-primary)' }}>품목별 결산 요약</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px', maxHeight: '250px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px' }}>
-              {closingReport.items.map((item: any) => (
-                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 12px', borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
-                  <span style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>{item.emoji}</span> {item.name}
-                  </span>
-                  <span style={{ fontSize: '12.5px', fontWeight: '600' }}>
-                    개시: {item.opening} | 판매: {item.sold} | <span style={{ color: '#34d399' }}>남은재고: {item.remaining}</span>
-                  </span>
-                </div>
-              ))}
+            {/* 품목별 수량 비교 및 폐기 입력 리스트 */}
+            <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-primary)' }}>품목별 결산 요약 및 폐기 입력</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px', maxHeight: '280px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px' }}>
+              {products.map((p) => {
+                const op = openingQtys[p.id] || 0;
+                const sold = closingReport.soldMap[p.id] || 0;
+                const waste = wasteQtys[p.id] || 0;
+                const rem = Math.max(0, op - sold - waste);
+                return (
+                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.02)', background: 'rgba(255,255,255,0.01)', borderRadius: '4px', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600' }}>
+                      <span>{p.emoji}</span> {p.name}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        개시: {op} | 판매: {sold}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '12px', color: '#fca5a5' }}>폐기:</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max={op - sold}
+                          value={waste}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            setWasteQtys(prev => ({
+                              ...prev,
+                              [p.id]: isNaN(val) || val < 0 ? 0 : val
+                            }));
+                          }}
+                          style={{
+                            width: '50px',
+                            padding: '4px 6px',
+                            textAlign: 'right',
+                            borderRadius: '4px',
+                            border: '1px solid var(--border-color)',
+                            background: 'rgba(255,255,255,0.05)',
+                            color: '#fff',
+                            fontWeight: '700',
+                            fontSize: '12px'
+                          }}
+                        />
+                      </div>
+                      <span style={{ fontSize: '12.5px', fontWeight: '800', color: '#34d399', width: '80px', textAlign: 'right' }}>
+                        실재고: {rem}개
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             <p style={{ fontSize: '12px', color: '#f87171', textAlign: 'center', marginBottom: '16px' }}>

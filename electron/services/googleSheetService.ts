@@ -105,7 +105,15 @@ export const googleSheetService = {
       totalQuantity: receipt.totalQuantity || totalQty,
       receivedAmount: receipt.receivedAmount,
       change: receipt.change,
-      cashierName: receipt.cashierName || '시스템'
+      cashierName: receipt.cashierName || '시스템',
+      purchasedItems: receipt.items.map((item: any) => {
+        const itemDiscount = item.discount && item.discountQty ? item.discount * item.discountQty : 0;
+        return {
+          name: item.product.name,
+          quantity: item.quantity,
+          amount: Math.max(0, (item.product.price * item.quantity) - itemDiscount)
+        };
+      })
     };
 
     console.log('[LOG 7] 구글 시트 전송 시작\n');
