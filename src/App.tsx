@@ -253,6 +253,14 @@ const App: React.FC = () => {
     }
   }, [currentCashier?.role, businessState, hasCloseToday, isBusinessOpenModalOpen, hasManuallyClosedOpenModal]);
 
+  // 다른 POS 기기 등에서 이미 영업 개시(OPENED)가 완료되면, 작성 중이던 모달을 자동으로 닫고 수동 제어 플래그를 리셋합니다.
+  useEffect(() => {
+    if (businessState === 'OPENED') {
+      setIsBusinessOpenModalOpen(false);
+      setHasManuallyClosedOpenModal(false);
+    }
+  }, [businessState]);
+
   const loadProducts = () => {
     const categoryMap: { [key: string]: string } = {
       '베이커리': 'bakery',
