@@ -26,6 +26,7 @@ const App: React.FC = () => {
   const [businessState, setBusinessState] = useState<BusinessState>('CLOSED');
   const [hasCloseToday, setHasCloseToday] = useState<boolean>(false);
   const [isBusinessOpenModalOpen, setIsBusinessOpenModalOpen] = useState<boolean>(false);
+  const [hasManuallyClosedOpenModal, setHasManuallyClosedOpenModal] = useState<boolean>(false);
   const [isBusinessCloseModalOpen, setIsBusinessCloseModalOpen] = useState<boolean>(false);
   const [openingQtys, setOpeningQtys] = useState<{ [productId: string]: number }>({});
   const [wasteQtys, setWasteQtys] = useState<{ [productId: string]: number }>({});
@@ -238,12 +239,19 @@ const App: React.FC = () => {
     }
   }, [products]);
 
-  // CLOSED 상태이고 관리자인 경우 자동으로 영업 개시 모달을 띄우는 동기화 UX 추가 (단, 오늘 마감한 적이 없을 때만 자동 기동)
+  // CLOSED 상태이고 관리자인 경우 자동으로 영업 개시 모달을 띄우는 동기화 UX 추가 (단, 오늘 마감한 적이 없고 수동으로 닫지 않았을 때만 최초 기동)
   useEffect(() => {
-    if (currentCashier && currentCashier.role === '관리자' && businessState === 'CLOSED' && !hasCloseToday) {
+    if (
+      currentCashier && 
+      currentCashier.role === '관리자' && 
+      businessState === 'CLOSED' && 
+      !hasCloseToday && 
+      !isBusinessOpenModalOpen && 
+      !hasManuallyClosedOpenModal
+    ) {
       setIsBusinessOpenModalOpen(true);
     }
-  }, [currentCashier, businessState, hasCloseToday]);
+  }, [currentCashier?.role, businessState, hasCloseToday, isBusinessOpenModalOpen, hasManuallyClosedOpenModal]);
 
   const loadProducts = () => {
     const categoryMap: { [key: string]: string } = {
@@ -891,7 +899,10 @@ const App: React.FC = () => {
               {businessState === 'CLOSED' && (
                 <button
                   type="button"
-                  onClick={() => setIsBusinessOpenModalOpen(true)}
+                  onClick={() => {
+                    setHasManuallyClosedOpenModal(false);
+                    setIsBusinessOpenModalOpen(true);
+                  }}
                   style={{
                     background: 'rgba(56, 189, 248, 0.15)',
                     border: '1px solid rgba(56, 189, 248, 0.25)',
@@ -1155,7 +1166,10 @@ const App: React.FC = () => {
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={() => setIsBusinessOpenModalOpen(false)}
+                onClick={() => {
+                  setIsBusinessOpenModalOpen(false);
+                  setHasManuallyClosedOpenModal(true);
+                }}
                 style={{ flex: 1 }}
               >
                 취소
