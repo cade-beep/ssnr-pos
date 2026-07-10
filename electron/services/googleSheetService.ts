@@ -109,8 +109,10 @@ export const googleSheetService = {
       purchasedItems: receipt.items.map((item: any) => {
         const itemDiscount = item.discount && item.discountQty ? item.discount * item.discountQty : 0;
         return {
+          id: item.product.id,
           name: item.product.name,
           quantity: item.quantity,
+          unitPrice: item.product.price,
           amount: Math.max(0, (item.product.price * item.quantity) - itemDiscount)
         };
       })

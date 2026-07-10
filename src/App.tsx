@@ -4,6 +4,7 @@ import POSGrid from './components/POSGrid';
 import Cart from './components/Cart';
 import ReceiptModal from './components/ReceiptModal';
 import LoginOverlay from './components/LoginOverlay';
+import QuantityInput from './components/QuantityInput';
 import { ShoppingBag, Clock, FileSpreadsheet, RefreshCw, TrendingUp, Coins, Award } from 'lucide-react';
 import { supabase } from './supabase';
 
@@ -42,10 +43,17 @@ const App: React.FC = () => {
       .catch(err => console.error("영업 상태 조회 실패:", err));
   };
 
-  const loadYesterdayOpeningQuantities = () => {
+  /**
+   * 영업 개시 수량 로드.
+   * GAS ?action=getOpeningQty 는 다음 우선순위로 반환합니다:
+   *   1순위: 오늘 날짜의 OpeningQty 시트 데이터 (이미 개시된 경우)
+   *   2순위: 직전 영업일의 OpeningQty 시트 데이터 (기본값으로 사용)
+   * 응답 형태: { success: true, quantities: { '소보로빵': 20, '단팥빵': 15 } }
+   */
+  const loadOpeningQuantities = () => {
     const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
     if (!webappUrl) return;
-    fetch(`${webappUrl}?action=getOpeningQuantities`)
+    fetch(`${webappUrl}?action=getOpeningQty`)
       .then(res => res.json())
       .then(data => {
         if (data && data.success && data.quantities) {
@@ -57,7 +65,7 @@ const App: React.FC = () => {
           setOpeningQtys(initial);
         }
       })
-      .catch(err => console.error("전날 개시 수량 로드 실패:", err));
+      .catch(err => console.error("개시 수량 로드 실패:", err));
   };
 
   useEffect(() => {
@@ -118,7 +126,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (products.length > 0) {
-      loadYesterdayOpeningQuantities();
+      loadOpeningQuantities();
     }
   }, [products]);
 
@@ -210,6 +218,8 @@ const App: React.FC = () => {
   };
 
   // 영업 개시 처리 함수
+  // GAS doPost(action='businessOpen') 에서 quantitiesList 를 OpeningQty 시트에
+  // 날짜|상품명|수량 형태로 1행/상품 저장합니다.
   const handleBusinessOpen = () => {
     const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
     if (!webappUrl) return;
@@ -219,7 +229,7 @@ const App: React.FC = () => {
       cashierName: currentCashier?.name || '관리자',
       quantitiesList: products.map(p => ({
         name: p.name,
-        quantity: openingQtys[p.id] || 0
+        quantity: openingQtys[p.id] ?? 0
       }))
     };
 
@@ -613,8 +623,10 @@ const App: React.FC = () => {
         purchasedItems: receipt.items.map((item: any) => {
           const itemDiscount = item.discount && item.discountQty ? item.discount * item.discountQty : 0;
           return {
+            id: item.product.id,
             name: item.product.name,
             quantity: item.quantity,
+            unitPrice: item.product.price,
             amount: Math.max(0, (item.product.price * item.quantity) - itemDiscount)
           };
         })
@@ -924,27 +936,18 @@ const App: React.FC = () => {
                     <span>{p.emoji}</span> {p.name}
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input
-                      type="number"
-                      min="0"
+                    <QuantityInput
                       value={openingQtys[p.id] ?? 0}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value, 10);
-                        setOpeningQtys(prev => ({
-                          ...prev,
-                          [p.id]: isNaN(val) || val < 0 ? 0 : val
-                        }));
-                      }}
-                      style={{
-                        width: '70px',
-                        padding: '6px 10px',
-                        textAlign: 'right',
-                        borderRadius: '4px',
-                        border: '1px solid var(--border-color)',
-                        background: 'rgba(255,255,255,0.05)',
-                        color: '#fff',
-                        fontWeight: '700'
-                      }}
+                      min={0}
+                      onIncrease={() =>
+                        setOpeningQtys(prev => ({ ...prev, [p.id]: (prev[p.id] ?? 0) + 1 }))
+                      }
+                      onDecrease={() =>
+                        setOpeningQtys(prev => ({ ...prev, [p.id]: Math.max(0, (prev[p.id] ?? 0) - 1) }))
+                      }
+                      onChange={(val) =>
+                        setOpeningQtys(prev => ({ ...prev, [p.id]: val }))
+                      }
                     />
                     <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>개</span>
                   </div>
