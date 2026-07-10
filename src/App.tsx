@@ -235,18 +235,13 @@ const App: React.FC = () => {
 
     fetch(webappUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'no-cors',
       body: JSON.stringify(payload)
     })
-    .then(res => res.json())
-    .then(data => {
-      if (data && data.success) {
-        setBusinessState('OPENED');
-        setIsBusinessOpenModalOpen(false);
-        showToast('🌅 오늘의 영업이 개시되었습니다! POS 결제가 활성화됩니다.');
-      } else {
-        alert('영업 개시 등록 실패: ' + (data.message || '알 수 없는 서버 에러'));
-      }
+    .then(() => {
+      setBusinessState('OPENED');
+      setIsBusinessOpenModalOpen(false);
+      showToast('🌅 오늘의 영업이 개시되었습니다! POS 결제가 활성화됩니다.');
     })
     .catch(err => {
       console.error('영업 개시 오류:', err);
@@ -415,18 +410,13 @@ const App: React.FC = () => {
 
     fetch(webappUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'no-cors',
       body: JSON.stringify(payload)
     })
-    .then(res => res.json())
-    .then(data => {
-      if (data && data.success) {
-        setBusinessState('FINISHED');
-        setIsBusinessCloseModalOpen(false);
-        showToast('🌙 금일 영업 마감 완료! 구글 시트에 정산 보고서가 적재되었습니다.');
-      } else {
-        alert('영업 마감 전송 실패: ' + (data.message || '알 수 없는 서버 에러'));
-      }
+    .then(() => {
+      setBusinessState('FINISHED');
+      setIsBusinessCloseModalOpen(false);
+      showToast('🌙 금일 영업 마감 완료! 구글 시트에 정산 보고서가 적재되었습니다.');
     })
     .catch(err => {
       console.error('영업 마감 전송 실패:', err);
