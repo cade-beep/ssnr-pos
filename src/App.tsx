@@ -130,6 +130,13 @@ const App: React.FC = () => {
     }
   }, [products]);
 
+  // CLOSED 상태이고 관리자인 경우 자동으로 영업 개시 모달을 띄우는 동기화 UX 추가
+  useEffect(() => {
+    if (currentCashier && currentCashier.role === '관리자' && businessState === 'CLOSED') {
+      setIsBusinessOpenModalOpen(true);
+    }
+  }, [currentCashier, businessState]);
+
   const loadProducts = () => {
     const categoryMap: { [key: string]: string } = {
       '베이커리': 'bakery',
@@ -218,8 +225,8 @@ const App: React.FC = () => {
   };
 
   // 영업 개시 처리 함수
-  // GAS doPost(action='businessOpen') 에서 quantitiesList 를 OpeningQty 시트에
-  // 날짜|상품명|수량 형태로 1행/상품 저장합니다.
+  // GAS doPost(action='businessOpen') 에서 quantitiesList 를 Sales 시트에
+  // BUSINESS-OPEN 레코드로 1행 저장합니다. (중복 방지 처리 포함)
   const handleBusinessOpen = () => {
     const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
     if (!webappUrl) return;
@@ -233,15 +240,26 @@ const App: React.FC = () => {
       }))
     };
 
+    // OPTIONS preflight를 회피하는 단순 POST fetch (Content-Type 제거)
     fetch(webappUrl, {
       method: 'POST',
-      mode: 'no-cors',
       body: JSON.stringify(payload)
     })
-    .then(() => {
-      setBusinessState('OPENED');
-      setIsBusinessOpenModalOpen(false);
-      showToast('🌅 오늘의 영업이 개시되었습니다! POS 결제가 활성화됩니다.');
+    .then(res => res.json())
+    .then(data => {
+      if (data && data.success) {
+        if (data.alreadyOpened) {
+          alert("오늘 영업은 이미 개시되었습니다.\n현재 재고를 불러옵니다.");
+        } else {
+          showToast('🌅 오늘의 영업이 개시되었습니다! POS 결제가 활성화됩니다.');
+        }
+        setBusinessState('OPENED');
+        setIsBusinessOpenModalOpen(false);
+        // 즉시 동기화된 개시 수량을 스프레드시트로부터 로드
+        loadOpeningQuantities();
+      } else {
+        alert('영업 개시 등록 실패: ' + (data.message || '알 수 없는 서버 에러'));
+      }
     })
     .catch(err => {
       console.error('영업 개시 오류:', err);
@@ -408,15 +426,20 @@ const App: React.FC = () => {
       })
     };
 
+    // OPTIONS preflight를 회피하는 단순 POST fetch (Content-Type 제거)
     fetch(webappUrl, {
       method: 'POST',
-      mode: 'no-cors',
       body: JSON.stringify(payload)
     })
-    .then(() => {
-      setBusinessState('FINISHED');
-      setIsBusinessCloseModalOpen(false);
-      showToast('🌙 금일 영업 마감 완료! 구글 시트에 정산 보고서가 적재되었습니다.');
+    .then(res => res.json())
+    .then(data => {
+      if (data && data.success) {
+        setBusinessState('FINISHED');
+        setIsBusinessCloseModalOpen(false);
+        showToast('🌙 금일 영업 마감 완료! 구글 시트에 정산 보고서가 적재되었습니다.');
+      } else {
+        alert('영업 마감 전송 실패: ' + (data.message || '알 수 없는 서버 에러'));
+      }
     })
     .catch(err => {
       console.error('영업 마감 전송 실패:', err);
