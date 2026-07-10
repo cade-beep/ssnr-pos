@@ -3,6 +3,7 @@ import { Product } from '../types';
 
 interface POSGridProps {
   products: Product[];
+  stocks: { [productId: string]: number };
   onProductClick: (product: Product) => void;
 }
 
@@ -15,7 +16,7 @@ const CATEGORIES: { value: CategoryFilter; label: string; emoji: string }[] = [
   { value: 'etc', label: '기타', emoji: '🏷️' },
 ];
 
-const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick }) => {
+const POSGrid: React.FC<POSGridProps> = ({ products, stocks, onProductClick }) => {
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('bakery');
 
   const filteredProducts = products.filter(p => {
@@ -58,20 +59,43 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick }) => {
       {/* Products Grid */}
       <div className="products-grid-container">
         <div className="products-grid">
-          {filteredProducts.map((product) => (
-            <button
-              key={product.id}
-              className="product-card"
-              onClick={() => onProductClick(product)}
-              style={{ '--accent-color': product.color } as React.CSSProperties}
-            >
-              <div className="product-emoji">{product.emoji}</div>
-              <div className="product-info">
-                <div className="product-name">{product.name}</div>
-                <div className="product-price">{product.price.toLocaleString()}원</div>
-              </div>
-            </button>
-          ))}
+          {filteredProducts.map((product) => {
+            const stock = stocks[product.id] ?? 0;
+            const isOutOfStock = stock <= 0;
+            const isLowStock = stock <= 5;
+            
+            let stockColor = 'var(--text-secondary)';
+            if (isOutOfStock) {
+              stockColor = '#ef4444'; // Red
+            } else if (isLowStock) {
+              stockColor = '#f59e0b'; // Orange
+            }
+
+            return (
+              <button
+                key={product.id}
+                className="product-card"
+                onClick={() => !isOutOfStock && onProductClick(product)}
+                disabled={isOutOfStock}
+                style={{ 
+                  '--accent-color': product.color,
+                  opacity: isOutOfStock ? 0.5 : 1,
+                  cursor: isOutOfStock ? 'not-allowed' : 'pointer'
+                } as React.CSSProperties}
+              >
+                <div className="product-emoji">{product.emoji}</div>
+                <div className="product-info">
+                  <div className="product-name">{product.name}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                    <div className="product-price">{product.price.toLocaleString()}원</div>
+                    <div style={{ fontSize: '11px', fontWeight: 'bold', color: stockColor, whiteSpace: 'nowrap' }}>
+                      재고 {stock}개
+                    </div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

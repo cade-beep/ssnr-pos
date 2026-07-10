@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Product, CartItem, PaymentMethod, Receipt, CashierUser, BusinessState } from './types';
 import POSGrid from './components/POSGrid';
 import Cart from './components/Cart';
@@ -24,11 +24,13 @@ const App: React.FC = () => {
 
   // Business Open / Close States
   const [businessState, setBusinessState] = useState<BusinessState>('CLOSED');
+  const [hasCloseToday, setHasCloseToday] = useState<boolean>(false);
   const [isBusinessOpenModalOpen, setIsBusinessOpenModalOpen] = useState<boolean>(false);
   const [isBusinessCloseModalOpen, setIsBusinessCloseModalOpen] = useState<boolean>(false);
   const [openingQtys, setOpeningQtys] = useState<{ [productId: string]: number }>({});
   const [wasteQtys, setWasteQtys] = useState<{ [productId: string]: number }>({});
   const [closingReport, setClosingReport] = useState<any | null>(null);
+  const [sheetsSales, setSheetsSales] = useState<any[]>([]);
 
   const loadBusinessState = () => {
     const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
@@ -38,6 +40,7 @@ const App: React.FC = () => {
       .then(data => {
         if (data && data.success && data.state) {
           setBusinessState(data.state);
+          setHasCloseToday(!!data.hasCloseToday);
         }
       })
       .catch(err => console.error("영업 상태 조회 실패:", err));
@@ -67,6 +70,109 @@ const App: React.FC = () => {
       })
       .catch(err => console.error("개시 수량 로드 실패:", err));
   };
+
+  // 5초 간격 실시간 다중 POS 상태/재고 동기화 폴러 (CORS OPTIONS preflight 우회)
+  useEffect(() => {
+    const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
+    if (!webappUrl) return;
+
+    const poll = () => {
+      // 1. 영업 상태 및 개시/마감 이력 동기화
+      fetch(`${webappUrl}?action=getBusinessState`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.success && data.state) {
+            setBusinessState(data.state);
+            setHasCloseToday(!!data.hasCloseToday);
+          }
+        })
+        .catch(err => console.error("영업 상태 폴링 에러:", err));
+
+      // 2. 개시 수량 동기화
+      fetch(`${webappUrl}?action=getOpeningQty`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.success && data.quantities) {
+            const initial: { [key: string]: number } = {};
+            products.forEach(p => {
+              const matchedQty = data.quantities[p.name] ?? data.quantities[p.name.trim()] ?? 0;
+              initial[p.id] = matchedQty;
+            });
+            setOpeningQtys(initial);
+          }
+        })
+        .catch(err => console.error("개시 수량 폴링 에러:", err));
+
+      // 3. 실시간 재고 차감 집계를 위한 누적 매출 동기화
+      fetch(`${webappUrl}?action=sales`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.success && data.sales) {
+            setSheetsSales(data.sales);
+          }
+        })
+        .catch(err => console.error("실시간 매출 폴링 에러:", err));
+    };
+
+    // 최초 기동 실행
+    poll();
+
+    const intervalId = setInterval(poll, 5000);
+    return () => clearInterval(intervalId);
+  }, [products]);
+
+  // 실시간 현재 재고 자동 산출 (Today's Stock = OpeningQty - Today's Sales Quantity)
+  const stocks = useMemo(() => {
+    const computed: { [productId: string]: number } = {};
+
+    // 오늘 결제 건만 필터링 (영업 개시/마감은 제외)
+    const todaySales = sheetsSales.filter((s: any) => {
+      try {
+        if (s.paymentMethod === 'Business Open' || s.paymentMethod === 'Business Close') {
+          return false;
+        }
+        const normalized = s.paymentDateTime.replace(/\./g, '/');
+        const d = new Date(normalized);
+        const today = new Date();
+        return d.getFullYear() === today.getFullYear() &&
+               d.getMonth() === today.getMonth() &&
+               d.getDate() === today.getDate();
+      } catch(e) {
+        return false;
+      }
+    });
+
+    // 오늘 품목별 누적 판매수량 계산
+    const soldCountMap: { [productName: string]: number } = {};
+    products.forEach(p => {
+      soldCountMap[p.name] = 0;
+    });
+
+    todaySales.forEach((sale: any) => {
+      if (sale.items) {
+        const itemsArr = sale.items.split(', ');
+        itemsArr.forEach((itemStr: string) => {
+          const parts = itemStr.split(' x ');
+          const name = parts[0];
+          const cleanName = name.split(' (')[0].trim();
+          const qtyPart = parts[1] ? parts[1].split(' ')[0] : '1';
+          const qty = Number(qtyPart) || 1;
+          if (cleanName && !cleanName.includes('[할인적용')) {
+            soldCountMap[cleanName] = (soldCountMap[cleanName] || 0) + qty;
+          }
+        });
+      }
+    });
+
+    // 재고 산출
+    products.forEach(p => {
+      const op = openingQtys[p.id] || 0;
+      const sold = soldCountMap[p.name] ?? soldCountMap[p.name.trim()] ?? 0;
+      computed[p.id] = Math.max(0, op - sold);
+    });
+
+    return computed;
+  }, [products, openingQtys, sheetsSales]);
 
   useEffect(() => {
     // 앱 구동 시 현재 로그인된 세션이 이미 존재하면 로드
@@ -130,12 +236,12 @@ const App: React.FC = () => {
     }
   }, [products]);
 
-  // CLOSED 상태이고 관리자인 경우 자동으로 영업 개시 모달을 띄우는 동기화 UX 추가
+  // CLOSED 상태이고 관리자인 경우 자동으로 영업 개시 모달을 띄우는 동기화 UX 추가 (단, 오늘 마감한 적이 없을 때만 자동 기동)
   useEffect(() => {
-    if (currentCashier && currentCashier.role === '관리자' && businessState === 'CLOSED') {
+    if (currentCashier && currentCashier.role === '관리자' && businessState === 'CLOSED' && !hasCloseToday) {
       setIsBusinessOpenModalOpen(true);
     }
-  }, [currentCashier, businessState]);
+  }, [currentCashier, businessState, hasCloseToday]);
 
   const loadProducts = () => {
     const categoryMap: { [key: string]: string } = {
@@ -394,6 +500,10 @@ const App: React.FC = () => {
 
   // 영업 마감 전송 함수
   const handleBusinessCloseSubmit = () => {
+    if (!window.confirm("정말 영업을 마감하시겠습니까?")) {
+      return;
+    }
+
     const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
     if (!webappUrl || !closingReport) return;
 
@@ -453,6 +563,16 @@ const App: React.FC = () => {
       showToast(businessState === 'CLOSED' ? '🌅 영업 개시를 먼저 진행해 주십시오.' : '🌙 오늘 영업이 마감되었습니다.');
       return;
     }
+
+    const currentStock = stocks[product.id] ?? 0;
+    const cartItem = cart.find(item => item.product.id === product.id);
+    const currentCartQty = cartItem ? cartItem.quantity : 0;
+
+    if (currentStock <= 0 || currentCartQty >= currentStock) {
+      showToast(`⚠️ ${product.name}의 재고가 부족합니다. (남은 재고: ${currentStock}개)`);
+      return;
+    }
+
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.product.id === product.id);
       if (existing) {
@@ -469,6 +589,15 @@ const App: React.FC = () => {
 
   // Increase qty
   const handleIncreaseQty = (productId: string) => {
+    const currentStock = stocks[productId] ?? 0;
+    const cartItem = cart.find(item => item.product.id === productId);
+    if (!cartItem) return;
+
+    if (cartItem.quantity >= currentStock) {
+      showToast(`⚠️ 재고가 부족하여 수량을 늘릴 수 없습니다. (남은 재고: ${currentStock}개)`);
+      return;
+    }
+
     setCart((prevCart) =>
       prevCart.map((item) =>
         item.product.id === productId
@@ -881,7 +1010,38 @@ const App: React.FC = () => {
       {/* Main POS Dashboard Grid */}
       <div className="pos-dashboard">
         <div className="pos-main-panel">
-          {products.length === 0 ? (
+          {businessState !== 'OPENED' ? (
+            <div style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--text-secondary)',
+              gap: '16px',
+              textAlign: 'center',
+              padding: '40px',
+              background: 'rgba(255, 255, 255, 0.01)',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px dashed var(--border-color)',
+              height: '80%'
+            }}>
+              <ShoppingBag size={48} style={{ opacity: 0.3, color: '#f87171' }} />
+              <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                {hasCloseToday ? '오늘 영업이 마감되었습니다.' : '영업 개시 대기 중'}
+              </div>
+              <div style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '400px', lineHeight: '1.6' }}>
+                {currentCashier.role === '관리자' 
+                  ? (hasCloseToday 
+                      ? '오늘의 영업 마감 처리가 완료되었습니다. 다시 영업을 기동하시려면 상단의 [영업 개시] 버튼을 눌러 개시 재고를 입력해 주십시오.' 
+                      : '영업 준비 중입니다. 상단의 🌅 영업 개시 버튼을 클릭해 개시 재고를 기입하고 기동해 주세요.')
+                  : (hasCloseToday
+                      ? '오늘의 영업 마감 처리가 완료되어 POS 결제가 비활성화되었습니다. 이용해 주셔서 감사합니다.'
+                      : '관리자가 영업 개시를 완료할 때까지 기다려 주세요.')
+                }
+              </div>
+            </div>
+          ) : products.length === 0 ? (
             <div style={{
               flex: 1,
               display: 'flex',
@@ -895,7 +1055,7 @@ const App: React.FC = () => {
               <div>상품 정보를 불러오는 중이거나 목록이 비어있습니다.</div>
             </div>
           ) : (
-            <POSGrid products={products} onProductClick={handleAddToCart} />
+            <POSGrid products={products} stocks={stocks} onProductClick={handleAddToCart} />
           )}
         </div>
         
