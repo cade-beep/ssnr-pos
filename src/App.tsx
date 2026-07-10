@@ -582,15 +582,6 @@ const App: React.FC = () => {
       return;
     }
 
-    const currentStock = stocks[product.id] ?? 0;
-    const cartItem = cart.find(item => item.product.id === product.id);
-    const currentCartQty = cartItem ? cartItem.quantity : 0;
-
-    if (currentStock <= 0 || currentCartQty >= currentStock) {
-      showToast(`⚠️ ${product.name}의 재고가 부족합니다. (남은 재고: ${currentStock}개)`);
-      return;
-    }
-
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.product.id === product.id);
       if (existing) {
@@ -607,15 +598,6 @@ const App: React.FC = () => {
 
   // Increase qty
   const handleIncreaseQty = (productId: string) => {
-    const currentStock = stocks[productId] ?? 0;
-    const cartItem = cart.find(item => item.product.id === productId);
-    if (!cartItem) return;
-
-    if (cartItem.quantity >= currentStock) {
-      showToast(`⚠️ 재고가 부족하여 수량을 늘릴 수 없습니다. (남은 재고: ${currentStock}개)`);
-      return;
-    }
-
     setCart((prevCart) =>
       prevCart.map((item) =>
         item.product.id === productId

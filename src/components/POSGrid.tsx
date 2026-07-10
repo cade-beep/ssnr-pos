@@ -75,12 +75,9 @@ const POSGrid: React.FC<POSGridProps> = ({ products, stocks, onProductClick }) =
               <button
                 key={product.id}
                 className="product-card"
-                onClick={() => !isOutOfStock && onProductClick(product)}
-                disabled={isOutOfStock}
+                onClick={() => onProductClick(product)}
                 style={{ 
-                  '--accent-color': product.color,
-                  opacity: isOutOfStock ? 0.5 : 1,
-                  cursor: isOutOfStock ? 'not-allowed' : 'pointer'
+                  '--accent-color': product.color
                 } as React.CSSProperties}
               >
                 <div className="product-emoji">{product.emoji}</div>
