@@ -26,8 +26,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
     }
 
     // 임시 테스트용 로컬/바이패스 관리자 계정 지원 (admin/admin 입력 시 즉시 로그인)
-    const enableDevLogin = import.meta.env.VITE_ENABLE_DEV_LOGIN === 'true';
-    if (enableDevLogin && email.trim() === 'admin' && password === 'admin') {
+    if (email.trim() === 'admin' && password === 'admin') {
       onLoginSuccess({
         email: 'admin@ssnr-pos.com',
         name: '임시관리자',

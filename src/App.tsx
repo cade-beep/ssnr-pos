@@ -196,7 +196,8 @@ const App: React.FC = () => {
           role: isAdmin ? '관리자' : '캐셔'
         });
       } else {
-        setCurrentCashier(null);
+        // 임시 테스트용 admin 계정이 켜져 있는 상태라면 강제 로그아웃 덮어쓰기 방지
+        setCurrentCashier(prev => (prev && prev.email === 'admin@ssnr-pos.com') ? prev : null);
       }
     });
 
@@ -221,7 +222,8 @@ const App: React.FC = () => {
           role: isAdmin ? '관리자' : '캐셔'
         });
       } else {
-        setCurrentCashier(null);
+        // 임시 테스트용 admin 계정이 켜져 있는 상태라면 강제 로그아웃 덮어쓰기 방지
+        setCurrentCashier(prev => (prev && prev.email === 'admin@ssnr-pos.com') ? prev : null);
       }
     });
 
