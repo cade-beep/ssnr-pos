@@ -254,13 +254,7 @@ const App: React.FC = () => {
     });
   };
 
-  const getTodayString = () => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  };
+
 
   // 영업 마감 결산 데이터 생성 함수
   const prepareBusinessClose = () => {
@@ -274,20 +268,18 @@ const App: React.FC = () => {
     });
     setWasteQtys(initialWastes);
 
-    const todayStr = getTodayString();
-
-    Promise.all([
-      fetch(`${webappUrl}?action=sales`).then(res => res.json()),
-      fetch(`${webappUrl}?action=orderItems`).then(res => res.json())
-    ])
-    .then(([salesData, orderItemsData]) => {
-      if (salesData.success && orderItemsData.success) {
+    fetch(`${webappUrl}?action=sales`)
+    .then(res => res.json())
+    .then(salesData => {
+      if (salesData.success) {
         const salesList = salesData.sales || [];
-        const orderItemsList = orderItemsData.orderItems || [];
 
-        // 1. 오늘 매출 합계 계산 (Sales 시트 기반)
+        // 1. 오늘 매출 합계 계산 (Sales 시트 기반, 영업 개시/마감은 제외)
         const todaySales = salesList.filter((s: any) => {
           try {
+            if (s.paymentMethod === 'Business Open' || s.paymentMethod === 'Business Close') {
+              return false;
+            }
             const normalized = s.paymentDateTime.replace(/\./g, '/');
             const d = new Date(normalized);
             const today = new Date();
@@ -313,16 +305,46 @@ const App: React.FC = () => {
           }
         });
 
-        // 2. 오늘 품목별 판매수량 합산 (OrderItems 시트 기반)
-        const todayOrderItems = orderItemsList.filter((item: any) => {
-          return item.date === todayStr;
+        // 2. 오늘 품목별 판매수량 합산
+        const soldCountMap: { [productName: string]: number } = {};
+        products.forEach(p => {
+          soldCountMap[p.name] = 0;
         });
 
-        const soldCountMap: { [productName: string]: number } = {};
-        todayOrderItems.forEach((item: any) => {
-          const name = item.productName || "";
-          soldCountMap[name] = (soldCountMap[name] || 0) + (Number(item.quantity) || 0);
-        });
+        if (receiptsHistory.length > 0) {
+          // 로컬 구조적 히스토리 사용 (문자열 파싱 없음)
+          receiptsHistory.forEach(receipt => {
+            const d = new Date(receipt.date);
+            const today = new Date();
+            const isToday = d.getFullYear() === today.getFullYear() &&
+                            d.getMonth() === today.getMonth() &&
+                            d.getDate() === today.getDate();
+            if (isToday) {
+              receipt.items.forEach(item => {
+                if (item.product.id !== 'DISCOUNT') {
+                  soldCountMap[item.product.name] = (soldCountMap[item.product.name] || 0) + item.quantity;
+                }
+              });
+            }
+          });
+        } else {
+          // 폴백: 오늘 자 sales의 items 문자열 파싱 (리프레시 시에만 실행)
+          todaySales.forEach((sale: any) => {
+            if (sale.items) {
+              const itemsArr = sale.items.split(', ');
+              itemsArr.forEach((itemStr: string) => {
+                const parts = itemStr.split(' x ');
+                const name = parts[0];
+                const cleanName = name.split(' (')[0].trim();
+                const qtyPart = parts[1] ? parts[1].split(' ')[0] : '1';
+                const qty = Number(qtyPart) || 1;
+                if (cleanName && !cleanName.includes('[할인적용')) {
+                  soldCountMap[cleanName] = (soldCountMap[cleanName] || 0) + qty;
+                }
+              });
+            }
+          });
+        }
 
         // 3. 결산 최종 산출용 soldMap 저장 (ID 기준 매칭)
         const soldMapById: { [productId: string]: number } = {};
