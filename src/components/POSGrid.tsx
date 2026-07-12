@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Product, CartItem } from '../types';
+import { Search, Menu } from 'lucide-react';
 
 interface POSGridProps {
   products: Product[];
@@ -7,19 +8,31 @@ interface POSGridProps {
   cart?: CartItem[];
 }
 
-type CategoryFilter = 'bakery' | 'cookies' | 'gift' | 'etc';
+type CategoryFilter = 'all' | 'bakery' | 'cookies' | 'gift' | 'etc';
 
 const CATEGORIES: { value: CategoryFilter; label: string }[] = [
-  { value: 'bakery', label: 'Bakery' },
-  { value: 'cookies', label: 'Cookies' },
-  { value: 'gift', label: 'Gift Sets' },
-  { value: 'etc', label: 'Others' },
+  { value: 'all', label: '전체' },
+  { value: 'bakery', label: '베이커리' },
+  { value: 'cookies', label: '쿠키/제과' },
+  { value: 'gift', label: '선물세트' },
+  { value: 'etc', label: '기타' },
 ];
 
 const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }) => {
-  const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('bakery');
+  const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const filteredProducts = products.filter(p => {
+    // Search Term Filter
+    if (searchTerm.trim() !== '') {
+      const term = searchTerm.toLowerCase();
+      if (!p.name.toLowerCase().includes(term)) {
+        return false;
+      }
+    }
+
+    // Category Filter
+    if (selectedCategory === 'all') return true;
     if (selectedCategory === 'bakery') {
       return p.category === 'bakery' && p.name.includes('빵');
     }
@@ -39,25 +52,42 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
     return cart.some(item => item.product.id === productId);
   };
 
-  const getCategoryLabel = (category: string, name: string) => {
-    if (category === 'bakery' && name.includes('빵')) return 'Bakery';
-    if (category === 'bakery' && !name.includes('빵')) return 'Cookie';
-    if (category === 'food') return 'Gift Set';
-    return 'Other';
-  };
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%', overflow: 'hidden' }}>
-      {/* Category Tabs */}
-      <div className="category-tabs">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%', overflow: 'hidden' }}>
+      
+      {/* Search Input and Category Button Row */}
+      <div className="search-row">
+        <div className="search-container">
+          <div className="search-icon-wrapper">
+            <Search size={18} />
+          </div>
+          <input
+            type="text"
+            className="search-input"
+            placeholder="상품명, 바코드 검색"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <button type="button" className="btn-category" onClick={() => {
+          setSelectedCategory('all');
+          setSearchTerm('');
+        }}>
+          <Menu size={16} />
+          <span>카테고리</span>
+        </button>
+      </div>
+
+      {/* Category Tabs / Chips */}
+      <div className="category-chips">
         {CATEGORIES.map((cat) => (
           <button
             key={cat.value}
             type="button"
-            className={`category-tab ${selectedCategory === cat.value ? 'active' : ''}`}
+            className={`category-chip ${selectedCategory === cat.value ? 'active' : ''}`}
             onClick={() => setSelectedCategory(cat.value)}
           >
-            <span>{cat.label}</span>
+            {cat.label}
           </button>
         ))}
       </div>
@@ -75,11 +105,10 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
                 onClick={() => onProductClick(product)}
                 style={{
                   borderColor: inCart ? 'var(--primary)' : 'var(--border-color)',
-                  boxShadow: inCart ? '0 0 0 2px var(--primary-glow), var(--shadow-md)' : 'var(--shadow-sm)',
-                  background: inCart ? '#f8faff' : 'var(--bg-card)'
+                  boxShadow: inCart ? '0 0 0 2px rgba(26, 100, 244, 0.08)' : 'var(--shadow-sm)'
                 }}
               >
-                {/* Product Photo Container */}
+                {/* Product Photo */}
                 <div className="product-image-container">
                   <img
                     src={product.imageUrl || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80'}
@@ -92,9 +121,6 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
                 <div className="product-info">
                   <div className="product-name">{product.name}</div>
                   <div className="product-price">{product.price.toLocaleString()}원</div>
-                  <span className="product-category-label">
-                    {getCategoryLabel(product.category, product.name)}
-                  </span>
                 </div>
               </button>
             );

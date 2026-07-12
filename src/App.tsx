@@ -4,19 +4,19 @@ import POSGrid from './components/POSGrid';
 import Cart from './components/Cart';
 import ReceiptModal from './components/ReceiptModal';
 import LoginOverlay from './components/LoginOverlay';
-import { ShoppingBag, Clock, FileSpreadsheet, RefreshCw, TrendingUp, Coins, Award } from 'lucide-react';
+import { FileSpreadsheet, RefreshCw, TrendingUp, Coins, Award } from 'lucide-react';
 import { supabase } from './supabase';
 import { STATIC_PRODUCTS, getCleanStaticName } from './productsData';
 
 const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [currentTime, setCurrentTime] = useState<string>('');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
   const [currentReceipt, setCurrentReceipt] = useState<Receipt | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [receiptsHistory, setReceiptsHistory] = useState<Receipt[]>([]);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState<boolean>(false);
+  const [isReceiptChecked, setIsReceiptChecked] = useState<boolean>(true);
   const [discountAmount, setDiscountAmount] = useState<number>(0);
 
   // Cashier Authentication States
@@ -88,10 +88,16 @@ const App: React.FC = () => {
     Promise.resolve(fetchSource)
       .then((data: any[]) => {
         const fetched = Array.isArray(data) ? data : [];
+        const seenIds = new Set<string>();
         const mapped = STATIC_PRODUCTS.map((staticP, idx) => {
           const match = fetched.find((f: any) => f.name && getCleanStaticName(f.name) === staticP.name);
+          let id = match ? match.id : `P-STATIC-${idx}`;
+          if (seenIds.has(id)) {
+            id = `${id}-dup-${idx}`;
+          }
+          seenIds.add(id);
           return {
-            id: match ? match.id : `P-STATIC-${idx}`,
+            id,
             name: staticP.name,
             price: match ? Number(match.price) || 0 : 1500,
             category: staticP.category as any,
@@ -121,28 +127,7 @@ const App: React.FC = () => {
     loadProducts();
   }, []);
 
-  // Time ticker
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      const formatted = now.toLocaleDateString('ko-KR', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        weekday: 'short'
-      }) + ' ' + now.toLocaleTimeString('ko-KR', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      });
-      setCurrentTime(formatted);
-    };
-    
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
+
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -207,6 +192,69 @@ const App: React.FC = () => {
     if (window.confirm('장바구니에 담긴 모든 내역을 삭제하시겠습니까?')) {
       setCart([]);
       showToast('장바구니가 초기화되었습니다.');
+    }
+  };
+
+  // Draft Save/Load
+  const handleSaveDraft = () => {
+    if (cart.length === 0) {
+      showToast('장바구니가 비어있어 임시저장할 수 없습니다.');
+      return;
+    }
+    localStorage.setItem('ssnr_pos_cart_draft', JSON.stringify(cart));
+    showToast('🛒 장바구니가 임시저장되었습니다.');
+  };
+
+  // Load draft on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('ssnr_pos_cart_draft');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCart(parsed);
+          showToast('💾 임시저장된 장바구니를 불러왔습니다.');
+          localStorage.removeItem('ssnr_pos_cart_draft');
+        }
+      } catch (e) {
+        console.error('Failed to parse draft cart', e);
+      }
+    }
+  }, []);
+
+  // Dynamic Recent Products
+  const getRecentProducts = (): string[] => {
+    const productNames = new Set<string>();
+    for (let i = receiptsHistory.length - 1; i >= 0; i--) {
+      const receipt = receiptsHistory[i];
+      if (receipt.items) {
+        receipt.items.forEach(item => {
+          if (item.product && item.product.name && !item.product.name.includes('[할인적용')) {
+            productNames.add(item.product.name);
+          }
+        });
+      }
+      if (productNames.size >= 4) break;
+    }
+    const list = Array.from(productNames);
+    const fallbacks = ['단팥빵', '소보로빵', '소금빵', '초코칩쿠키'];
+    while (list.length < 4) {
+      const next = fallbacks.find(f => !list.includes(f));
+      if (next) {
+        list.push(next);
+      } else {
+        break;
+      }
+    }
+    return list.slice(0, 4);
+  };
+
+  const handleRecentChipClick = (productName: string) => {
+    const found = products.find(p => p.name === productName);
+    if (found) {
+      handleAddToCart(found);
+    } else {
+      showToast(`상품 '${productName}'을(를) 찾을 수 없습니다.`);
     }
   };
 
@@ -428,111 +476,34 @@ const App: React.FC = () => {
 
   return (
     <div className="app-container">
-      {/* Header */}
+      {/* Header (GNB) */}
       <header className="app-header">
         <div className="header-logo">
-          <ShoppingBag size={22} color="var(--primary)" />
-          <h1>서산나래 미니빵집</h1>
-          <span className="excel-badge" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <FileSpreadsheet size={12} />
-            Excel Live
-          </span>
-          <button 
-            type="button" 
-            className="btn-refresh btn-reload" 
-            onClick={loadProducts}
-            title="상품 목록 실시간 새로고침"
-            style={{ 
-              background: '#f1f3f5', 
-              border: 'none', 
-              borderRadius: '8px', 
-              padding: '6px 12px', 
-              color: 'var(--text-secondary)', 
-              cursor: 'pointer', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px',
-              fontSize: '12.5px',
-              marginLeft: '16px',
-              fontWeight: '700',
-              transition: 'all 0.2s ease',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-            }}
-          >
-            <RefreshCw size={12} />
-            상품 새로고침
-          </button>
+          <div className="header-logo-icon">P</div>
+          <h1>POS</h1>
         </div>
-        <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {currentCashier.role === '관리자' && (
-            <a
-              href={import.meta.env.VITE_SPREADSHEET_URL || '#'}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                textDecoration: 'none',
-                color: 'var(--success)',
-                background: 'var(--success-glow)',
-                border: '1px solid rgba(22, 163, 74, 0.15)',
-                borderRadius: '8px',
-                padding: '6px 12px',
-                fontSize: '12.5px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-              }}
-            >
-              <FileSpreadsheet size={13} />
-              📊 스프레드시트
-            </a>
-          )}
-          <div 
-            className="cashier-info"
-            style={{ 
-              fontSize: '12.5px', 
-              padding: '5px 12px', 
-              background: currentCashier.role === '관리자' ? 'var(--success-glow)' : '#f1f3f5',
-              color: currentCashier.role === '관리자' ? 'var(--success)' : 'var(--text-secondary)',
-              borderRadius: '99px',
-              border: currentCashier.role === '관리자' ? '1px solid rgba(22, 163, 74, 0.15)' : '1px solid rgba(0, 0, 0, 0.05)',
-              fontWeight: '700',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            👤 {currentCashier.name} ({currentCashier.role})
-          </div>
-          <button
-            type="button"
-            className="btn-refresh btn-shift"
-            onClick={async () => {
+
+        <div className="gnb-tabs">
+          <button type="button" className="gnb-tab active">판매</button>
+          <button type="button" className="gnb-tab" onClick={() => setIsHistoryModalOpen(true)}>내역</button>
+          <button type="button" className="gnb-tab" onClick={() => showToast('상품 관리 기능은 준비 중입니다.')}>상품</button>
+          <button type="button" className="gnb-tab" onClick={() => showToast('설정 기능은 준비 중입니다.')}>설정</button>
+        </div>
+
+        <div 
+          className="header-profile" 
+          onClick={async () => {
+            if (window.confirm('로그아웃 하시겠습니까?')) {
               await supabase.auth.signOut();
               setCurrentCashier(null);
               showToast('👋 근무자 로그아웃 완료');
-            }}
-            style={{
-              background: 'var(--danger-glow)',
-              border: '1px solid rgba(239, 68, 68, 0.15)',
-              borderRadius: '8px',
-              padding: '6px 12px',
-              color: 'var(--danger)',
-              cursor: 'pointer',
-              fontSize: '12.5px',
-              fontWeight: '700',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            로그아웃
-          </button>
-          <div className="header-time">
-            <Clock size={13} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
-            {currentTime}
-          </div>
+            }
+          }}
+          title="클릭하여 로그아웃"
+        >
+          <div className="profile-avatar">👤</div>
+          <span>{currentCashier.name} 님</span>
+          <span style={{ fontSize: '9px', color: 'var(--text-muted)', marginLeft: '4px' }}>▼</span>
         </div>
       </header>
 
@@ -575,6 +546,42 @@ const App: React.FC = () => {
           />
         </aside>
       </div>
+
+      {/* Bottom Control Bar */}
+      <footer className="bottom-control-bar">
+        <div className="bottom-left-controls">
+          <div className="receipt-toggle-label">
+            <span>영수증</span>
+            <label className="receipt-toggle-switch">
+              <input 
+                type="checkbox" 
+                checked={isReceiptChecked} 
+                onChange={(e) => setIsReceiptChecked(e.target.checked)} 
+              />
+              <span className="toggle-slider"></span>
+            </label>
+          </div>
+          <button type="button" className="btn-draft" onClick={handleSaveDraft}>
+            임시저장
+          </button>
+        </div>
+
+        <div className="bottom-right-recent">
+          <span className="recent-label">최근 판매 상품</span>
+          <div className="recent-chips">
+            {getRecentProducts().map(name => (
+              <button 
+                key={name}
+                type="button" 
+                className="recent-chip"
+                onClick={() => handleRecentChipClick(name)}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+      </footer>
 
       {/* Payment Selection and Change Calculator Modal */}
       {isPaymentModalOpen && (
