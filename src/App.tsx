@@ -6,6 +6,7 @@ import ReceiptModal from './components/ReceiptModal';
 import LoginOverlay from './components/LoginOverlay';
 import { ShoppingBag, Clock, FileSpreadsheet, RefreshCw, TrendingUp, Coins, Award } from 'lucide-react';
 import { supabase } from './supabase';
+import { STATIC_PRODUCTS, getCleanStaticName } from './productsData';
 
 const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -78,56 +79,42 @@ const App: React.FC = () => {
   }, []);
 
   const loadProducts = () => {
-    const categoryMap: { [key: string]: string } = {
-      '베이커리': 'bakery',
-      '제과류': 'bakery',
-      '음료': 'beverage',
-      '커피': 'coffee',
-      '간식및선물세트': 'food',
-      '기타': 'etc'
-    };
+    const fetchSource = window.electronAPI 
+      ? window.electronAPI.getProducts() 
+      : fetch(`${import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || ""}?action=products`)
+          .then(res => res.json())
+          .then(data => data.products || []);
 
-    if (window.electronAPI) {
-      window.electronAPI.getProducts()
-        .then((data) => {
-          const mapped = data
-            .filter((p: any) => p.name && p.name.trim() !== '')
-            .map((p: any) => ({
-              ...p,
-              category: categoryMap[p.category] || p.category
-            }));
-          setProducts(mapped);
-          showToast('구글 시트 상품 정보를 동적으로 로드했습니다. 🔄');
-        })
-        .catch((err) => {
-          console.error('Failed to load initial products:', err);
-          showToast('Unable to load products.');
+    Promise.resolve(fetchSource)
+      .then((data: any[]) => {
+        const fetched = Array.isArray(data) ? data : [];
+        const mapped = STATIC_PRODUCTS.map((staticP, idx) => {
+          const match = fetched.find((f: any) => f.name && getCleanStaticName(f.name) === staticP.name);
+          return {
+            id: match ? match.id : `P-STATIC-${idx}`,
+            name: staticP.name,
+            price: match ? Number(match.price) || 0 : 1500,
+            category: staticP.category as any,
+            emoji: staticP.emoji,
+            imageUrl: staticP.imageUrl
+          } as Product;
         });
-    } else {
-      // Browser Direct Web Fallback Mode
-      const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
-      fetch(`${webappUrl}?action=products`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data && data.success && data.products) {
-            const mapped = data.products
-              .filter((p: any) => p.name && p.name.trim() !== '')
-              .map((p: any) => ({
-                ...p,
-                category: categoryMap[p.category] || p.category
-              }));
-            setProducts(mapped);
-            showToast('구글 시트 상품 정보를 동적으로 로드했습니다. 🔄');
-          } else {
-            console.error('API response success is false or products array missing:', data);
-            showToast('Unable to load products.');
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to fetch products directly in web browser:', err);
-          showToast('Unable to load products.');
-        });
-    }
+        setProducts(mapped);
+        showToast('구글 시트 상품 정보를 동적으로 로드했습니다. 🔄');
+      })
+      .catch((err) => {
+        console.error('Failed to load products dynamically:', err);
+        const mapped = STATIC_PRODUCTS.map((staticP, idx) => ({
+          id: `P-STATIC-${idx}`,
+          name: staticP.name,
+          price: 1500,
+          category: staticP.category as any,
+          emoji: staticP.emoji,
+          imageUrl: staticP.imageUrl
+        } as Product));
+        setProducts(mapped);
+        showToast('네트워크 오류: 오프라인 모드로 부팅되었습니다.');
+      });
   };
 
   useEffect(() => {
@@ -444,7 +431,7 @@ const App: React.FC = () => {
       {/* Header */}
       <header className="app-header">
         <div className="header-logo">
-          <ShoppingBag size={22} color="#38bdf8" />
+          <ShoppingBag size={22} color="var(--primary)" />
           <h1>서산나래 미니빵집</h1>
           <span className="excel-badge" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <FileSpreadsheet size={12} />
@@ -456,11 +443,11 @@ const App: React.FC = () => {
             onClick={loadProducts}
             title="상품 목록 실시간 새로고침"
             style={{ 
-              background: 'rgba(255,255,255,0.08)', 
+              background: '#f1f3f5', 
               border: 'none', 
-              borderRadius: '6px', 
+              borderRadius: '8px', 
               padding: '6px 12px', 
-              color: 'var(--text-primary)', 
+              color: 'var(--text-secondary)', 
               cursor: 'pointer', 
               display: 'flex', 
               alignItems: 'center', 
@@ -469,7 +456,7 @@ const App: React.FC = () => {
               marginLeft: '16px',
               fontWeight: '700',
               transition: 'all 0.2s ease',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
             }}
           >
             <RefreshCw size={12} />
@@ -487,16 +474,16 @@ const App: React.FC = () => {
                 alignItems: 'center',
                 gap: '6px',
                 textDecoration: 'none',
-                color: '#34d399',
-                background: 'rgba(52, 211, 153, 0.1)',
-                border: '1px solid rgba(52, 211, 153, 0.2)',
-                borderRadius: '6px',
+                color: 'var(--success)',
+                background: 'var(--success-glow)',
+                border: '1px solid rgba(22, 163, 74, 0.15)',
+                borderRadius: '8px',
                 padding: '6px 12px',
                 fontSize: '12.5px',
                 fontWeight: '700',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
               }}
             >
               <FileSpreadsheet size={13} />
@@ -507,12 +494,12 @@ const App: React.FC = () => {
             className="cashier-info"
             style={{ 
               fontSize: '12.5px', 
-              padding: '4px 10px', 
-              background: currentCashier.role === '관리자' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.08)',
-              color: currentCashier.role === '관리자' ? '#34d399' : 'var(--text-primary)',
+              padding: '5px 12px', 
+              background: currentCashier.role === '관리자' ? 'var(--success-glow)' : '#f1f3f5',
+              color: currentCashier.role === '관리자' ? 'var(--success)' : 'var(--text-secondary)',
               borderRadius: '99px',
-              border: currentCashier.role === '관리자' ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(255, 255, 255, 0.12)',
-              fontWeight: '600',
+              border: currentCashier.role === '관리자' ? '1px solid rgba(22, 163, 74, 0.15)' : '1px solid rgba(0, 0, 0, 0.05)',
+              fontWeight: '700',
               display: 'flex',
               alignItems: 'center',
               gap: '6px'
@@ -529,13 +516,13 @@ const App: React.FC = () => {
               showToast('👋 근무자 로그아웃 완료');
             }}
             style={{
-              background: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
-              borderRadius: '6px',
-              padding: '5px 10px',
-              color: '#fca5a5',
+              background: 'var(--danger-glow)',
+              border: '1px solid rgba(239, 68, 68, 0.15)',
+              borderRadius: '8px',
+              padding: '6px 12px',
+              color: 'var(--danger)',
               cursor: 'pointer',
-              fontSize: '12px',
+              fontSize: '12.5px',
               fontWeight: '700',
               transition: 'all 0.2s ease'
             }}
@@ -562,11 +549,11 @@ const App: React.FC = () => {
               color: 'var(--text-secondary)',
               gap: '12px'
             }}>
-              <FileSpreadsheet size={48} className="cart-empty-icon" style={{ opacity: 0.3 }} />
+              <FileSpreadsheet size={48} className="cart-empty-icon" style={{ opacity: 0.15 }} />
               <div>상품 정보를 불러오는 중이거나 목록이 비어있습니다.</div>
             </div>
           ) : (
-            <POSGrid products={products} onProductClick={handleAddToCart} />
+            <POSGrid products={products} onProductClick={handleAddToCart} cart={cart} />
           )}
         </div>
         
@@ -669,7 +656,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ totalAmount, onClose, onPay
 
           {method === 'TRANSFER' ? (
             <div style={{ 
-              background: 'rgba(0,0,0,0.15)', 
+              background: '#f9fafb', 
               borderRadius: 'var(--radius-md)', 
               padding: '24px 16px', 
               textAlign: 'center',
@@ -677,17 +664,17 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ totalAmount, onClose, onPay
               border: '1px solid var(--border-color)',
               color: 'var(--text-secondary)'
             }}>
-              <p style={{ fontSize: '14px', marginBottom: '8px' }}>아래 계좌로 송금을 확인한 뒤 완료해 주세요.</p>
-              <div style={{ margin: '12px 0', padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '6px', fontSize: '15px', color: 'var(--text-primary)', fontWeight: '700' }}>
+              <p style={{ fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>아래 계좌로 송금을 확인한 뒤 완료해 주세요.</p>
+              <div style={{ margin: '12px 0', padding: '12px', background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '15px', color: 'var(--text-primary)', fontWeight: '700' }}>
                 농협 351-8770-93 예금주: 서산나래
               </div>
-              <h3 style={{ color: 'var(--text-primary)', fontSize: '22px', fontWeight: '800' }}>
+              <h3 style={{ color: 'var(--text-primary)', fontSize: '24px', fontWeight: '800' }}>
                 {totalAmount.toLocaleString()}원
               </h3>
             </div>
           ) : (
             <div style={{ 
-              background: 'rgba(0,0,0,0.15)', 
+              background: '#f9fafb', 
               borderRadius: 'var(--radius-md)', 
               padding: '24px 16px', 
               textAlign: 'center',
@@ -695,8 +682,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ totalAmount, onClose, onPay
               border: '1px solid var(--border-color)',
               color: 'var(--text-secondary)'
             }}>
-              <p style={{ fontSize: '14px', marginBottom: '8px' }}>카드 단말기 결제를 대기합니다.</p>
-              <h3 style={{ color: 'var(--text-primary)', fontSize: '22px', fontWeight: '800' }}>
+              <p style={{ fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>카드 단말기 결제를 대기합니다.</p>
+              <h3 style={{ color: 'var(--text-primary)', fontSize: '24px', fontWeight: '800' }}>
                 {totalAmount.toLocaleString()}원
               </h3>
             </div>
@@ -937,14 +924,14 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ receipts, onClose, onSelect
               onClick={() => setSalesSource('local')}
               style={{
                 flex: 1,
-                padding: '10px',
-                borderRadius: '6px',
+                padding: '12px',
+                borderRadius: '8px',
                 border: '1px solid var(--border-color)',
-                background: salesSource === 'local' ? 'rgba(56,189,248,0.1)' : 'transparent',
-                color: salesSource === 'local' ? '#38bdf8' : 'var(--text-secondary)',
+                background: salesSource === 'local' ? 'var(--primary-glow)' : 'transparent',
+                color: salesSource === 'local' ? 'var(--primary)' : 'var(--text-secondary)',
                 fontWeight: 'bold',
                 cursor: 'pointer',
-                fontSize: '13px',
+                fontSize: '13.5px',
                 transition: 'all 0.2s ease'
               }}
             >
@@ -955,14 +942,14 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ receipts, onClose, onSelect
               onClick={() => setSalesSource('sheets')}
               style={{
                 flex: 1,
-                padding: '10px',
-                borderRadius: '6px',
+                padding: '12px',
+                borderRadius: '8px',
                 border: '1px solid var(--border-color)',
-                background: salesSource === 'sheets' ? 'rgba(56,189,248,0.1)' : 'transparent',
-                color: salesSource === 'sheets' ? '#38bdf8' : 'var(--text-secondary)',
+                background: salesSource === 'sheets' ? 'var(--primary-glow)' : 'transparent',
+                color: salesSource === 'sheets' ? 'var(--primary)' : 'var(--text-secondary)',
                 fontWeight: 'bold',
                 cursor: 'pointer',
-                fontSize: '13px',
+                fontSize: '13.5px',
                 transition: 'all 0.2s ease'
               }}
             >
@@ -978,20 +965,20 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ receipts, onClose, onSelect
               gap: '12px',
               marginBottom: '16px'
             }}>
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Coins size={12} color="#fbbf24" /> 오늘 총 매출액
+              <div style={{ background: '#f9fafb', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '700' }}>
+                  <Coins size={12} color="#f59e0b" /> 오늘 총 매출액
                 </span>
                 <span style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-primary)' }}>
                   {summary.total.toLocaleString()}원
                 </span>
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   오늘 {todaySales.length}건 기입됨
                 </span>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <TrendingUp size={12} color="#38bdf8" /> 결제 수단 분류
+              <div style={{ background: '#f9fafb', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '700' }}>
+                  <TrendingUp size={12} color="var(--primary)" /> 결제 수단 분류
                 </span>
                 <span style={{ fontSize: '11.5px', color: 'var(--text-primary)', fontWeight: '700' }}>
                   💳 카드: {summary.cardCount}건 ({summary.cardAmount.toLocaleString()}원)
@@ -1000,12 +987,12 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ receipts, onClose, onSelect
                   🏦 이체: {summary.transferCount}건 ({summary.transferAmount.toLocaleString()}원)
                 </span>
               </div>
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Award size={12} color="#34d399" /> 실시간 인기 빵 TOP 3
+              <div style={{ background: '#f9fafb', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '700' }}>
+                  <Award size={12} color="var(--success)" /> 실시간 인기 빵 TOP 3
                 </span>
                 {topItems.length === 0 ? (
-                  <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>집계 데이터 없음</span>
+                  <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>집계 데이터 없음</span>
                 ) : (
                   topItems.map(([name, qty], idx) => (
                     <span key={name} style={{ fontSize: '11px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: '700' }}>
@@ -1017,14 +1004,14 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ receipts, onClose, onSelect
             </div>
           ) : (
             salesSource === 'sheets' && !isLoading && (
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', padding: '16px', textAlign: 'center', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+              <div style={{ background: '#f9fafb', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', padding: '16px', textAlign: 'center', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
                 오늘 날짜({todayStr})의 정산 내역이 구글 시트에 아직 기록되지 않았습니다.
               </div>
             )
           )}
 
           {/* 매출 목록 컨테이너 */}
-          <div style={{ maxHeight: '280px', overflowY: 'auto', margin: '8px 0', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
+          <div style={{ maxHeight: '280px', overflowY: 'auto', margin: '8px 0', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', background: '#ffffff' }}>
             {isLoading ? (
               <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--text-secondary)' }}>
                 <RefreshCw size={24} className="cart-empty-icon" style={{ animation: 'spin 2s linear infinite', marginBottom: '8px' }} />
@@ -1048,7 +1035,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ receipts, onClose, onSelect
                     alignItems: 'center', 
                     padding: '12px 16px', 
                     borderBottom: '1px solid var(--border-color)',
-                    background: 'rgba(255,255,255,0.01)'
+                    background: '#ffffff'
                   }}
                 >
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, marginRight: '16px', overflow: 'hidden' }}>
@@ -1058,10 +1045,10 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ receipts, onClose, onSelect
                       </span>
                       <span style={{ 
                         fontSize: '11px', 
-                        padding: '2px 6px', 
+                        padding: '2px 8px', 
                         borderRadius: '4px', 
-                        background: s.paymentMethod === '신용카드' ? 'rgba(56,189,248,0.1)' : 'rgba(46,204,182,0.1)',
-                        color: s.paymentMethod === '신용카드' ? '#38bdf8' : '#2ec4b6',
+                        background: s.paymentMethod === '신용카드' ? 'var(--primary-glow)' : 'var(--success-glow)',
+                        color: s.paymentMethod === '신용카드' ? 'var(--primary)' : 'var(--success)',
                         fontWeight: '700'
                       }}>
                         {s.paymentMethod}
@@ -1079,7 +1066,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ receipts, onClose, onSelect
                     <button 
                       type="button" 
                       className="btn btn-secondary" 
-                      style={{ padding: '6px 12px', fontSize: '12px', whiteSpace: 'nowrap' }}
+                      style={{ padding: '6px 12px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: '8px' }}
                       onClick={() => handleSelectSheetReceipt(s)}
                     >
                       상세보기
@@ -1093,11 +1080,11 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ receipts, onClose, onSelect
 
         <div className="modal-footer" style={{ gap: '8px' }}>
           {salesSource === 'sheets' && (
-            <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={loadSheetsSales}>
+            <button type="button" className="btn btn-secondary" style={{ flex: 1, borderRadius: '10px' }} onClick={loadSheetsSales}>
               🔄 실시간 동기화
             </button>
           )}
-          <button type="button" className="btn btn-primary" style={{ flex: 2 }} onClick={onClose}>
+          <button type="button" className="btn btn-primary" style={{ flex: 2, borderRadius: '10px' }} onClick={onClose}>
             닫기
           </button>
         </div>

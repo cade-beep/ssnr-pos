@@ -5,6 +5,7 @@ export interface Product {
   category: 'coffee' | 'beverage' | 'bakery' | 'food' | 'etc';
   emoji: string;
   color?: string; // Card accent color
+  imageUrl?: string;
 }
 
 export interface CartItem {

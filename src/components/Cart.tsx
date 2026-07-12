@@ -154,13 +154,13 @@ const Cart: React.FC<CartProps> = ({
                 style={{ 
                   border: item.discount && item.discountQty && item.discount > 0 && item.discountQty > 0 
                     ? '1px solid rgba(239, 68, 68, 0.4)' 
-                    : '1px solid rgba(56, 189, 248, 0.35)', 
+                    : '1px solid rgba(49, 130, 246, 0.25)', 
                   background: item.discount && item.discountQty && item.discount > 0 && item.discountQty > 0 
-                    ? 'rgba(239, 68, 68, 0.12)' 
-                    : 'rgba(56, 189, 248, 0.08)', 
+                    ? 'rgba(239, 68, 68, 0.08)' 
+                    : 'rgba(49, 130, 246, 0.05)', 
                   color: item.discount && item.discountQty && item.discount > 0 && item.discountQty > 0 
                     ? '#ef4444' 
-                    : '#38bdf8',
+                    : '#3182f6',
                   borderRadius: '6px',
                   padding: '5px 10px',
                   fontSize: '11.5px',
@@ -198,7 +198,7 @@ const Cart: React.FC<CartProps> = ({
       {/* Cart Summary & Footer Controls */}
       <div className="cart-footer">
         {discountAmount > 0 && (
-          <div className="summary-row" style={{ color: '#ef4444', fontSize: '13.5px', marginBottom: '6px', borderBottom: '1px dashed rgba(255,255,255,0.05)', paddingBottom: '6px' }}>
+          <div className="summary-row" style={{ color: '#ef4444', fontSize: '13.5px', marginBottom: '6px', borderBottom: '1px dashed var(--border-color)', paddingBottom: '6px' }}>
             <span>할인 적용</span>
             <span style={{ fontWeight: '600' }}>-{discountAmount.toLocaleString()}원</span>
           </div>
@@ -217,15 +217,18 @@ const Cart: React.FC<CartProps> = ({
               onClick={onViewHistory}
               style={{ 
                 flex: 1, 
-                padding: '10px', 
+                padding: '12px', 
                 display: 'flex', 
                 justifyContent: 'center', 
                 alignItems: 'center', 
                 gap: '6px', 
-                fontSize: '13px',
-                border: '1px solid var(--border-color)',
-                background: 'rgba(255,255,255,0.02)',
-                color: 'var(--text-secondary)'
+                fontSize: '13.5px',
+                border: 'none',
+                background: '#f1f3f5',
+                color: 'var(--text-secondary)',
+                borderRadius: 'var(--radius-md)',
+                fontWeight: '600',
+                cursor: 'pointer'
               }}
             >
               <History size={14} />
@@ -239,15 +242,18 @@ const Cart: React.FC<CartProps> = ({
               disabled={items.length === 0}
               style={{ 
                 flex: 1, 
-                padding: '10px', 
+                padding: '12px', 
                 display: 'flex', 
                 justifyContent: 'center', 
                 alignItems: 'center', 
                 gap: '6px', 
-                fontSize: '13px',
-                border: '1px solid var(--border-color)',
-                background: 'rgba(255,255,255,0.02)',
-                color: 'var(--text-secondary)'
+                fontSize: '13.5px',
+                border: 'none',
+                background: '#f1f3f5',
+                color: 'var(--text-secondary)',
+                borderRadius: 'var(--radius-md)',
+                fontWeight: '600',
+                cursor: 'pointer'
               }}
             >
               <span>🏷️</span>
@@ -272,12 +278,12 @@ const Cart: React.FC<CartProps> = ({
         <div className="modal-overlay" style={{ zIndex: 1200 }}>
           <div className="modal-content" style={{ maxWidth: '400px', width: '90%', padding: '24px' }}>
             <div className="modal-header" style={{ marginBottom: '18px' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: 'bold' }}>🏷️ 결제 할인 적용</h3>
+              <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>🏷️ 결제 할인 적용</h3>
             </div>
             
             {/* Quick Percentage Buttons */}
             <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>할인율 (%) 선택</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: '600' }}>할인율 (%) 선택</div>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {[5, 10, 15, 20, 30].map((pct) => (
                   <button
@@ -285,7 +291,7 @@ const Cart: React.FC<CartProps> = ({
                     type="button"
                     className="btn btn-secondary"
                     onClick={() => handlePercentDiscount(pct)}
-                    style={{ flex: '1 0 50px', padding: '8px', fontSize: '13px' }}
+                    style={{ flex: '1 0 50px', padding: '10px', fontSize: '13.5px', borderRadius: '10px' }}
                   >
                     {pct}%
                   </button>
@@ -295,7 +301,7 @@ const Cart: React.FC<CartProps> = ({
 
             {/* Custom Amount Form */}
             <form onSubmit={handleCustomDiscountSubmit} style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px' }}>직접 할인액 (원) 입력</div>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: '600' }}>직접 할인액 (원) 입력</div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input
                   type="number"
@@ -304,17 +310,18 @@ const Cart: React.FC<CartProps> = ({
                   onChange={(e) => setCustomDiscountText(e.target.value)}
                   style={{
                     flex: 1,
-                    padding: '10px',
-                    borderRadius: '6px',
+                    padding: '12px',
+                    borderRadius: '10px',
                     border: '1px solid var(--border-color)',
-                    background: 'rgba(255,255,255,0.05)',
-                    color: '#ffffff',
-                    fontSize: '14px'
+                    background: '#f9fafb',
+                    color: 'var(--text-primary)',
+                    fontSize: '14px',
+                    outline: 'none'
                   }}
                   min="0"
                   max={totalAmount}
                 />
-                <button type="submit" className="btn btn-primary" style={{ padding: '0 16px' }}>
+                <button type="submit" className="btn btn-primary" style={{ padding: '0 20px', borderRadius: '10px' }}>
                   적용
                 </button>
               </div>
@@ -326,7 +333,7 @@ const Cart: React.FC<CartProps> = ({
                 type="button"
                 className="btn btn-secondary"
                 onClick={handleResetDiscount}
-                style={{ flex: 1 }}
+                style={{ flex: 1, borderRadius: '10px' }}
               >
                 할인 안 함
               </button>
@@ -334,7 +341,7 @@ const Cart: React.FC<CartProps> = ({
                 type="button"
                 className="btn btn-secondary"
                 onClick={() => setIsDiscountModalOpen(false)}
-                style={{ flex: 1 }}
+                style={{ flex: 1, borderRadius: '10px' }}
               >
                 닫기
               </button>
