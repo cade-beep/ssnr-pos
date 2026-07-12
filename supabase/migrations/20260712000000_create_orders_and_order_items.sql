@@ -1,6 +1,11 @@
--- Create orders table
-CREATE TABLE IF NOT EXISTS orders (
-  id VARCHAR(255) PRIMARY KEY,
+-- Drop existing tables to recreate with UUID primary key
+DROP TABLE IF EXISTS order_items CASCADE;
+DROP TABLE IF EXISTS orders CASCADE;
+
+-- Create orders table with UUID PK and human-readable order_number
+CREATE TABLE orders (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  order_number VARCHAR(255) NOT NULL UNIQUE,
   payment_date_time TIMESTAMP WITH TIME ZONE NOT NULL,
   payment_method VARCHAR(50) NOT NULL,
   total_amount NUMERIC NOT NULL,
@@ -11,10 +16,10 @@ CREATE TABLE IF NOT EXISTS orders (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Create order_items table
-CREATE TABLE IF NOT EXISTS order_items (
+-- Create order_items table referencing orders(id) via UUID
+CREATE TABLE order_items (
   id BIGSERIAL PRIMARY KEY,
-  order_id VARCHAR(255) NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   product_id VARCHAR(255) NOT NULL,
   product_name VARCHAR(255) NOT NULL,
   product_price NUMERIC NOT NULL,

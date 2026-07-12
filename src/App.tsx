@@ -314,11 +314,11 @@ const App: React.FC = () => {
 
     // 1. Supabase Write (First)
     try {
-      // Insert Order Header
-      const { error: orderError } = await supabase
+      // Insert Order Header and return generated UUID
+      const { data: insertedOrder, error: orderError } = await supabase
         .from('orders')
         .insert({
-          id: plainReceipt.id,
+          order_number: plainReceipt.id, // human-readable POS order number
           payment_date_time: new Date(plainReceipt.date).toISOString(),
           payment_method: plainReceipt.paymentMethod, // 'CARD' or 'TRANSFER'
           total_amount: plainReceipt.total,
@@ -326,15 +326,19 @@ const App: React.FC = () => {
           received_amount: plainReceipt.receivedAmount,
           change: plainReceipt.change,
           cashier_name: plainReceipt.cashierName
-        });
+        })
+        .select('id')
+        .single();
 
       if (orderError) {
         throw new Error(orderError.message);
       }
 
-      // Insert Order Items
+      const orderUUID = insertedOrder.id;
+
+      // Insert Order Items referencing orderUUID
       const orderItemsPayload = plainReceipt.items.map((item: any) => ({
-        order_id: plainReceipt.id,
+        order_id: orderUUID,
         product_id: item.product.id,
         product_name: item.product.name,
         product_price: item.product.price,
@@ -350,8 +354,8 @@ const App: React.FC = () => {
         .insert(orderItemsPayload);
 
       if (itemsError) {
-        // Rollback Order Header to maintain transactional integrity
-        await supabase.from('orders').delete().eq('id', plainReceipt.id);
+        // Rollback Order Header to maintain transactional integrity using UUID
+        await supabase.from('orders').delete().eq('id', orderUUID);
         throw new Error(itemsError.message);
       }
     } catch (supabaseErr: any) {
@@ -737,6 +741,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ receipts, onClose, onSelect
         .from('orders')
         .select(`
           id,
+          order_number,
           payment_date_time,
           payment_method,
           total_amount,
@@ -759,7 +764,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ receipts, onClose, onSelect
           .map((item: any) => `${item.product_name} x ${item.quantity}`)
           .join(', ');
         return {
-          orderId: order.id,
+          orderId: order.order_number, // Map order_number (e.g. '원격 PC-4363') to orderId for UI consistency
           paymentDateTime: new Date(order.payment_date_time).toLocaleString('ko-KR'),
           paymentMethod: order.payment_method === 'CARD' ? '신용카드' : '계좌이체',
           totalAmount: Number(order.total_amount) || 0,

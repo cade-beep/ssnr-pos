@@ -89,7 +89,7 @@ async function migrate() {
   const { error: cleanError } = await supabase
     .from('orders')
     .delete()
-    .like('id', 'POS-MIGRATED-%');
+    .like('order_number', 'POS-MIGRATED-%');
     
   if (cleanError) {
     console.warn('Warning during cleanup of old generated IDs:', cleanError.message);
@@ -101,7 +101,7 @@ async function migrate() {
   // 3. Classify records
   sales.forEach((sale, idx) => {
     const rawDate = sale.paymentDateTime || '';
-    // Date pattern check (checking if it starts with a YYYY.MM.DD date-like format)
+    // Date pattern check
     const isDatePattern = /^\d{4}\s*[-.]\s*\d{1,2}\s*[-.]\s*\d{1,2}/.test(rawDate);
     const parsedDate = parseKoreanDate(rawDate);
 
@@ -140,11 +140,11 @@ async function migrate() {
       console.log(`  -> Generated unique ID for empty orderId field.`);
     }
     
-    // Check if order already exists in Supabase
+    // Check if order already exists in Supabase by matching order_number column
     const { data: existingOrder, error: checkError } = await supabase
       .from('orders')
       .select('id')
-      .eq('id', orderId)
+      .eq('order_number', orderId)
       .maybeSingle();
 
     if (checkError) {
@@ -154,7 +154,7 @@ async function migrate() {
     }
 
     const orderPayload = {
-      id: orderId,
+      order_number: orderId,
       payment_date_time: parsedDate.toISOString(),
       payment_method: sale.paymentMethod === '신용카드' ? 'CARD' : 'TRANSFER',
       total_amount: Number(sale.totalAmount) || 0,
@@ -169,7 +169,7 @@ async function migrate() {
       const { error: updateError } = await supabase
         .from('orders')
         .update({ payment_date_time: parsedDate.toISOString() })
-        .eq('id', orderId);
+        .eq('order_number', orderId);
 
       if (updateError) {
         console.error(`  Failed to update order ${orderId}:`, updateError.message);
@@ -180,10 +180,12 @@ async function migrate() {
       continue;
     }
 
-    // Insert new order header
-    const { error: orderInsertError } = await supabase
+    // Insert new order header and get returned UUID
+    const { data: insertedOrder, error: orderInsertError } = await supabase
       .from('orders')
-      .insert(orderPayload);
+      .insert(orderPayload)
+      .select('id')
+      .single();
 
     if (orderInsertError) {
       console.error(`  Failed to insert order header for ${orderId}:`, orderInsertError.message);
@@ -191,7 +193,9 @@ async function migrate() {
       continue;
     }
 
-    // Parse and insert items
+    const orderUUID = insertedOrder.id;
+
+    // Parse and insert items referencing UUID
     const itemsStr = sale.items || '';
     const itemParts = itemsStr.split(', ');
     const orderItemsPayload = [];
@@ -222,7 +226,7 @@ async function migrate() {
         }
 
         orderItemsPayload.push({
-          order_id: orderId,
+          order_id: orderUUID,
           product_id: productId,
           product_name: productName,
           product_price: productPrice,
@@ -243,7 +247,7 @@ async function migrate() {
       if (itemsInsertError) {
         console.error(`  Failed to insert items for order ${orderId}:`, itemsInsertError.message);
         // Delete order header to preserve integrity
-        await supabase.from('orders').delete().eq('id', orderId);
+        await supabase.from('orders').delete().eq('id', orderUUID);
         errorCount++;
         continue;
       }
@@ -269,12 +273,12 @@ async function migrate() {
   }
 
   console.log('\n--- MIGRATION SUMMARY REPORT ---');
-  console.log(`Total Google Sheets records read: ${sales.length}`);
-  console.log(`Sales transactions identified:   ${salesTransactions.length}`);
-  console.log(`  - Successfully migrated:       ${migratedCount}`);
-  console.log(`  - Corrected/Updated dates:     ${updatedCount}`);
-  console.log(`  - Errors encountered:          ${errorCount}`);
-  console.log(`Metadata/Notes filtered out:     ${notesAndMetadata.length}`);
+  console.log("Total Google Sheets records read: " + sales.length);
+  console.log("Sales transactions identified:   " + salesTransactions.length);
+  console.log("  - Successfully migrated:       " + migratedCount);
+  console.log("  - Corrected/Updated dates:     " + updatedCount);
+  console.log("  - Errors encountered:          " + errorCount);
+  console.log("Metadata/Notes filtered out:     " + notesAndMetadata.length);
   console.log('--------------------------------\n');
 }
 
