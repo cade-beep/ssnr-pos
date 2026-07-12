@@ -1,6 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
 
-const supabaseUrl = "https://bhnlwajdrlxmjjqnio.supabase.co" || "https://bhnlbfwajdrlxmjjqnio.supabase.co"; // fallback to actual URL
 const actualUrl = "https://bhnlbfwajdrlxmjjqnio.supabase.co";
 const supabaseAnonKey = "sb_publishable_M714oyHbLIfc6mDvNOhhww_Z-hb2_Jg";
 const webappUrl = "https://script.google.com/macros/s/AKfycbyuVyDfxcye9Uyx7ZSEtMXGvSrkQNmApZ4Bt8-ae0wodGYPriFVnKIGsJAPFS7GcP748g/exec";
@@ -8,30 +7,41 @@ const webappUrl = "https://script.google.com/macros/s/AKfycbyuVyDfxcye9Uyx7ZSEtM
 const supabase = createClient(actualUrl, supabaseAnonKey);
 
 function parseKoreanDate(dateStr) {
-  if (!dateStr) return new Date();
-  try {
-    // e.g. "2026. 7. 12. 오후 2:16:41"
-    const normalized = dateStr.replace(/\./g, '-').replace(/\s+/g, ' ');
-    const parts = normalized.split(' ');
-    const datePart = parts.slice(0, 3).join('').replace(/-$/, ''); // "2026-7-12"
-    const ampm = parts[3]; // "오후" or "오전"
-    const timePart = parts[4]; // "2:16:41"
-    if (!timePart) return new Date(dateStr);
-    const timeParts = timePart.split(':');
-    let hour = parseInt(timeParts[0], 10);
-    const min = parseInt(timeParts[1], 10);
-    const sec = parseInt(timeParts[2] || '0', 10);
+  if (!dateStr) return null;
+  
+  // Clean multiple spaces
+  const cleaned = dateStr.replace(/\s+/g, ' ').trim();
+  
+  // Format check: YYYY. MM. DD. [오전/오후] HH:MM:SS
+  const match = cleaned.match(/^(\d{4})\s*[\s.-]\s*(\d{1,2})\s*[\s.-]\s*(\d{1,2})\s*[\s.-]?\s*(오전|오후)?\s*(\d{1,2}):(\d{1,2}):(\d{1,2})/i);
+  
+  if (match) {
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10);
+    const day = parseInt(match[3], 10);
+    const ampm = match[4];
+    let hour = parseInt(match[5], 10);
+    const minute = parseInt(match[6], 10);
+    const second = parseInt(match[7], 10);
+
     if (ampm === '오후' && hour < 12) {
       hour += 12;
     } else if (ampm === '오전' && hour === 12) {
       hour = 0;
     }
-    const isoString = `${datePart}T${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
-    return new Date(isoString);
-  } catch (e) {
-    console.error('Failed to parse date:', dateStr, e.message);
-    return new Date(dateStr);
+
+    const date = new Date(year, month - 1, day, hour, minute, second);
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
   }
+
+  // Fallback to standard JS Date constructor
+  const parsed = new Date(dateStr);
+  if (!isNaN(parsed.getTime())) {
+    return parsed;
+  }
+  return null;
 }
 
 async function migrate() {
@@ -64,7 +74,7 @@ async function migrate() {
     const data = await res.json();
     if (data && data.success) {
       sales = data.sales || [];
-      console.log(`Loaded ${sales.length} sales records from Google Sheets.`);
+      console.log(`Loaded ${sales.length} raw records from Google Sheets.`);
     } else {
       console.error('Failed to load sales from Google Sheets response:', data);
       process.exit(1);
@@ -74,16 +84,61 @@ async function migrate() {
     process.exit(1);
   }
 
+  // Clean up any previously generated temporary migrated IDs to start fresh
+  console.log('Cleaning up previous generated IDs in Supabase...');
+  const { error: cleanError } = await supabase
+    .from('orders')
+    .delete()
+    .like('id', 'POS-MIGRATED-%');
+    
+  if (cleanError) {
+    console.warn('Warning during cleanup of old generated IDs:', cleanError.message);
+  }
+
+  const salesTransactions = [];
+  const notesAndMetadata = [];
+
+  // 3. Classify records
+  sales.forEach((sale, idx) => {
+    const rawDate = sale.paymentDateTime || '';
+    // Date pattern check (checking if it starts with a YYYY.MM.DD date-like format)
+    const isDatePattern = /^\d{4}\s*[-.]\s*\d{1,2}\s*[-.]\s*\d{1,2}/.test(rawDate);
+    const parsedDate = parseKoreanDate(rawDate);
+
+    if (isDatePattern && parsedDate) {
+      salesTransactions.push({ sale, parsedDate, originalIdx: idx });
+    } else {
+      notesAndMetadata.push({ sale, reason: !isDatePattern ? '날짜 패턴 불일치 (메모/마감)' : '날짜 파싱 실패', originalIdx: idx });
+    }
+  });
+
+  console.log(`\nClassification Complete:`);
+  console.log(`- Sales Transactions: ${salesTransactions.length} records`);
+  console.log(`- Metadata/Notes:     ${notesAndMetadata.length} records`);
+
   let migratedCount = 0;
-  let skippedCount = 0;
+  let updatedCount = 0;
   let errorCount = 0;
 
-  // 3. Migrate each record sequentially
-  for (let i = 0; i < sales.length; i++) {
-    const sale = sales[i];
-    const orderId = sale.orderId;
+  // 4. Migrate each valid sales transaction sequentially
+  console.log('\nStarting Database Migration...');
+  for (let i = 0; i < salesTransactions.length; i++) {
+    const { sale, parsedDate, originalIdx } = salesTransactions[i];
     
-    console.log(`[${i+1}/${sales.length}] Processing order ${orderId}...`);
+    // Generate clean ID if blank using local time components
+    let orderId = sale.orderId ? sale.orderId.trim() : "";
+    let isIdNormalized = false;
+    if (!orderId) {
+      const pad = (n) => n.toString().padStart(2, '0');
+      const localStr = `${parsedDate.getFullYear()}${pad(parsedDate.getMonth() + 1)}${pad(parsedDate.getDate())}${pad(parsedDate.getHours())}${pad(parsedDate.getMinutes())}${pad(parsedDate.getSeconds())}`;
+      orderId = `POS-MIGRATED-${localStr}-${originalIdx}`;
+      isIdNormalized = true;
+    }
+    
+    console.log(`[${i+1}/${salesTransactions.length}] Processing transaction ${orderId} (Row #${originalIdx + 1})...`);
+    if (isIdNormalized) {
+      console.log(`  -> Generated unique ID for empty orderId field.`);
+    }
     
     // Check if order already exists in Supabase
     const { data: existingOrder, error: checkError } = await supabase
@@ -98,17 +153,9 @@ async function migrate() {
       continue;
     }
 
-    if (existingOrder) {
-      console.log(`  Order ${orderId} already exists in Supabase. Skipping.`);
-      skippedCount++;
-      continue;
-    }
-
-    // Insert order header
-    const paymentDate = parseKoreanDate(sale.paymentDateTime);
     const orderPayload = {
       id: orderId,
-      payment_date_time: paymentDate.toISOString(),
+      payment_date_time: parsedDate.toISOString(),
       payment_method: sale.paymentMethod === '신용카드' ? 'CARD' : 'TRANSFER',
       total_amount: Number(sale.totalAmount) || 0,
       total_quantity: Number(sale.totalQuantity) || 0,
@@ -117,6 +164,23 @@ async function migrate() {
       cashier_name: sale.cashierName || '시스템'
     };
 
+    if (existingOrder) {
+      console.log(`  Order ${orderId} already exists. Updating/Correcting payment_date_time.`);
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ payment_date_time: parsedDate.toISOString() })
+        .eq('id', orderId);
+
+      if (updateError) {
+        console.error(`  Failed to update order ${orderId}:`, updateError.message);
+        errorCount++;
+      } else {
+        updatedCount++;
+      }
+      continue;
+    }
+
+    // Insert new order header
     const { error: orderInsertError } = await supabase
       .from('orders')
       .insert(orderPayload);
@@ -189,11 +253,28 @@ async function migrate() {
     migratedCount++;
   }
 
+  // 5. Output reports
+  console.log('\n--- CLASSIFIED METADATA/NOTES REPORT ---');
+  if (notesAndMetadata.length === 0) {
+    console.log('No metadata or note records identified.');
+  } else {
+    notesAndMetadata.forEach(item => {
+      console.log(`[Row #${item.originalIdx + 1}]`);
+      console.log(`  orderId:         "${item.sale.orderId}"`);
+      console.log(`  paymentDateTime: "${item.sale.paymentDateTime}"`);
+      console.log(`  items/content:   "${item.sale.items || '(empty)'}"`);
+      console.log(`  Reason:          ${item.reason}`);
+      console.log('--------------------------------');
+    });
+  }
+
   console.log('\n--- MIGRATION SUMMARY REPORT ---');
   console.log(`Total Google Sheets records read: ${sales.length}`);
-  console.log(`Successfully migrated:           ${migratedCount}`);
-  console.log(`Skipped (already exists):        ${skippedCount}`);
-  console.log(`Errors encountered:              ${errorCount}`);
+  console.log(`Sales transactions identified:   ${salesTransactions.length}`);
+  console.log(`  - Successfully migrated:       ${migratedCount}`);
+  console.log(`  - Corrected/Updated dates:     ${updatedCount}`);
+  console.log(`  - Errors encountered:          ${errorCount}`);
+  console.log(`Metadata/Notes filtered out:     ${notesAndMetadata.length}`);
   console.log('--------------------------------\n');
 }
 
