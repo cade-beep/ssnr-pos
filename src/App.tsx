@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Product, CartItem, PaymentMethod, Receipt, CashierUser, BusinessState } from './types';
+import React, { useState, useEffect } from 'react';
+import { Product, CartItem, PaymentMethod, Receipt, CashierUser } from './types';
 import POSGrid from './components/POSGrid';
 import Cart from './components/Cart';
 import ReceiptModal from './components/ReceiptModal';
 import LoginOverlay from './components/LoginOverlay';
-import QuantityInput from './components/QuantityInput';
 import { ShoppingBag, Clock, FileSpreadsheet, RefreshCw, TrendingUp, Coins, Award } from 'lucide-react';
 import { supabase } from './supabase';
 
@@ -21,159 +20,6 @@ const App: React.FC = () => {
 
   // Cashier Authentication States
   const [currentCashier, setCurrentCashier] = useState<CashierUser | null>(null);
-
-  // Business Open / Close States
-  const [businessState, setBusinessState] = useState<BusinessState>('CLOSED');
-  const [hasCloseToday, setHasCloseToday] = useState<boolean>(false);
-  const [isBusinessOpenModalOpen, setIsBusinessOpenModalOpen] = useState<boolean>(false);
-  const [hasManuallyClosedOpenModal, setHasManuallyClosedOpenModal] = useState<boolean>(false);
-  const [isBusinessCloseModalOpen, setIsBusinessCloseModalOpen] = useState<boolean>(false);
-  const [openingQtys, setOpeningQtys] = useState<{ [productId: string]: number }>({});
-  const [wasteQtys, setWasteQtys] = useState<{ [productId: string]: number }>({});
-  const [closingReport, setClosingReport] = useState<any | null>(null);
-  const [sheetsSales, setSheetsSales] = useState<any[]>([]);
-
-  const loadBusinessState = () => {
-    const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
-    if (!webappUrl) return;
-    fetch(`${webappUrl}?action=getBusinessState`)
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.success && data.state) {
-          setBusinessState(data.state);
-          setHasCloseToday(!!data.hasCloseToday);
-        }
-      })
-      .catch(err => console.error("영업 상태 조회 실패:", err));
-  };
-
-  /**
-   * 영업 개시 수량 로드.
-   * GAS ?action=getOpeningQty 는 다음 우선순위로 반환합니다:
-   *   1순위: 오늘 날짜의 OpeningQty 시트 데이터 (이미 개시된 경우)
-   *   2순위: 직전 영업일의 OpeningQty 시트 데이터 (기본값으로 사용)
-   * 응답 형태: { success: true, quantities: { '소보로빵': 20, '단팥빵': 15 } }
-   */
-  const loadOpeningQuantities = () => {
-    const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
-    if (!webappUrl) return;
-    fetch(`${webappUrl}?action=getOpeningQty`)
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.success && data.quantities) {
-          const initial: { [key: string]: number } = {};
-          products.forEach(p => {
-            const matchedQty = data.quantities[p.name] ?? data.quantities[p.name.trim()] ?? 0;
-            initial[p.id] = matchedQty;
-          });
-          setOpeningQtys(initial);
-        }
-      })
-      .catch(err => console.error("개시 수량 로드 실패:", err));
-  };
-
-  // 5초 간격 실시간 다중 POS 상태/재고 동기화 폴러 (CORS OPTIONS preflight 우회)
-  useEffect(() => {
-    const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
-    if (!webappUrl) return;
-
-    const poll = () => {
-      // 1. 영업 상태 및 개시/마감 이력 동기화
-      fetch(`${webappUrl}?action=getBusinessState`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.success && data.state) {
-            setBusinessState(data.state);
-            setHasCloseToday(!!data.hasCloseToday);
-          }
-        })
-        .catch(err => console.error("영업 상태 폴링 에러:", err));
-
-      // 2. 개시 수량 동기화
-      fetch(`${webappUrl}?action=getOpeningQty`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.success && data.quantities) {
-            const initial: { [key: string]: number } = {};
-            products.forEach(p => {
-              const matchedQty = data.quantities[p.name] ?? data.quantities[p.name.trim()] ?? 0;
-              initial[p.id] = matchedQty;
-            });
-            setOpeningQtys(initial);
-          }
-        })
-        .catch(err => console.error("개시 수량 폴링 에러:", err));
-
-      // 3. 실시간 재고 차감 집계를 위한 누적 매출 동기화
-      fetch(`${webappUrl}?action=sales`)
-        .then(res => res.json())
-        .then(data => {
-          if (data && data.success && data.sales) {
-            setSheetsSales(data.sales);
-          }
-        })
-        .catch(err => console.error("실시간 매출 폴링 에러:", err));
-    };
-
-    // 최초 기동 실행
-    poll();
-
-    const intervalId = setInterval(poll, 5000);
-    return () => clearInterval(intervalId);
-  }, [products]);
-
-  // 실시간 현재 재고 자동 산출 (Today's Stock = OpeningQty - Today's Sales Quantity)
-  const stocks = useMemo(() => {
-    const computed: { [productId: string]: number } = {};
-
-    // 오늘 결제 건만 필터링 (영업 개시/마감은 제외)
-    const todaySales = sheetsSales.filter((s: any) => {
-      try {
-        if (s.paymentMethod === 'Business Open' || s.paymentMethod === 'Business Close') {
-          return false;
-        }
-        const normalized = s.paymentDateTime.replace(/\./g, '/');
-        const d = new Date(normalized);
-        const today = new Date();
-        return d.getFullYear() === today.getFullYear() &&
-               d.getMonth() === today.getMonth() &&
-               d.getDate() === today.getDate();
-      } catch(e) {
-        return false;
-      }
-    });
-
-    // 오늘 품목별 누적 판매수량 계산
-    const soldCountMap: { [productName: string]: number } = {};
-    products.forEach(p => {
-      soldCountMap[p.name] = 0;
-    });
-
-    todaySales.forEach((sale: any) => {
-      if (sale.items) {
-        const itemsArr = sale.items.split(', ');
-        itemsArr.forEach((itemStr: string) => {
-          const parts = itemStr.split(' x ');
-          const name = parts[0];
-          const cleanName = name.split(' (')[0].trim();
-          const qtyPart = parts[1] ? parts[1].split(' ')[0] : '1';
-          const qty = Number(qtyPart) || 1;
-          if (cleanName && !cleanName.includes('[할인적용')) {
-            soldCountMap[cleanName] = (soldCountMap[cleanName] || 0) + qty;
-          }
-        });
-      }
-    });
-
-    // 재고 산출
-    products.forEach(p => {
-      const op = openingQtys[p.id] || 0;
-      const sold = soldCountMap[p.name] ?? soldCountMap[p.name.trim()] ?? 0;
-      computed[p.id] = Math.max(0, op - sold);
-    });
-
-    return computed;
-  }, [products, openingQtys, sheetsSales]);
 
   useEffect(() => {
     // 앱 구동 시 현재 로그인된 세션이 이미 존재하면 로드
@@ -228,38 +74,8 @@ const App: React.FC = () => {
       }
     });
 
-    loadBusinessState();
-
     return () => subscription.unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (products.length > 0) {
-      loadOpeningQuantities();
-    }
-  }, [products]);
-
-  // CLOSED 상태이고 관리자인 경우 자동으로 영업 개시 모달을 띄우는 동기화 UX 추가 (단, 오늘 마감한 적이 없고 수동으로 닫지 않았을 때만 최초 기동)
-  useEffect(() => {
-    if (
-      currentCashier && 
-      currentCashier.role === '관리자' && 
-      businessState === 'CLOSED' && 
-      !hasCloseToday && 
-      !isBusinessOpenModalOpen && 
-      !hasManuallyClosedOpenModal
-    ) {
-      setIsBusinessOpenModalOpen(true);
-    }
-  }, [currentCashier?.role, businessState, hasCloseToday, isBusinessOpenModalOpen, hasManuallyClosedOpenModal]);
-
-  // 다른 POS 기기 등에서 이미 영업 개시(OPENED)가 완료되면, 작성 중이던 모달을 자동으로 닫고 수동 제어 플래그를 리셋합니다.
-  useEffect(() => {
-    if (businessState === 'OPENED') {
-      setIsBusinessOpenModalOpen(false);
-      setHasManuallyClosedOpenModal(false);
-    }
-  }, [businessState]);
 
   const loadProducts = () => {
     const categoryMap: { [key: string]: string } = {
@@ -348,240 +164,8 @@ const App: React.FC = () => {
     }, 2000);
   };
 
-  // 영업 개시 처리 함수
-  // GAS doPost(action='businessOpen') 에서 quantitiesList 를 Sales 시트에
-  // BUSINESS-OPEN 레코드로 1행 저장합니다. (중복 방지 처리 포함)
-  const handleBusinessOpen = () => {
-    const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
-    if (!webappUrl) return;
-
-    const payload = {
-      action: 'businessOpen',
-      cashierName: currentCashier?.name || '관리자',
-      quantitiesList: products.map(p => ({
-        name: p.name,
-        quantity: openingQtys[p.id] ?? 0
-      }))
-    };
-
-    // OPTIONS preflight를 회피하는 단순 POST fetch (Content-Type 제거)
-    fetch(webappUrl, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data && data.success) {
-        if (data.alreadyOpened) {
-          alert("오늘 영업은 이미 개시되었습니다.\n현재 재고를 불러옵니다.");
-        } else {
-          showToast('🌅 오늘의 영업이 개시되었습니다! POS 결제가 활성화됩니다.');
-        }
-        setBusinessState('OPENED');
-        setIsBusinessOpenModalOpen(false);
-        // 즉시 동기화된 개시 수량을 스프레드시트로부터 로드
-        loadOpeningQuantities();
-      } else {
-        alert('영업 개시 등록 실패: ' + (data.message || '알 수 없는 서버 에러'));
-      }
-    })
-    .catch(err => {
-      console.error('영업 개시 오류:', err);
-      alert('네트워크 연결이 지연되고 있습니다.');
-    });
-  };
-
-
-
-  // 영업 마감 결산 데이터 생성 함수
-  const prepareBusinessClose = () => {
-    const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
-    if (!webappUrl) return;
-
-    // 초기 폐기 수량은 모두 0개로 세팅
-    const initialWastes: { [key: string]: number } = {};
-    products.forEach(p => {
-      initialWastes[p.id] = 0;
-    });
-    setWasteQtys(initialWastes);
-
-    fetch(`${webappUrl}?action=sales`)
-    .then(res => res.json())
-    .then(salesData => {
-      if (salesData.success) {
-        const salesList = salesData.sales || [];
-
-        // 1. 오늘 매출 합계 계산 (Sales 시트 기반, 영업 개시/마감은 제외)
-        const todaySales = salesList.filter((s: any) => {
-          try {
-            if (s.paymentMethod === 'Business Open' || s.paymentMethod === 'Business Close') {
-              return false;
-            }
-            const normalized = s.paymentDateTime.replace(/\./g, '/');
-            const d = new Date(normalized);
-            const today = new Date();
-            return d.getFullYear() === today.getFullYear() &&
-                   d.getMonth() === today.getMonth() &&
-                   d.getDate() === today.getDate();
-          } catch(e) {
-            return false;
-          }
-        });
-
-        let totalSales = 0;
-        let cashSales = 0;
-        let cardSales = 0;
-        let transactionCount = todaySales.length;
-
-        todaySales.forEach((sale: any) => {
-          totalSales += Number(sale.totalAmount) || 0;
-          if (sale.paymentMethod === '계좌이체') {
-            cashSales += Number(sale.totalAmount) || 0;
-          } else if (sale.paymentMethod === '신용카드') {
-            cardSales += Number(sale.totalAmount) || 0;
-          }
-        });
-
-        // 2. 오늘 품목별 판매수량 합산
-        const soldCountMap: { [productName: string]: number } = {};
-        products.forEach(p => {
-          soldCountMap[p.name] = 0;
-        });
-
-        if (receiptsHistory.length > 0) {
-          // 로컬 구조적 히스토리 사용 (문자열 파싱 없음)
-          receiptsHistory.forEach(receipt => {
-            const d = new Date(receipt.date);
-            const today = new Date();
-            const isToday = d.getFullYear() === today.getFullYear() &&
-                            d.getMonth() === today.getMonth() &&
-                            d.getDate() === today.getDate();
-            if (isToday) {
-              receipt.items.forEach(item => {
-                if (item.product.id !== 'DISCOUNT') {
-                  soldCountMap[item.product.name] = (soldCountMap[item.product.name] || 0) + item.quantity;
-                }
-              });
-            }
-          });
-        } else {
-          // 폴백: 오늘 자 sales의 items 문자열 파싱 (리프레시 시에만 실행)
-          todaySales.forEach((sale: any) => {
-            if (sale.items) {
-              const itemsArr = sale.items.split(', ');
-              itemsArr.forEach((itemStr: string) => {
-                const parts = itemStr.split(' x ');
-                const name = parts[0];
-                const cleanName = name.split(' (')[0].trim();
-                const qtyPart = parts[1] ? parts[1].split(' ')[0] : '1';
-                const qty = Number(qtyPart) || 1;
-                if (cleanName && !cleanName.includes('[할인적용')) {
-                  soldCountMap[cleanName] = (soldCountMap[cleanName] || 0) + qty;
-                }
-              });
-            }
-          });
-        }
-
-        // 3. 결산 최종 산출용 soldMap 저장 (ID 기준 매칭)
-        const soldMapById: { [productId: string]: number } = {};
-        products.forEach(p => {
-          const soldQty = soldCountMap[p.name] ?? soldCountMap[p.name.trim()] ?? 0;
-          soldMapById[p.id] = soldQty;
-        });
-
-        const openingQtyTotal = Object.values(openingQtys).reduce((a, b) => a + b, 0);
-        const soldQtyTotal = Object.values(soldMapById).reduce((a, b) => a + b, 0);
-        const remainingQtyTotal = openingQtyTotal - soldQtyTotal;
-
-        setClosingReport({
-          openingQty: openingQtyTotal,
-          soldQty: soldQtyTotal,
-          remainingQty: remainingQtyTotal,
-          totalSales,
-          cashSales,
-          cardSales,
-          transactionCount,
-          soldMap: soldMapById
-        });
-
-        setIsBusinessCloseModalOpen(true);
-      } else {
-        alert('마감 정산 데이터 로드 실패');
-      }
-    })
-    .catch(err => {
-      console.error('영업 마감 조회 에러:', err);
-      alert('네트워크 연결이 지연되고 있습니다.');
-    });
-  };
-
-  // 영업 마감 전송 함수
-  const handleBusinessCloseSubmit = () => {
-    if (!window.confirm("정말 영업을 마감하시겠습니까?")) {
-      return;
-    }
-
-    const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
-    if (!webappUrl || !closingReport) return;
-
-    const totalWaste = Object.values(wasteQtys).reduce((a, b) => a + b, 0);
-    const finalRemaining = closingReport.openingQty - closingReport.soldQty - totalWaste;
-
-    const payload = {
-      action: 'dailyClosing',
-      cashierName: currentCashier?.name || '관리자',
-      openingQty: closingReport.openingQty,
-      soldQty: closingReport.soldQty,
-      wasteQty: totalWaste,
-      remainingQty: finalRemaining,
-      totalSales: closingReport.totalSales,
-      cashSales: closingReport.cashSales,
-      cardSales: closingReport.cardSales,
-      transactionCount: closingReport.transactionCount,
-      itemsList: products.map(p => {
-        const op = openingQtys[p.id] || 0;
-        const sold = closingReport.soldMap[p.id] || 0;
-        const waste = wasteQtys[p.id] || 0;
-        const rem = Math.max(0, op - sold - waste);
-        return {
-          name: p.name,
-          opening: op,
-          sold: sold,
-          waste: waste,
-          remaining: rem
-        };
-      })
-    };
-
-    // OPTIONS preflight를 회피하는 단순 POST fetch (Content-Type 제거)
-    fetch(webappUrl, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data && data.success) {
-        setBusinessState('FINISHED');
-        setIsBusinessCloseModalOpen(false);
-        showToast('🌙 금일 영업 마감 완료! 구글 시트에 정산 보고서가 적재되었습니다.');
-      } else {
-        alert('영업 마감 전송 실패: ' + (data.message || '알 수 없는 서버 에러'));
-      }
-    })
-    .catch(err => {
-      console.error('영업 마감 전송 실패:', err);
-      alert('네트워크 연결이 지연되고 있습니다.');
-    });
-  };
-
   // Add to cart
   const handleAddToCart = (product: Product) => {
-    if (businessState !== 'OPENED') {
-      showToast(businessState === 'CLOSED' ? '🌅 영업 개시를 먼저 진행해 주십시오.' : '🌙 오늘 영업이 마감되었습니다.');
-      return;
-    }
-
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.product.id === product.id);
       if (existing) {
@@ -783,17 +367,7 @@ const App: React.FC = () => {
         totalQuantity: plainReceipt.totalQuantity,
         receivedAmount: plainReceipt.receivedAmount,
         change: plainReceipt.change,
-        cashierName: currentCashier ? currentCashier.name : '시스템',
-        purchasedItems: receipt.items.map((item: any) => {
-          const itemDiscount = item.discount && item.discountQty ? item.discount * item.discountQty : 0;
-          return {
-            id: item.product.id,
-            name: item.product.name,
-            quantity: item.quantity,
-            unitPrice: item.product.price,
-            amount: Math.max(0, (item.product.price * item.quantity) - itemDiscount)
-          };
-        })
+        cashierName: currentCashier ? currentCashier.name : '시스템'
       };
 
       fetch(webappUrl, {
@@ -863,81 +437,6 @@ const App: React.FC = () => {
           </button>
         </div>
         <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          {/* 영업 상태 뱃지 */}
-          <div 
-            style={{ 
-              fontSize: '12.5px', 
-              padding: '4px 10px', 
-              background: businessState === 'OPENED' ? 'rgba(52, 211, 153, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-              color: businessState === 'OPENED' ? '#34d399' : '#f87171',
-              borderRadius: '99px',
-              border: businessState === 'OPENED' ? '1px solid rgba(52, 211, 153, 0.25)' : '1px solid rgba(239, 68, 68, 0.25)',
-              fontWeight: '700',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
-            }}
-          >
-            {businessState === 'CLOSED' && '💤 영업 준비 중'}
-            {businessState === 'OPENED' && '🌅 영업 중'}
-            {businessState === 'FINISHED' && '🌙 영업 마감'}
-          </div>
-
-          {/* 관리자 영업 제어 버튼 */}
-          {currentCashier.role === '관리자' && (
-            <>
-              {businessState === 'CLOSED' && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setHasManuallyClosedOpenModal(false);
-                    setIsBusinessOpenModalOpen(true);
-                  }}
-                  style={{
-                    background: 'rgba(56, 189, 248, 0.15)',
-                    border: '1px solid rgba(56, 189, 248, 0.25)',
-                    borderRadius: '6px',
-                    padding: '6px 12px',
-                    color: '#38bdf8',
-                    cursor: 'pointer',
-                    fontSize: '12.5px',
-                    fontWeight: '700',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                  }}
-                >
-                  🌅 영업 개시
-                </button>
-              )}
-              {businessState === 'OPENED' && (
-                <button
-                  type="button"
-                  onClick={prepareBusinessClose}
-                  style={{
-                    background: 'rgba(251, 191, 36, 0.15)',
-                    border: '1px solid rgba(251, 191, 36, 0.25)',
-                    borderRadius: '6px',
-                    padding: '6px 12px',
-                    color: '#fbbf24',
-                    cursor: 'pointer',
-                    fontSize: '12.5px',
-                    fontWeight: '700',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-                  }}
-                >
-                  🌙 영업 마감
-                </button>
-              )}
-            </>
-          )}
-
           {currentCashier.role === '관리자' && (
             <a
               href={import.meta.env.VITE_SPREADSHEET_URL || '#'}
@@ -1013,38 +512,7 @@ const App: React.FC = () => {
       {/* Main POS Dashboard Grid */}
       <div className="pos-dashboard">
         <div className="pos-main-panel">
-          {businessState !== 'OPENED' ? (
-            <div style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--text-secondary)',
-              gap: '16px',
-              textAlign: 'center',
-              padding: '40px',
-              background: 'rgba(255, 255, 255, 0.01)',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px dashed var(--border-color)',
-              height: '80%'
-            }}>
-              <ShoppingBag size={48} style={{ opacity: 0.3, color: '#f87171' }} />
-              <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
-                {hasCloseToday ? '오늘 영업이 마감되었습니다.' : '영업 개시 대기 중'}
-              </div>
-              <div style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '400px', lineHeight: '1.6' }}>
-                {currentCashier.role === '관리자' 
-                  ? (hasCloseToday 
-                      ? '오늘의 영업 마감 처리가 완료되었습니다. 다시 영업을 기동하시려면 상단의 [영업 개시] 버튼을 눌러 개시 재고를 입력해 주십시오.' 
-                      : '영업 준비 중입니다. 상단의 🌅 영업 개시 버튼을 클릭해 개시 재고를 기입하고 기동해 주세요.')
-                  : (hasCloseToday
-                      ? '오늘의 영업 마감 처리가 완료되어 POS 결제가 비활성화되었습니다. 이용해 주셔서 감사합니다.'
-                      : '관리자가 영업 개시를 완료할 때까지 기다려 주세요.')
-                }
-              </div>
-            </div>
-          ) : products.length === 0 ? (
+          {products.length === 0 ? (
             <div style={{
               flex: 1,
               display: 'flex',
@@ -1058,7 +526,7 @@ const App: React.FC = () => {
               <div>상품 정보를 불러오는 중이거나 목록이 비어있습니다.</div>
             </div>
           ) : (
-            <POSGrid products={products} stocks={stocks} onProductClick={handleAddToCart} />
+            <POSGrid products={products} onProductClick={handleAddToCart} />
           )}
         </div>
         
@@ -1077,7 +545,6 @@ const App: React.FC = () => {
             historyCount={receiptsHistory.length}
             onApplyDiscount={handleApplyGlobalDiscount}
             onApplyItemDiscount={handleApplyItemDiscount}
-            businessState={businessState}
           />
         </aside>
       </div>
@@ -1114,186 +581,6 @@ const App: React.FC = () => {
       {toastMessage && (
         <div className="toast">
           {toastMessage}
-        </div>
-      )}
-
-      {/* 영업 개시 모달 */}
-      {isBusinessOpenModalOpen && (
-        <div className="modal-overlay" style={{ zIndex: 1100 }}>
-          <div className="modal-content" style={{ maxWidth: '500px', width: '90%', padding: '24px', maxHeight: '80vh', overflowY: 'auto' }}>
-            <div className="modal-header" style={{ marginBottom: '18px' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: 'bold' }}>🌅 오늘의 영업 개시 준비</h3>
-            </div>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-              오늘 판매를 시작할 상품의 초기 수량을 입력해 주세요. (전날 마감 수량 또는 0으로 기본 세팅됩니다.)
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-              {products.map(p => (
-                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '10px 16px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>{p.emoji}</span> {p.name}
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <QuantityInput
-                      value={openingQtys[p.id] ?? 0}
-                      min={0}
-                      onIncrease={() =>
-                        setOpeningQtys(prev => ({ ...prev, [p.id]: (prev[p.id] ?? 0) + 1 }))
-                      }
-                      onDecrease={() =>
-                        setOpeningQtys(prev => ({ ...prev, [p.id]: Math.max(0, (prev[p.id] ?? 0) - 1) }))
-                      }
-                      onChange={(val) =>
-                        setOpeningQtys(prev => ({ ...prev, [p.id]: val }))
-                      }
-                    />
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>개</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  setIsBusinessOpenModalOpen(false);
-                  setHasManuallyClosedOpenModal(true);
-                }}
-                style={{ flex: 1 }}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleBusinessOpen}
-                style={{ flex: 1 }}
-              >
-                영업 개시 확정
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 영업 마감 결산 모달 */}
-      {isBusinessCloseModalOpen && closingReport && (
-        <div className="modal-overlay" style={{ zIndex: 1100 }}>
-          <div className="modal-content" style={{ maxWidth: '600px', width: '90%', padding: '24px', maxHeight: '85vh', overflowY: 'auto' }}>
-            <div className="modal-header" style={{ marginBottom: '18px' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: 'bold' }}>🌙 금일 영업 마감 결산 보고</h3>
-            </div>
-            
-            {/* 결산 재무 지표 */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>총 매출액</div>
-                <div style={{ fontSize: '18px', fontWeight: '800', color: '#fbbf24' }}>{closingReport.totalSales.toLocaleString()}원</div>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>신용카드 매출</div>
-                <div style={{ fontSize: '16px', fontWeight: '700', color: '#38bdf8' }}>{closingReport.cardSales.toLocaleString()}원</div>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>계좌이체 매출</div>
-                <div style={{ fontSize: '16px', fontWeight: '700', color: '#2ec4b6' }}>{closingReport.cashSales.toLocaleString()}원</div>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px 12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>총 개시 수량</div>
-                <div style={{ fontSize: '15px', fontWeight: '700' }}>{closingReport.openingQty}개</div>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px 12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>총 판매 수량</div>
-                <div style={{ fontSize: '15px', fontWeight: '700' }}>{closingReport.soldQty}개</div>
-              </div>
-              <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px 12px', textAlign: 'center' }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>최종 남은 실재고</div>
-                <div style={{ fontSize: '15px', fontWeight: '700', color: '#34d399' }}>
-                  {closingReport.openingQty - closingReport.soldQty - Object.values(wasteQtys).reduce((a, b) => a + b, 0)}개
-                </div>
-              </div>
-            </div>
-
-            {/* 품목별 수량 비교 및 폐기 입력 리스트 */}
-            <div style={{ fontSize: '13px', fontWeight: '700', marginBottom: '8px', color: 'var(--text-primary)' }}>품목별 결산 요약 및 폐기 입력</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px', maxHeight: '280px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '8px' }}>
-              {products.map((p) => {
-                const op = openingQtys[p.id] || 0;
-                const sold = closingReport.soldMap[p.id] || 0;
-                const waste = wasteQtys[p.id] || 0;
-                const rem = Math.max(0, op - sold - waste);
-                return (
-                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.02)', background: 'rgba(255,255,255,0.01)', borderRadius: '4px', marginBottom: '4px' }}>
-                    <span style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: '600' }}>
-                      <span>{p.emoji}</span> {p.name}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                        개시: {op} | 판매: {sold}
-                      </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '12px', color: '#fca5a5' }}>폐기:</span>
-                        <input
-                          type="number"
-                          min="0"
-                          max={op - sold}
-                          value={waste}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value, 10);
-                            setWasteQtys(prev => ({
-                              ...prev,
-                              [p.id]: isNaN(val) || val < 0 ? 0 : val
-                            }));
-                          }}
-                          style={{
-                            width: '50px',
-                            padding: '4px 6px',
-                            textAlign: 'right',
-                            borderRadius: '4px',
-                            border: '1px solid var(--border-color)',
-                            background: 'rgba(255,255,255,0.05)',
-                            color: '#fff',
-                            fontWeight: '700',
-                            fontSize: '12px'
-                          }}
-                        />
-                      </div>
-                      <span style={{ fontSize: '12.5px', fontWeight: '800', color: '#34d399', width: '80px', textAlign: 'right' }}>
-                        실재고: {rem}개
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <p style={{ fontSize: '12px', color: '#f87171', textAlign: 'center', marginBottom: '16px' }}>
-              ⚠️ 영업 마감 확정 시 오늘 영업 데이터가 스프레드시트에 영구 보존되며, 다음 영업 개시 전까지 추가 결제가 차단됩니다.
-            </p>
-
-            <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setIsBusinessCloseModalOpen(false)}
-                style={{ flex: 1 }}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleBusinessCloseSubmit}
-                style={{ flex: 1, background: '#fbbf24', borderColor: '#fbbf24', color: '#000' }}
-              >
-                영업 마감 확정
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>

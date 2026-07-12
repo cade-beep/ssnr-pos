@@ -1,5 +1,5 @@
 import React from 'react';
-import { CartItem, BusinessState } from '../types';
+import { CartItem } from '../types';
 import { Trash2, Plus, Minus, RotateCcw, CreditCard, History } from 'lucide-react';
 
 interface CartProps {
@@ -15,7 +15,6 @@ interface CartProps {
   historyCount: number;
   onApplyDiscount: (amount: number) => void;
   onApplyItemDiscount: (productId: string, amount: number, qty: number, isPercent?: boolean, percentVal?: number) => void;
-  businessState?: BusinessState;
 }
 
 const Cart: React.FC<CartProps> = ({
@@ -31,7 +30,6 @@ const Cart: React.FC<CartProps> = ({
   historyCount,
   onApplyDiscount,
   onApplyItemDiscount,
-  businessState = 'CLOSED',
 }) => {
   const [isDiscountModalOpen, setIsDiscountModalOpen] = React.useState(false);
   const [customDiscountText, setCustomDiscountText] = React.useState('');
@@ -238,7 +236,7 @@ const Cart: React.FC<CartProps> = ({
               type="button"
               className="btn btn-secondary"
               onClick={() => setIsDiscountModalOpen(true)}
-              disabled={items.length === 0 || businessState !== 'OPENED'}
+              disabled={items.length === 0}
               style={{ 
                 flex: 1, 
                 padding: '10px', 
@@ -261,16 +259,10 @@ const Cart: React.FC<CartProps> = ({
             type="button"
             className="btn btn-primary"
             onClick={onCheckout}
-            disabled={items.length === 0 || businessState !== 'OPENED'}
+            disabled={items.length === 0}
           >
             <CreditCard size={16} />
-            <span>
-              {businessState === 'CLOSED' 
-                ? '🌅 영업을 시작해 주세요' 
-                : businessState === 'FINISHED' 
-                ? '🌙 금일 영업 마감됨' 
-                : '결제 및 주문하기'}
-            </span>
+            <span>결제 및 주문하기</span>
           </button>
         </div>
       </div>
