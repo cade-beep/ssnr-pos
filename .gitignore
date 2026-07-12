@@ -31,3 +31,6 @@ Thumbs.db
 
 # Excel files
 *.xlsx
+
+# Wrangler
+.wrangler/

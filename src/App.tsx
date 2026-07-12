@@ -282,7 +282,7 @@ const App: React.FC = () => {
   };
 
   // Payment process handler
-  const handleCompletePayment = (paymentMethod: PaymentMethod) => {
+  const handleCompletePayment = async (paymentMethod: PaymentMethod) => {
     console.log('[LOG 1] 결제 버튼 클릭됨 (handleCompletePayment)');
     const finalAmount = Math.max(0, totalAmount - discountAmount);
     const receipt: Receipt = {
@@ -296,57 +296,87 @@ const App: React.FC = () => {
       date: new Date()
     };
     
-    setCurrentReceipt(receipt);
-    setReceiptsHistory((prev) => [...prev, receipt]);
-    setIsPaymentModalOpen(false);
-    setCart([]);
     const savedDiscount = discountAmount;
-    setDiscountAmount(0);
-    
-    if (window.electronAPI && window.electronAPI.saveReceipt) {
-      const plainReceipt = JSON.parse(JSON.stringify(receipt));
-      plainReceipt.cashierName = currentCashier ? currentCashier.name : '시스템';
-      if (savedDiscount > 0) {
-        plainReceipt.items.push({
-          product: {
-            id: 'DISCOUNT',
-            name: `[할인적용: -${savedDiscount.toLocaleString()}원]`,
-            price: 0,
-            category: 'etc',
-            emoji: '🏷️'
-          },
-          quantity: 1
+    const plainReceipt = JSON.parse(JSON.stringify(receipt));
+    plainReceipt.cashierName = currentCashier ? currentCashier.name : '시스템';
+    if (savedDiscount > 0) {
+      plainReceipt.items.push({
+        product: {
+          id: 'DISCOUNT',
+          name: `[할인적용: -${savedDiscount.toLocaleString()}원]`,
+          price: 0,
+          category: 'etc',
+          emoji: '🏷️'
+        },
+        quantity: 1
+      });
+    }
+
+    // 1. Supabase Write (First)
+    try {
+      // Insert Order Header
+      const { error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          id: plainReceipt.id,
+          payment_date_time: new Date(plainReceipt.date).toISOString(),
+          payment_method: plainReceipt.paymentMethod, // 'CARD' or 'TRANSFER'
+          total_amount: plainReceipt.total,
+          total_quantity: plainReceipt.totalQuantity,
+          received_amount: plainReceipt.receivedAmount,
+          change: plainReceipt.change,
+          cashier_name: plainReceipt.cashierName
         });
+
+      if (orderError) {
+        throw new Error(orderError.message);
       }
-      window.electronAPI.saveReceipt(plainReceipt)
-        .then((res) => {
-          if (res.success) {
-            showToast('결제가 완료되었으며 매출이 기록되었습니다.');
-          } else {
-            showToast('결제 완료 (매출 엑셀 기록 실패: ' + res.error + ')');
-          }
-        })
-        .catch((err) => {
-          console.error(err);
-          showToast('결제 완료 (매출 기록 오류 발생: ' + String(err.message || err) + ')');
-        });
+
+      // Insert Order Items
+      const orderItemsPayload = plainReceipt.items.map((item: any) => ({
+        order_id: plainReceipt.id,
+        product_id: item.product.id,
+        product_name: item.product.name,
+        product_price: item.product.price,
+        quantity: item.quantity,
+        discount: item.discount || 0,
+        discount_qty: item.discountQty || 0,
+        is_percent: !!item.isPercent,
+        discount_percent: item.discountPercent || 0
+      }));
+
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(orderItemsPayload);
+
+      if (itemsError) {
+        // Rollback Order Header to maintain transactional integrity
+        await supabase.from('orders').delete().eq('id', plainReceipt.id);
+        throw new Error(itemsError.message);
+      }
+    } catch (supabaseErr: any) {
+      console.error('Checkout aborted due to Supabase error:', supabaseErr);
+      alert(`⚠️ 결제 실패: 데이터베이스(Supabase) 저장에 실패하여 결제가 취소되었습니다.\n(${supabaseErr.message || supabaseErr})`);
+      return; // Stop checkout flow!
+    }
+
+    // 2. Google Sheets Write (Second)
+    if (window.electronAPI && window.electronAPI.saveReceipt) {
+      try {
+        const res = await window.electronAPI.saveReceipt(plainReceipt);
+        if (res.success) {
+          showToast('결제가 완료되었으며 매출이 기록되었습니다. 💾');
+        } else {
+          console.error('Google Sheets write failed:', res.error);
+          showToast('⚠️ 결제 완료 (매출 구글 시트 저장 실패 - Supabase 저장됨)');
+        }
+      } catch (sheetsErr: any) {
+        console.error('Google Sheets write error:', sheetsErr);
+        showToast('⚠️ 결제 완료 (매출 구글 시트 저장 실패 - Supabase 저장됨)');
+      }
     } else {
       // Browser Direct Web Fallback Mode (doPost)
       const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
-      const plainReceipt = JSON.parse(JSON.stringify(receipt));
-      if (savedDiscount > 0) {
-        plainReceipt.items.push({
-          product: {
-            id: 'DISCOUNT',
-            name: `[할인적용: -${savedDiscount.toLocaleString()}원]`,
-            price: 0,
-            category: 'etc',
-            emoji: '🏷️'
-          },
-          quantity: 1
-        });
-      }
-
       const itemsSummary = plainReceipt.items.map((item: any) => {
         if (item.discount && item.discountQty && item.discount > 0 && item.discountQty > 0) {
           const discountSum = item.discount * item.discountQty;
@@ -367,25 +397,31 @@ const App: React.FC = () => {
         totalQuantity: plainReceipt.totalQuantity,
         receivedAmount: plainReceipt.receivedAmount,
         change: plainReceipt.change,
-        cashierName: currentCashier ? currentCashier.name : '시스템'
+        cashierName: plainReceipt.cashierName
       };
 
-      fetch(webappUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      })
-      .then(() => {
+      try {
+        await fetch(webappUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
         showToast('결제가 완료되었으며 매출이 온라인 기록되었습니다! 💾');
-      })
-      .catch((err) => {
-        console.error('Failed to post payment directly from web browser:', err);
-        showToast('결제 완료 (매출 온라인 저장 실패: 오프라인)');
-      });
+      } catch (sheetsErr: any) {
+        console.error('Browser direct Google Sheets write failed:', sheetsErr);
+        showToast('⚠️ 결제 완료 (매출 구글 시트 저장 실패 - Supabase 저장됨)');
+      }
     }
+
+    // Checkout succeeds: clear state and show receipt
+    setCurrentReceipt(receipt);
+    setReceiptsHistory((prev) => [...prev, receipt]);
+    setIsPaymentModalOpen(false);
+    setCart([]);
+    setDiscountAmount(0);
   };
 
   if (!currentCashier) {
@@ -692,38 +728,86 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ receipts, onClose, onSelect
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const loadSheetsSales = () => {
+  const loadSheetsSales = async () => {
     setIsLoading(true);
     setErrorMessage(null);
-    if (window.electronAPI && window.electronAPI.getSales) {
-      window.electronAPI.getSales()
-        .then((data) => {
-          setSheetsSales(data);
-          setIsLoading(false);
-        })
-        .catch((err) => {
-          console.error(err);
-          setErrorMessage('구글 시트 매출 로드에 실패했습니다.');
-          setIsLoading(false);
-        });
-    } else {
-      // Browser Direct Web Fallback Mode
-      const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
-      fetch(`${webappUrl}?action=sales`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data && data.success && data.sales) {
-            setSheetsSales(data.sales);
-          } else {
-            setErrorMessage('구글 시트 매출 배열이 비어있습니다.');
-          }
-          setIsLoading(false);
-        })
-        .catch((err) => {
-          console.error(err);
-          setErrorMessage('인터넷 연결을 확인해 주십시오.');
-          setIsLoading(false);
-        });
+    try {
+      console.log('Fetching sales history from Supabase...');
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          id,
+          payment_date_time,
+          payment_method,
+          total_amount,
+          total_quantity,
+          received_amount,
+          change,
+          cashier_name,
+          order_items (
+            product_name,
+            quantity
+          )
+        `);
+
+      if (error) {
+        throw error;
+      }
+
+      const mapped = (data || []).map((order: any) => {
+        const itemsStr = (order.order_items || [])
+          .map((item: any) => `${item.product_name} x ${item.quantity}`)
+          .join(', ');
+        return {
+          orderId: order.id,
+          paymentDateTime: new Date(order.payment_date_time).toLocaleString('ko-KR'),
+          paymentMethod: order.payment_method === 'CARD' ? '신용카드' : '계좌이체',
+          totalAmount: Number(order.total_amount) || 0,
+          items: itemsStr,
+          totalQuantity: Number(order.total_quantity) || 0,
+          receivedAmount: Number(order.received_amount) || 0,
+          change: Number(order.change) || 0,
+          cashierName: order.cashier_name
+        };
+      });
+
+      // Sort by date descending
+      mapped.sort((a, b) => new Date(b.paymentDateTime).getTime() - new Date(a.paymentDateTime).getTime());
+
+      setSheetsSales(mapped);
+      setIsLoading(false);
+    } catch (supabaseErr: any) {
+      console.error('Supabase sales load failed, falling back to Google Sheets:', supabaseErr);
+      if (window.electronAPI && window.electronAPI.getSales) {
+        window.electronAPI.getSales()
+          .then((data) => {
+            setSheetsSales(data);
+            setIsLoading(false);
+          })
+          .catch((err) => {
+            console.error(err);
+            setErrorMessage('구글 시트 매출 로드에 실패했습니다.');
+            setIsLoading(false);
+          });
+      } else {
+        // Browser Direct Web Fallback Mode
+        const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
+        fetch(`${webappUrl}?action=sales`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data && data.success && data.sales) {
+              setSheetsSales(data.sales);
+            } else {
+              setErrorMessage('구글 시트 매출 배열이 비어있습니다.');
+            }
+            setIsLoading(false);
+          })
+          .catch((err) => {
+            console.error(err);
+            setErrorMessage('인터넷 연결을 확인해 주십시오.');
+            setIsLoading(false);
+          });
+      }
     }
   };
 
