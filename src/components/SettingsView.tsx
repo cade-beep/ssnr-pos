@@ -282,7 +282,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
             </div>
 
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', background: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', wordBreak: 'break-all', fontFamily: 'monospace' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', background: 'var(--bg-primary)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', wordBreak: 'break-all', fontFamily: 'monospace' }}>
               API: bhnlbfwajdrlxmjjqnio.supabase.co
             </div>
           </div>
@@ -292,7 +292,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             target="_blank" 
             rel="noopener noreferrer"
             className="btn btn-secondary" 
-            style={{ width: '100%', height: '44px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', textDecoration: 'none', fontWeight: '600' }}
+            style={{ width: '100%', height: '48px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', textDecoration: 'none', fontWeight: '600' }}
           >
             <FileSpreadsheet size={14} />
             <span>구글 스프레드시트 이동</span>

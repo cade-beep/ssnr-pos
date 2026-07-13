@@ -270,7 +270,7 @@ const Cart: React.FC<CartProps> = ({
                     padding: '12px',
                     borderRadius: '10px',
                     border: '1px solid var(--border-color)',
-                    background: '#f9fafb',
+                    background: 'var(--bg-primary)',
                     color: 'var(--text-primary)',
                     fontSize: '14px',
                     outline: 'none'

@@ -156,9 +156,11 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
                   </div>
 
                   <div className="product-info">
-                    <div className="product-name" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>{product.name}</span>
-                      {product.emoji && <span>{product.emoji}</span>}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', gap: '6px' }}>
+                      <span className="product-name" style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'left' }}>
+                        {product.name}
+                      </span>
+                      {product.emoji && <span style={{ flexShrink: 0 }}>{product.emoji}</span>}
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
                       <div className="product-price">{product.price.toLocaleString()}원</div>

@@ -301,7 +301,7 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
             className="bo-select" 
             value={sortOption} 
             onChange={(e) => setSortOption(e.target.value as any)}
-            style={{ height: '44px', fontSize: '13.5px', padding: '0 10px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#ffffff' }}
+            style={{ height: '46px', fontSize: '13.5px', padding: '0 10px', borderRadius: '10px', border: '1.5px solid var(--border-color)', background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
           >
             <option value="code">코드순</option>
             <option value="name">상품명순</option>
@@ -314,7 +314,7 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
         <button 
           type="button" 
           className="btn btn-primary" 
-          style={{ width: 'auto', padding: '0 20px', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '10px', height: '44px' }}
+          style={{ width: 'auto', padding: '0 20px', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '10px', height: '46px' }}
           onClick={() => { resetForm(); setIsAddModalOpen(true); }}
         >
           <Plus size={16} />
@@ -432,8 +432,8 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                     width: '120px',
                     height: '120px',
                     borderRadius: '16px',
-                    background: '#f8fafc',
-                    border: '1.5px dashed #cbd5e1',
+                    background: 'var(--bg-primary)',
+                    border: '1.5px dashed var(--border-color)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -511,7 +511,7 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                 </button>
 
                 {isAdvancedOpen && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px', padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px', padding: '12px', background: 'var(--bg-primary)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                     {/* First row: Product ID & Barcode */}
                     <div style={{ display: 'flex', gap: '12px' }}>
                       <div className="bo-field" style={{ flex: 1 }}>
@@ -569,8 +569,8 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                     width: '120px',
                     height: '120px',
                     borderRadius: '16px',
-                    background: '#f8fafc',
-                    border: '1.5px dashed #cbd5e1',
+                    background: 'var(--bg-primary)',
+                    border: '1.5px dashed var(--border-color)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -648,12 +648,12 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                 </button>
 
                 {isAdvancedOpen && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px', padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px', padding: '12px', background: 'var(--bg-primary)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                     {/* First row: Product ID & Barcode */}
                     <div style={{ display: 'flex', gap: '12px' }}>
                       <div className="bo-field" style={{ flex: 1 }}>
                         <label className="bo-label" style={{ color: 'var(--text-muted)' }}>상품코드 (수정 불가)</label>
-                        <input type="text" className="bo-input" value={id} disabled style={{ height: '36px', fontSize: '13px', background: '#e2e8f0' }} />
+                        <input type="text" className="bo-input" value={id} disabled style={{ height: '36px', fontSize: '13px', background: 'var(--border-color)', color: 'var(--text-muted)' }} />
                       </div>
                       <div className="bo-field" style={{ flex: 1 }}>
                         <label className="bo-label">바코드 번호</label>

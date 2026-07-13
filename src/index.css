@@ -27,6 +27,176 @@
   --transition: all 0.15s ease;
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #0f1012;
+    --bg-secondary: #17171c;
+    --bg-card: #1c1c22;
+    
+    --border-color: #292a30;
+    --text-primary: #f9fafb;
+    --text-secondary: #b0b8c1;
+    --text-muted: #6b7684;
+    
+    --primary: #3182f6;
+    --primary-hover: #1b64f4;
+    --primary-glow: rgba(49, 130, 246, 0.08);
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+  }
+
+  .login-overlay {
+    background: #0f1012;
+  }
+  .login-card {
+    background: #17171c;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 12px 40px rgba(0, 0, 0, 0.4);
+  }
+  .login-input-wrapper {
+    background: #202026;
+    border-color: #2c2c34;
+  }
+  .login-input-wrapper:focus-within {
+    background: #1c1c22;
+  }
+  .login-footer {
+    border-top-color: #222226;
+  }
+
+  .bo-table-wrap, .bo-table tbody tr.inactive {
+    background: #17171c;
+    border-color: #292a30;
+  }
+  .bo-table th {
+    background: #1c1c22;
+    border-bottom-color: #292a30;
+    color: #8b95a1;
+  }
+  .bo-table td {
+    border-bottom-color: #222226;
+  }
+  .bo-table tbody tr:hover {
+    background: #202026;
+  }
+  .bo-action-btn {
+    background: #202026;
+    border-color: #2c2c34;
+    color: #b0b8c1;
+  }
+  .bo-action-btn:hover {
+    background: #2c2c34;
+    color: #f9fafb;
+    border-color: #4e5968;
+  }
+
+  .bo-modal {
+    background: #17171c;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  }
+  .bo-modal-footer {
+    border-top-color: #222226;
+  }
+  .bo-input, .bo-select {
+    background: #202026;
+    border-color: #2c2c34;
+    color: #f9fafb;
+  }
+  .bo-input:focus, .bo-select:focus {
+    background: #1c1c22;
+  }
+  .bo-input:disabled {
+    background: #222228;
+    color: #6b7684;
+  }
+  .bo-file-btn {
+    background: #202026;
+    border-color: #2c2c34;
+    color: #b0b8c1;
+  }
+  .bo-file-btn:hover {
+    background: #2c2c34;
+  }
+  .bo-divider {
+    background: #222226;
+  }
+  .bo-data-row {
+    border-bottom-color: #222226;
+  }
+  .bo-filter-chip {
+    background: #17171c;
+    border-color: #2c2c34;
+    color: #b0b8c1;
+  }
+  .bo-filter-chip:hover {
+    background: #202026;
+  }
+  .bo-filter-chip.active {
+    background: var(--primary);
+    color: #ffffff;
+  }
+  .bo-payment-option {
+    background: #202026;
+    border-color: #2c2c34;
+  }
+  .bo-payment-option:hover:not(:disabled) {
+    background: #2c2c34;
+  }
+  .bo-payment-option.selected {
+    background: rgba(49, 130, 246, 0.1);
+    border-color: var(--primary);
+  }
+  .bo-payment-option-title {
+    color: #f9fafb;
+  }
+
+  .cart-item {
+    background: #17171c;
+    border-bottom-color: #222226;
+  }
+  .cart-item-controls {
+    background: #202026;
+  }
+  .quantity-btn:hover {
+    background: #2c2c34;
+  }
+  .clear-cart-btn {
+    background: #202026;
+    color: #b0b8c1;
+  }
+  .clear-cart-btn:hover {
+    background: #2c2c34;
+    color: #f9fafb;
+  }
+  .btn-draft {
+    background: #17171c;
+    border-color: #292a30;
+    color: #b0b8c1;
+  }
+  .recent-chip {
+    background: #17171c;
+    border-color: #292a30;
+    color: #b0b8c1;
+  }
+  .recent-chip:hover {
+    background: #202026;
+  }
+
+  .btn--danger-outline {
+    background: #17171c;
+    border-color: #ef4444;
+  }
+  .btn--danger-outline:hover {
+    background: rgba(239, 68, 68, 0.1);
+  }
+  .btn--ghost:hover {
+    background: #202026;
+    color: #f9fafb;
+  }
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -107,21 +277,33 @@ body {
   font-size: 15px;
   font-weight: 500;
   text-decoration: none;
-  border-bottom: 2px solid transparent;
   cursor: pointer;
   background: transparent;
-  border-top: none;
-  border-left: none;
-  border-right: none;
+  border: none;
   transition: var(--transition);
+  position: relative;
 }
 .gnb-tab:hover {
   color: var(--text-primary);
 }
+.gnb-tab::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 3px;
+  background-color: var(--primary);
+  transition: width 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), left 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border-radius: 3px 3px 0 0;
+}
 .gnb-tab.active {
   color: var(--primary);
   font-weight: 700;
-  border-bottom-color: var(--primary);
+}
+.gnb-tab.active::after {
+  width: 100%;
+  left: 0;
 }
 
 /* User profile */
@@ -278,7 +460,7 @@ body {
 
 /* Product Cards */
 .product-card {
-  background: #ffffff;
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 16px;
@@ -286,25 +468,26 @@ body {
   flex-direction: column;
   align-items: center;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s ease, background-color 0.2s ease;
   height: 216px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
   outline: none;
 }
 .product-card:hover:not(.sold-out) {
-  border-color: rgba(26, 100, 244, 0.35);
-  box-shadow: 0 8px 24px rgba(26, 100, 244, 0.06);
+  border-color: var(--primary);
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 28px var(--primary-glow);
 }
 .product-card:active:not(.sold-out) {
   transform: scale(0.96);
-  background-color: #f8fafc;
+  background-color: var(--bg-primary);
 }
 .product-image-container {
   width: 100%;
   height: 100px;
   border-radius: var(--radius-md);
   overflow: hidden;
-  background: #f8fafc;
+  background: var(--bg-primary);
   margin-bottom: 12px;
   display: flex;
   align-items: center;
@@ -313,7 +496,7 @@ body {
   flex-shrink: 0;
 }
 .product-card:hover:not(.sold-out) .product-image-container {
-  background: #f1f3f5;
+  background: var(--border-color);
 }
 .product-image {
   max-width: 85%;
@@ -1700,9 +1883,9 @@ input:checked + .toggle-slider:before {
 /* ---- Danger button variant ---- */
 .btn--danger-outline {
   width: 100%;
-  height: 44px;
+  height: 48px;
   border: 1.5px solid #fca5a5;
-  background: #ffffff;
+  background: var(--bg-secondary);
   color: #ef4444;
   font-weight: 600;
   font-size: 14px;
