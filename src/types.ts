@@ -6,6 +6,26 @@ export interface Product {
   emoji: string;
   color?: string; // Card accent color
   imageUrl?: string;
+  stock?: number;
+  lowStockThreshold?: number;
+  barcode?: string;
+  isActive?: boolean;
+}
+
+export interface ClosingReport {
+  id?: string;
+  closed_at: string;
+  cashier_name: string;
+  total_sales: number;
+  card_sales: number;
+  transfer_sales: number;
+  cash_sales: number;
+  total_quantity: number;
+  refund_count: number;
+  refund_amount: number;
+  sales_count: number;
+  item_details: Record<string, number>;
+  inventory_snapshot: Record<string, { stock: number; threshold: number }>;
 }
 
 export interface CartItem {
@@ -34,6 +54,10 @@ export interface Receipt {
   receivedAmount: number;
   change: number;
   date: Date;
+  cashierName?: string;
+  isRefunded?: boolean;
+  refundedAt?: string;
+  refundedBy?: string;
 }
 
 // Extend global window object for type safety in React renderer
