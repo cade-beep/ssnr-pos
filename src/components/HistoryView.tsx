@@ -56,6 +56,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast })
   };
 
   const fetchHistory = async () => {
+    if (isLoading) return;
     setIsLoading(true);
     const { start, end } = resolveDates();
     
@@ -184,7 +185,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast })
 
   // Refund Order & restore inventory (atomic database transaction)
   const handleRefund = async (order: any) => {
-    if (order.is_refunded) return;
+    if (isLoading || order.is_refunded) return;
     
     const reason = window.prompt(`⚠️ 주문번호 [${order.order_number}] 결제건을 환불하시겠습니까?\n사유를 입력해 주세요 (필수):`, '고객 단순 변심');
     if (reason === null) return;

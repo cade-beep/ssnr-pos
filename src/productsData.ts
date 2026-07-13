@@ -4,289 +4,432 @@ export interface StaticProduct extends Product {
   imageUrl: string;
 }
 
-export const STATIC_PRODUCTS: Omit<StaticProduct, 'id' | 'price'>[] = [
-  // Bakery
+export const STATIC_PRODUCTS: Omit<StaticProduct, 'id'>[] = [
+
+  // BAKERY
   {
     name: '단팥빵',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?auto=format&fit=crop&w=300&q=80'
+    price: 1800,
+    imageUrl: '/images/p-1.png'
   },
   {
     name: '단팥빵(小)',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?auto=format&fit=crop&w=300&q=80'
+    price: 1000,
+    imageUrl: '/images/p-2.png'
   },
   {
     name: '소보로빵',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80'
+    price: 1800,
+    imageUrl: '/images/p-3.png'
   },
   {
     name: '소보로빵(小)',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80'
+    price: 1000,
+    imageUrl: '/images/p-4.png'
   },
   {
     name: '소보로단팥빵',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80'
+    price: 2000,
+    imageUrl: '/images/p-5.png'
   },
   {
     name: '소보로단팥빵(小)',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80'
+    price: 1200,
+    imageUrl: '/images/p-6.png'
   },
   {
     name: '완두앙금빵',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?auto=format&fit=crop&w=300&q=80'
+    price: 1800,
+    imageUrl: '/images/p-7.png'
   },
   {
     name: '완두앙금빵(小)',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?auto=format&fit=crop&w=300&q=80'
+    price: 1000,
+    imageUrl: '/images/p-8.png'
   },
   {
     name: '크림빵',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=300&q=80'
+    price: 1800,
+    imageUrl: '/images/p-9.png'
   },
   {
     name: '크림빵(小)',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=300&q=80'
+    price: 1000,
+    imageUrl: '/images/p-10.png'
   },
   {
     name: '사과잼빵',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=300&q=80'
+    price: 1800,
+    imageUrl: '/images/p-11.png'
   },
   {
     name: '사과잼빵(小)',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=300&q=80'
+    price: 1000,
+    imageUrl: '/images/p-12.png'
   },
   {
     name: '오트밀 크림빵',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?auto=format&fit=crop&w=300&q=80'
+    price: 2000,
+    imageUrl: '/images/p-13.png'
   },
   {
     name: '오트밀 크림빵(小)',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?auto=format&fit=crop&w=300&q=80'
+    price: 1200,
+    imageUrl: '/images/p-14.png'
   },
   {
     name: '모카 크림빵',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=300&q=80'
+    price: 2000,
+    imageUrl: '/images/p-15.png'
   },
   {
     name: '모카 크림빵(小)',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=300&q=80'
+    price: 1200,
+    imageUrl: '/images/p-16.png'
   },
   {
     name: '소금빵',
     category: 'bakery',
     emoji: '🥐',
-    imageUrl: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?auto=format&fit=crop&w=300&q=80'
+    price: 2500,
+    imageUrl: '/images/p-17.png'
   },
   {
     name: '소시지빵',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=300&q=80'
+    price: 2800,
+    imageUrl: '/images/p-18.png'
   },
   {
     name: '슈크림빵',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=300&q=80'
+    price: 1800,
+    imageUrl: '/images/p-19.png'
   },
   {
     name: '슈크림빵(小)',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=300&q=80'
+    price: 1000,
+    imageUrl: '/images/p-20.png'
   },
   {
     name: '초코크림빵',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=300&q=80'
+    price: 1800,
+    imageUrl: '/images/p-21.png'
   },
   {
     name: '초코크림빵(小)',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=300&q=80'
+    price: 1000,
+    imageUrl: '/images/p-22.png'
   },
   {
     name: '모닝빵',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?auto=format&fit=crop&w=300&q=80'
+    price: 3000,
+    imageUrl: '/images/p-23.png'
   },
   {
     name: '식빵',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1598373182133-52452f7691ef?auto=format&fit=crop&w=300&q=80'
+    price: 3500,
+    imageUrl: '/images/p-24.png'
   },
   {
     name: '밤식빵',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80'
+    price: 4500,
+    imageUrl: '/images/p-25.png'
   },
   {
     name: '소보로밤식빵',
     category: 'bakery',
     emoji: '🍞',
-    imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80'
+    price: 4800,
+    imageUrl: '/images/p-26.png'
   },
-
-  // Cookies
   {
-    name: '버터링쿠키',
+    name: '버터링쿠키(2개입)',
     category: 'bakery',
     emoji: '🍪',
-    imageUrl: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=300&q=80'
+    price: 2500,
+    imageUrl: '/images/p-27.png'
+  },
+  {
+    name: '버터링쿠키(1개입)',
+    category: 'bakery',
+    emoji: '🍪',
+    price: 1300,
+    imageUrl: '/images/p-28.png'
   },
   {
     name: '초코칩쿠키',
     category: 'bakery',
     emoji: '🍪',
-    imageUrl: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=300&q=80'
+    price: 1500,
+    imageUrl: '/images/p-29.png'
   },
   {
     name: '모카아몬드쿠키',
     category: 'bakery',
     emoji: '🍪',
-    imageUrl: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=300&q=80'
+    price: 1500,
+    imageUrl: '/images/p-30.png'
   },
   {
     name: '오트밀쿠키',
     category: 'bakery',
     emoji: '🍪',
-    imageUrl: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=300&q=80'
+    price: 1500,
+    imageUrl: '/images/p-31.png'
   },
   {
     name: '브라우니쿠키',
     category: 'bakery',
     emoji: '🍪',
-    imageUrl: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=300&q=80'
+    price: 1800,
+    imageUrl: '/images/p-32.png'
   },
   {
     name: '플레인머핀',
     category: 'bakery',
     emoji: '🧁',
-    imageUrl: 'https://images.unsplash.com/photo-1587314168485-3236d6710814?auto=format&fit=crop&w=300&q=80'
+    price: 2000,
+    imageUrl: '/images/p-33.png'
   },
   {
     name: '초코머핀',
     category: 'bakery',
     emoji: '🧁',
-    imageUrl: 'https://images.unsplash.com/photo-1587314168485-3236d6710814?auto=format&fit=crop&w=300&q=80'
+    price: 2000,
+    imageUrl: '/images/p-34.png'
   },
   {
     name: '카스테라',
     category: 'bakery',
     emoji: '🍰',
-    imageUrl: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=300&q=80'
+    price: 3500,
+    imageUrl: '/images/p-35.png'
   },
   {
-    name: '마들렌',
+    name: '마들렌(2개입)',
     category: 'bakery',
     emoji: '🥐',
-    imageUrl: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?auto=format&fit=crop&w=300&q=80'
+    price: 2200,
+    imageUrl: '/images/p-36.png'
   },
+  {
+    name: '마들렌(1개입)',
+    category: 'bakery',
+    emoji: '🥐',
+    price: 1200,
+    imageUrl: '/images/p-37.png'
+  },
+
+  // FOOD
   {
     name: '롤케이크',
     category: 'food',
     emoji: '🥖',
-    imageUrl: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=300&q=80'
+    price: 12000,
+    imageUrl: '/images/p-38.png'
   },
-
-  // Gift Sets
   {
     name: '모카롤케이크',
     category: 'food',
     emoji: '🥖',
-    imageUrl: 'https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=300&q=80'
+    price: 12000,
+    imageUrl: '/images/p-39.png'
   },
   {
     name: '간식도시락',
     category: 'food',
     emoji: '🍱',
-    imageUrl: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=300&q=80'
+    price: 6000,
+    imageUrl: '/images/p-35.png'
   },
   {
     name: '샌드위치단품',
     category: 'food',
     emoji: '🥪',
-    imageUrl: 'https://images.unsplash.com/photo-1509722747041-616f39b57569?auto=format&fit=crop&w=300&q=80'
+    price: 4000,
+    imageUrl: '/images/p-24.png'
   },
   {
     name: '만쥬세트',
     category: 'food',
     emoji: '🍡',
-    imageUrl: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=300&q=80'
+    price: 8000,
+    imageUrl: '/images/p-42.png'
   },
   {
-    name: '동전쿠키단품',
+    name: '동전쿠키단품(녹차)',
     category: 'food',
     emoji: '🍪',
-    imageUrl: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=300&q=80'
+    price: 1200,
+    imageUrl: '/images/p-43.png'
+  },
+  {
+    name: '동전쿠키단품(초코)',
+    category: 'food',
+    emoji: '🍪',
+    price: 1200,
+    imageUrl: '/images/p-44.png'
+  },
+  {
+    name: '동전쿠키단품(버터)',
+    category: 'food',
+    emoji: '🍪',
+    price: 1200,
+    imageUrl: '/images/p-45.png'
+  },
+  {
+    name: '동전쿠키단품(크렌베리)',
+    category: 'food',
+    emoji: '🍪',
+    price: 1200,
+    imageUrl: '/images/p-46.png'
+  },
+  {
+    name: '동전쿠키단품(모카아몬드)',
+    category: 'food',
+    emoji: '🍪',
+    price: 1200,
+    imageUrl: '/images/p-47.png'
+  },
+  {
+    name: '동전쿠키단품(황치즈)',
+    category: 'food',
+    emoji: '🍪',
+    price: 1200,
+    imageUrl: '/images/p-27.png'
+  },
+  {
+    name: '동전쿠키단품(모둠)',
+    category: 'food',
+    emoji: '🍪',
+    price: 1500,
+    imageUrl: '/images/p-32.png'
   },
   {
     name: '수제쿠키세트6종',
     category: 'food',
     emoji: '🍪',
-    imageUrl: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=300&q=80'
+    price: 10000,
+    imageUrl: '/images/p-32.png'
   },
   {
     name: '수제쿠키세트3종',
     category: 'food',
     emoji: '🍪',
-    imageUrl: 'https://images.unsplash.com/photo-1549465220-1a8b9238cd48?auto=format&fit=crop&w=300&q=80'
+    price: 5000,
+    imageUrl: '/images/p-32.png'
   },
 
-  // Others
+  // ETC
   {
-    name: '박스(대)',
+    name: '박스大',
     category: 'etc',
     emoji: '📦',
-    imageUrl: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&fit=crop&w=300&q=80'
+    price: 1000,
+    imageUrl: '/images/p-52.png'
   },
   {
-    name: '박스(소)',
+    name: '박스小',
     category: 'etc',
     emoji: '📦',
-    imageUrl: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&fit=crop&w=300&q=80'
+    price: 500,
+    imageUrl: '/images/p-53.png'
   },
   {
     name: '봉투',
     category: 'etc',
     emoji: '🛍️',
-    imageUrl: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=300&q=80'
+    price: 100,
+    imageUrl: '/images/p-54.png'
+  },
+  {
+    name: '1원',
+    category: 'etc',
+    emoji: '🪙',
+    price: 1,
+    imageUrl: '/images/p-55.png'
+  },
+  {
+    name: '10원',
+    category: 'etc',
+    emoji: '🪙',
+    price: 10,
+    imageUrl: '/images/p-56.png'
+  },
+  {
+    name: '100원',
+    category: 'etc',
+    emoji: '🪙',
+    price: 100,
+    imageUrl: '/images/p-37.png'
+  },
+  {
+    name: '1,000원',
+    category: 'etc',
+    emoji: '💵',
+    price: 1000,
+    imageUrl: '/images/p-37.png'
+  },
+  {
+    name: '10,000원',
+    category: 'etc',
+    emoji: '💵',
+    price: 10000,
+    imageUrl: '/images/p-37.png'
+  },
+  {
+    name: '100,000원',
+    category: 'etc',
+    emoji: '💵',
+    price: 100000,
+    imageUrl: '/images/p-37.png'
   }
 ];
 

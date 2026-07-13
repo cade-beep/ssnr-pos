@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
 import { supabase } from '../supabase';
-import { FileSpreadsheet, Lock, RefreshCw, BarChart, AlertTriangle, ShieldCheck, Printer } from 'lucide-react';
+import { FileSpreadsheet, Lock, RefreshCw, BarChart, ShieldCheck, Printer } from 'lucide-react';
 import { auditLog } from '../utils/auditLogger';
 import { withTimeout } from '../utils/asyncHelper';
 
@@ -31,10 +31,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [savingClose, setSavingClose] = useState(false);
   const [activeCloseReport, setActiveCloseReport] = useState<any>(null);
 
-  // Low stock products
-  const lowStockProducts = products.filter(
-    p => p.isActive !== false && (p.stock || 0) <= (p.lowStockThreshold || 5)
-  );
+
 
   const checkSupabaseConnection = async () => {
     setCheckingDb(true);
@@ -325,37 +322,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
       {/* RIGHT COLUMN */}
       <div className="bo-page-col">
-        
-        {/* Stock Alerts panel */}
-        <div className="bo-card">
-          <div className="bo-card-header">
-            <AlertTriangle size={16} color="#f59e0b" /> 실시간 재고 부족 알림
-            <span className={`bo-badge bo-badge--pill ${lowStockProducts.length > 0 ? 'bo-badge--danger' : 'bo-badge--success'}`}>
-              {lowStockProducts.length}건
-            </span>
-          </div>
-          
-          <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {lowStockProducts.length === 0 ? (
-              <div style={{ padding: '14px', background: '#f0fdf4', color: '#059669', border: '1px solid #bbf7d0', borderRadius: '10px', fontSize: '13px', textAlign: 'center', fontWeight: '600' }}>
-                ✅ 모든 활성 상품의 재고가 여유롭습니다.
-              </div>
-            ) : (
-              lowStockProducts.map(p => (
-                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '10px', fontSize: '13px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>{p.emoji || '🍞'}</span>
-                    <strong style={{ fontWeight: '700' }}>{p.name}</strong>
-                    <span className="bo-badge bo-badge--neutral" style={{ fontSize: '10px', padding: '2px 6px' }}>ID: {p.id}</span>
-                  </div>
-                  <span style={{ color: (p.stock || 0) === 0 ? '#ef4444' : '#d97706', fontWeight: '800', fontSize: '12px' }}>
-                    {(p.stock || 0) === 0 ? '품절' : `${p.stock}개 남음`} (경고: {p.lowStockThreshold}개)
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
 
         {/* History of close reports */}
         <div className="bo-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

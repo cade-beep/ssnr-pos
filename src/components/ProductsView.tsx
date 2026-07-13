@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import { Product } from '../types';
 import { supabase } from '../supabase';
-import { Plus, Edit2, Trash2, Search, ArrowUpDown, Upload, Check, AlertTriangle } from 'lucide-react';
-import { auditLog } from '../utils/auditLogger';
-import { withTimeout } from '../utils/asyncHelper';
+import { Plus, Edit2, Trash2, Search, Upload } from 'lucide-react';
 
 interface ProductsViewProps {
   products: Product[];
@@ -14,8 +12,6 @@ interface ProductsViewProps {
 const CATEGORIES = [
   { value: 'all', label: '전체' },
   { value: 'bakery', label: '베이커리' },
-  { value: 'coffee', label: '커피' },
-  { value: 'beverage', label: '음료' },
   { value: 'food', label: '선물세트' },
   { value: 'etc', label: '기타' }
 ];
@@ -23,23 +19,23 @@ const CATEGORIES = [
 const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showToast }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [sortField, setSortField] = useState<'name' | 'price' | 'stock'>('name');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortOption, setSortOption] = useState<'code' | 'name' | 'category' | 'price_asc' | 'price_desc'>('code');
   
   // CRUD Modals States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
   
   // Form State
   const [id, setId] = useState('');
   const [name, setName] = useState('');
   const [price, setPrice] = useState(0);
-  const [category, setCategory] = useState<'coffee' | 'beverage' | 'bakery' | 'food' | 'etc'>('bakery');
+  const [category, setCategory] = useState<'bakery' | 'food' | 'etc'>('bakery');
   const [emoji, setEmoji] = useState('🍞');
   const [imageUrl, setImageUrl] = useState('');
-  const [stock, setStock] = useState(50);
-  const [lowStockThreshold, setLowStockThreshold] = useState(5);
+  const [stock, setStock] = useState(9999);
+  const [lowStockThreshold, setLowStockThreshold] = useState(0);
   const [barcode, setBarcode] = useState('');
   const [isActive, setIsActive] = useState(true);
   
@@ -55,27 +51,42 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
   });
 
   const sortedProducts = [...filteredProducts].sort((a, b) => {
-    let valA: any = a[sortField] || '';
-    let valB: any = b[sortField] || '';
-    
-    if (sortField === 'price' || sortField === 'stock') {
-      valA = Number(valA);
-      valB = Number(valB);
+    if (sortOption === 'code') {
+      const getCodeNumber = (code: string) => {
+        const matches = code.match(/\d+/);
+        return matches ? parseInt(matches[0], 10) : 0;
+      };
+      const numA = getCodeNumber(a.id);
+      const numB = getCodeNumber(b.id);
+      if (numA !== numB) {
+        return numA - numB;
+      }
+      return a.id.localeCompare(b.id);
     }
     
-    if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-    if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+    if (sortOption === 'name') {
+      return a.name.localeCompare(b.name, 'ko');
+    }
+    
+    if (sortOption === 'category') {
+      const getCategoryLabel = (cat: string) => {
+        return CATEGORIES.find(c => c.value === cat)?.label || cat;
+      };
+      const labelA = getCategoryLabel(a.category);
+      const labelB = getCategoryLabel(b.category);
+      return labelA.localeCompare(labelB, 'ko');
+    }
+    
+    if (sortOption === 'price_asc') {
+      return a.price - b.price;
+    }
+    
+    if (sortOption === 'price_desc') {
+      return b.price - a.price;
+    }
+    
     return 0;
   });
-
-  const toggleSort = (field: 'name' | 'price' | 'stock') => {
-    if (sortField === field) {
-      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortOrder('asc');
-    }
-  };
 
   const resetForm = () => {
     setId('');
@@ -84,11 +95,12 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
     setCategory('bakery');
     setEmoji('🍞');
     setImageUrl('');
-    setStock(50);
-    setLowStockThreshold(5);
+    setStock(9999);
+    setLowStockThreshold(0);
     setBarcode('');
     setIsActive(true);
     setImageFile(null);
+    setIsAdvancedOpen(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,11 +204,12 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
     setCategory(product.category);
     setEmoji(product.emoji || '🍞');
     setImageUrl(product.imageUrl || '');
-    setStock(product.stock || 0);
-    setLowStockThreshold(product.lowStockThreshold || 5);
+    setStock(product.stock !== undefined ? product.stock : 9999);
+    setLowStockThreshold(product.lowStockThreshold !== undefined ? product.lowStockThreshold : 0);
     setBarcode(product.barcode || '');
     setIsActive(product.isActive !== false);
     setImageFile(null);
+    setIsAdvancedOpen(false);
     setIsEditModalOpen(true);
   };
 
@@ -264,48 +277,7 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
     }
   };
 
-  // Quick Stock Adjustment
-  // Quick Stock Adjustment (via secure RPC with audit logging)
-  const adjustStock = async (product: Product, amount: number) => {
-    const reason = window.prompt(`[${product.name}] 재고를 ${amount > 0 ? '+' : ''}${amount}개 조정하는 사유를 입력해 주세요 (필수):`);
-    if (reason === null) return;
-    if (!reason.trim()) {
-      alert('재고 수동 조정 시에는 조치 사유를 반드시 기입해 주셔야 적용됩니다.');
-      return;
-    }
 
-    try {
-      const { error } = (await withTimeout(
-        supabase.rpc('adjust_product_stock', {
-          p_product_id: product.id,
-          p_amount: amount,
-          p_reason: reason.trim()
-        }),
-        8000
-      )) as any;
-
-      if (error) throw error;
-      
-      auditLog({
-        action: 'INVENTORY_ADJUSTMENT',
-        result: 'SUCCESS',
-        context: { productId: product.id, productName: product.name, amount, reason: reason.trim() }
-      });
-
-      showToast(`📦 ${product.name} 재고 변경 완료: ${amount > 0 ? '+' : ''}${amount}개`);
-      onRefresh();
-    } catch (err: any) {
-      console.error(err);
-      
-      auditLog({
-        action: 'API_FAILURE',
-        result: 'FAIL',
-        context: { actionType: 'INVENTORY_ADJUSTMENT', productId: product.id, error: err.message || String(err) }
-      });
-
-      showToast(`⚠️ 재고 변경 실패: ${err.message || err}`);
-    }
-  };
 
   return (
     <div className="bo-page">
@@ -324,6 +296,21 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <div style={{ width: '135px', flexShrink: 0 }}>
+          <select 
+            className="bo-select" 
+            value={sortOption} 
+            onChange={(e) => setSortOption(e.target.value as any)}
+            style={{ height: '44px', fontSize: '13.5px', padding: '0 10px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#ffffff' }}
+          >
+            <option value="code">코드순</option>
+            <option value="name">상품명순</option>
+            <option value="category">카테고리순</option>
+            <option value="price_asc">가격 낮은순</option>
+            <option value="price_desc">가격 높은순</option>
+          </select>
+        </div>
+
         <button 
           type="button" 
           className="btn btn-primary" 
@@ -355,17 +342,9 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
           <thead>
             <tr>
               <th>이미지</th>
-              <th className="sortable" onClick={() => toggleSort('name')}>
-                상품명/코드 <ArrowUpDown size={11} style={{ marginLeft: '3px', display: 'inline', opacity: 0.5 }} />
-              </th>
-              <th className="sortable text-right" onClick={() => toggleSort('price')}>
-                가격 <ArrowUpDown size={11} style={{ marginLeft: '3px', display: 'inline', opacity: 0.5 }} />
-              </th>
+              <th>상품명/코드</th>
+              <th className="text-right">가격</th>
               <th>카테고리</th>
-              <th className="sortable text-center" onClick={() => toggleSort('stock')}>
-                재고 현황 <ArrowUpDown size={11} style={{ marginLeft: '3px', display: 'inline', opacity: 0.5 }} />
-              </th>
-              <th>바코드</th>
               <th className="text-center">상태</th>
               <th className="text-center">관리</th>
             </tr>
@@ -373,15 +352,12 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
           <tbody>
             {sortedProducts.length === 0 ? (
               <tr>
-                <td colSpan={8} className="cell-empty">
+                <td colSpan={6} className="cell-empty">
                   검색 결과에 맞는 상품이 존재하지 않습니다.
                 </td>
               </tr>
             ) : (
               sortedProducts.map((p) => {
-                const isLowStock = (p.stock || 0) <= (p.lowStockThreshold || 5);
-                const isSoldOut = (p.stock || 0) === 0;
-
                 return (
                   <tr key={p.id} className={p.isActive === false ? 'inactive' : ''}>
                     {/* Image / Emoji */}
@@ -408,22 +384,6 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                         {CATEGORIES.find(c => c.value === p.category)?.label || p.category}
                       </span>
                     </td>
-
-                    {/* Stock controls */}
-                    <td>
-                      <div className="bo-stock-group">
-                        <button type="button" className="bo-stock-btn" onClick={() => adjustStock(p, -1)}>−</button>
-                        <span className={`bo-stock-value ${isSoldOut ? 'sold-out' : isLowStock ? 'low-stock' : ''}`}>
-                          {p.stock}개
-                          {isLowStock && <AlertTriangle size={12} />}
-                        </span>
-                        <button type="button" className="bo-stock-btn" onClick={() => adjustStock(p, 1)}>+</button>
-                        <button type="button" className="bo-stock-btn bo-stock-btn--accent" onClick={() => adjustStock(p, 10)}>+10</button>
-                      </div>
-                    </td>
-
-                    {/* Barcode */}
-                    <td style={{ color: 'var(--text-muted)' }}>{p.barcode || '—'}</td>
 
                     {/* Active/Inactive */}
                     <td className="text-center">
@@ -456,83 +416,127 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
       {/* ADD MODAL */}
       {isAddModalOpen && (
         <div className="bo-modal-overlay">
-          <form className="bo-modal" onSubmit={handleAddProduct}>
+          <form className="bo-modal" onSubmit={handleAddProduct} style={{ maxWidth: '560px' }}>
             <div className="bo-modal-header">
               <div className="bo-modal-title">신규 상품 등록</div>
               <div className="bo-modal-desc">새로운 상품의 기본 정보를 입력해 주세요.</div>
             </div>
 
             <div className="bo-modal-body">
-              <div className="bo-form-grid bo-form-grid--2">
-                <div className="bo-field">
-                  <label className="bo-label">상품코드 (필수, 고유값)</label>
-                  <input type="text" className="bo-input" value={id} onChange={e => setId(e.target.value)} placeholder="예: P-0041" required />
-                </div>
-                <div className="bo-field">
-                  <label className="bo-label">상품명 (필수)</label>
-                  <input type="text" className="bo-input" value={name} onChange={e => setName(e.target.value)} placeholder="예: 생크림 소보로" required />
-                </div>
-              </div>
-
-              <div className="bo-form-grid bo-form-grid--2-wide">
-                <div className="bo-field">
-                  <label className="bo-label">카테고리</label>
-                  <select className="bo-select" value={category} onChange={e => setCategory(e.target.value as any)}>
-                    <option value="bakery">베이커리</option>
-                    <option value="coffee">커피</option>
-                    <option value="beverage">음료</option>
-                    <option value="food">선물세트</option>
-                    <option value="etc">기타</option>
-                  </select>
-                </div>
-                <div className="bo-field">
-                  <label className="bo-label">가격 (원 단위)</label>
-                  <input type="number" className="bo-input" value={price} onChange={e => setPrice(Math.max(0, Number(e.target.value)))} min="0" required />
-                </div>
-              </div>
-
-              <div className="bo-form-grid bo-form-grid--2">
-                <div className="bo-field">
-                  <label className="bo-label">초기 재고 (개)</label>
-                  <input type="number" className="bo-input" value={stock} onChange={e => setStock(Math.max(0, Number(e.target.value)))} min="0" required />
-                </div>
-                <div className="bo-field">
-                  <label className="bo-label">재고 경고 임계값 (개)</label>
-                  <input type="number" className="bo-input" value={lowStockThreshold} onChange={e => setLowStockThreshold(Math.max(0, Number(e.target.value)))} min="0" required />
-                </div>
-              </div>
-
-              <div className="bo-form-grid bo-form-grid--3-wide">
-                <div className="bo-field">
-                  <label className="bo-label">기본 이모지</label>
-                  <input type="text" className="bo-input bo-input--center" value={emoji} onChange={e => setEmoji(e.target.value)} placeholder="🍞" />
-                </div>
-                <div className="bo-field">
-                  <label className="bo-label">바코드 번호 (스캐너 연동)</label>
-                  <input type="text" className="bo-input" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="선택 사항" />
-                </div>
-              </div>
-
-              <div className="bo-field" style={{ marginBottom: '16px' }}>
-                <label className="bo-label">상품 이미지 등록 (파일 업로드 또는 직접 URL 기입)</label>
-                <div className="bo-form-row">
-                  <input type="text" className="bo-input" style={{ flex: 1 }} value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImageFile(null); }} placeholder="https://..." />
-                  <label className="bo-file-btn">
-                    <Upload size={14} />
-                    파일 선택
+              {/* Primary Section */}
+              <div style={{ display: 'flex', gap: '24px', marginBottom: '20px' }}>
+                {/* Left Side: Product Image/Emoji Preview */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '120px', gap: '10px', flexShrink: 0 }}>
+                  <label className="bo-label">상품 이미지</label>
+                  <div style={{
+                    width: '120px',
+                    height: '120px',
+                    borderRadius: '16px',
+                    background: '#f8fafc',
+                    border: '1.5px dashed #cbd5e1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    position: 'relative'
+                  }}>
+                    {imageFile ? (
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'center', padding: '4px' }}>
+                        업로드 대기<br/>
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{imageFile.name.slice(0, 12)}...</span>
+                      </div>
+                    ) : imageUrl ? (
+                      <img src={imageUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ fontSize: '48px' }}>{emoji || '🍞'}</div>
+                    )}
+                  </div>
+                  <label className="bo-file-btn" style={{ width: '100%', justifyContent: 'center', cursor: 'pointer', height: '36px', borderRadius: '8px', fontSize: '12.5px' }}>
+                    <Upload size={13} />
+                    이미지 업로드
                     <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
                   </label>
                 </div>
-                {imageFile && (
-                  <div className="bo-file-hint">
-                    <Check size={12} /> 업로드 대기 중: {imageFile.name}
+
+                {/* Right Side: Primary Info Fields */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div className="bo-field">
+                    <label className="bo-label">상품명</label>
+                    <input type="text" className="bo-input" value={name} onChange={e => setName(e.target.value)} placeholder="예: 생크림 소보로" required style={{ height: '40px' }} />
                   </div>
-                )}
+
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <div className="bo-field" style={{ flex: 1 }}>
+                      <label className="bo-label">카테고리</label>
+                      <select className="bo-select" value={category} onChange={e => setCategory(e.target.value as any)} style={{ height: '40px' }}>
+                        <option value="bakery">베이커리</option>
+                        <option value="food">선물세트</option>
+                        <option value="etc">기타</option>
+                      </select>
+                    </div>
+                    <div className="bo-field" style={{ flex: 1 }}>
+                      <label className="bo-label">가격 (원)</label>
+                      <input type="number" className="bo-input" value={price} onChange={e => setPrice(Math.max(0, Number(e.target.value)))} min="0" required style={{ height: '40px' }} />
+                    </div>
+                  </div>
+
+                  <div className="bo-checkbox-row" style={{ marginTop: '4px' }}>
+                    <input type="checkbox" id="isActive" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
+                    <label htmlFor="isActive" style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>포스기 화면에 노출 (판매 가능 상태)</label>
+                  </div>
+                </div>
               </div>
 
-              <div className="bo-checkbox-row">
-                <input type="checkbox" id="isActive" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
-                <label htmlFor="isActive">포스기 화면에 노출 (판매 가능 상태)</label>
+              {/* Collapsible Advanced Settings */}
+              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', marginTop: '16px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+                  style={{
+                    width: '100%',
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 0',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
+                >
+                  <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-secondary)' }}>고급 설정</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    {isAdvancedOpen ? '접기 ▲' : '더보기 ▼'}
+                  </span>
+                </button>
+
+                {isAdvancedOpen && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px', padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    {/* First row: Product ID & Barcode */}
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <div className="bo-field" style={{ flex: 1 }}>
+                        <label className="bo-label">상품코드 (필수, 고유값)</label>
+                        <input type="text" className="bo-input" value={id} onChange={e => setId(e.target.value)} placeholder="예: P-0041" required style={{ height: '36px', fontSize: '13px' }} />
+                      </div>
+                      <div className="bo-field" style={{ flex: 1 }}>
+                        <label className="bo-label">바코드 번호</label>
+                        <input type="text" className="bo-input" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="바코드 입력" style={{ height: '36px', fontSize: '13px' }} />
+                      </div>
+                    </div>
+
+                    {/* Second row: Emoji & Image URL */}
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <div className="bo-field" style={{ width: '80px', flexShrink: 0 }}>
+                        <label className="bo-label">이모지</label>
+                        <input type="text" className="bo-input bo-input--center" value={emoji} onChange={e => setEmoji(e.target.value)} placeholder="🍞" style={{ height: '36px', fontSize: '13px' }} />
+                      </div>
+                      <div className="bo-field" style={{ flex: 1 }}>
+                        <label className="bo-label">이미지 URL</label>
+                        <input type="text" className="bo-input" value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImageFile(null); }} placeholder="https://..." style={{ height: '36px', fontSize: '13px' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -549,83 +553,127 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
       {/* EDIT MODAL */}
       {isEditModalOpen && editingProduct && (
         <div className="bo-modal-overlay">
-          <form className="bo-modal" onSubmit={handleEditProduct}>
+          <form className="bo-modal" onSubmit={handleEditProduct} style={{ maxWidth: '560px' }}>
             <div className="bo-modal-header">
               <div className="bo-modal-title">상품 정보 수정</div>
               <div className="bo-modal-desc">{editingProduct.name}의 정보를 수정합니다.</div>
             </div>
 
             <div className="bo-modal-body">
-              <div className="bo-form-grid bo-form-grid--2">
-                <div className="bo-field">
-                  <label className="bo-label">상품코드 (수정 불가)</label>
-                  <input type="text" className="bo-input" value={id} disabled />
-                </div>
-                <div className="bo-field">
-                  <label className="bo-label">상품명</label>
-                  <input type="text" className="bo-input" value={name} onChange={e => setName(e.target.value)} placeholder="예: 생크림 소보로" required />
-                </div>
-              </div>
-
-              <div className="bo-form-grid bo-form-grid--2-wide">
-                <div className="bo-field">
-                  <label className="bo-label">카테고리</label>
-                  <select className="bo-select" value={category} onChange={e => setCategory(e.target.value as any)}>
-                    <option value="bakery">베이커리</option>
-                    <option value="coffee">커피</option>
-                    <option value="beverage">음료</option>
-                    <option value="food">선물세트</option>
-                    <option value="etc">기타</option>
-                  </select>
-                </div>
-                <div className="bo-field">
-                  <label className="bo-label">가격 (원 단위)</label>
-                  <input type="number" className="bo-input" value={price} onChange={e => setPrice(Math.max(0, Number(e.target.value)))} min="0" required />
-                </div>
-              </div>
-
-              <div className="bo-form-grid bo-form-grid--2">
-                <div className="bo-field">
-                  <label className="bo-label">현재 재고 (개)</label>
-                  <input type="number" className="bo-input" value={stock} onChange={e => setStock(Math.max(0, Number(e.target.value)))} min="0" required />
-                </div>
-                <div className="bo-field">
-                  <label className="bo-label">재고 경고 임계값 (개)</label>
-                  <input type="number" className="bo-input" value={lowStockThreshold} onChange={e => setLowStockThreshold(Math.max(0, Number(e.target.value)))} min="0" required />
-                </div>
-              </div>
-
-              <div className="bo-form-grid bo-form-grid--3-wide">
-                <div className="bo-field">
-                  <label className="bo-label">기본 이모지</label>
-                  <input type="text" className="bo-input bo-input--center" value={emoji} onChange={e => setEmoji(e.target.value)} placeholder="🍞" />
-                </div>
-                <div className="bo-field">
-                  <label className="bo-label">바코드 번호</label>
-                  <input type="text" className="bo-input" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="바코드 입력" />
-                </div>
-              </div>
-
-              <div className="bo-field" style={{ marginBottom: '16px' }}>
-                <label className="bo-label">상품 이미지 수정 (파일 업로드 또는 직접 URL 기입)</label>
-                <div className="bo-form-row">
-                  <input type="text" className="bo-input" style={{ flex: 1 }} value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImageFile(null); }} placeholder="https://..." />
-                  <label className="bo-file-btn">
-                    <Upload size={14} />
-                    파일 선택
+              {/* Primary Section */}
+              <div style={{ display: 'flex', gap: '24px', marginBottom: '20px' }}>
+                {/* Left Side: Product Image/Emoji Preview */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '120px', gap: '10px', flexShrink: 0 }}>
+                  <label className="bo-label">상품 이미지</label>
+                  <div style={{
+                    width: '120px',
+                    height: '120px',
+                    borderRadius: '16px',
+                    background: '#f8fafc',
+                    border: '1.5px dashed #cbd5e1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    position: 'relative'
+                  }}>
+                    {imageFile ? (
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'center', padding: '4px' }}>
+                        업로드 대기<br/>
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{imageFile.name.slice(0, 12)}...</span>
+                      </div>
+                    ) : imageUrl ? (
+                      <img src={imageUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ fontSize: '48px' }}>{emoji || '🍞'}</div>
+                    )}
+                  </div>
+                  <label className="bo-file-btn" style={{ width: '100%', justifyContent: 'center', cursor: 'pointer', height: '36px', borderRadius: '8px', fontSize: '12.5px' }}>
+                    <Upload size={13} />
+                    이미지 업로드
                     <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
                   </label>
                 </div>
-                {imageFile && (
-                  <div className="bo-file-hint">
-                    <Check size={12} /> 업로드 대기 중: {imageFile.name}
+
+                {/* Right Side: Primary Info Fields */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div className="bo-field">
+                    <label className="bo-label">상품명</label>
+                    <input type="text" className="bo-input" value={name} onChange={e => setName(e.target.value)} placeholder="예: 생크림 소보로" required style={{ height: '40px' }} />
                   </div>
-                )}
+
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <div className="bo-field" style={{ flex: 1 }}>
+                      <label className="bo-label">카테고리</label>
+                      <select className="bo-select" value={category} onChange={e => setCategory(e.target.value as any)} style={{ height: '40px' }}>
+                        <option value="bakery">베이커리</option>
+                        <option value="food">선물세트</option>
+                        <option value="etc">기타</option>
+                      </select>
+                    </div>
+                    <div className="bo-field" style={{ flex: 1 }}>
+                      <label className="bo-label">가격 (원)</label>
+                      <input type="number" className="bo-input" value={price} onChange={e => setPrice(Math.max(0, Number(e.target.value)))} min="0" required style={{ height: '40px' }} />
+                    </div>
+                  </div>
+
+                  <div className="bo-checkbox-row" style={{ marginTop: '4px' }}>
+                    <input type="checkbox" id="editIsActive" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
+                    <label htmlFor="editIsActive" style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>포스기 화면에 노출 (판매 가능 상태)</label>
+                  </div>
+                </div>
               </div>
 
-              <div className="bo-checkbox-row">
-                <input type="checkbox" id="editIsActive" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
-                <label htmlFor="editIsActive">포스기 화면에 노출 (판매 가능 상태)</label>
+              {/* Collapsible Advanced Settings */}
+              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '14px', marginTop: '16px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsAdvancedOpen(!isAdvancedOpen)}
+                  style={{
+                    width: '100%',
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 0',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    outline: 'none'
+                  }}
+                >
+                  <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-secondary)' }}>고급 설정</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                    {isAdvancedOpen ? '접기 ▲' : '더보기 ▼'}
+                  </span>
+                </button>
+
+                {isAdvancedOpen && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px', padding: '12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    {/* First row: Product ID & Barcode */}
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <div className="bo-field" style={{ flex: 1 }}>
+                        <label className="bo-label" style={{ color: 'var(--text-muted)' }}>상품코드 (수정 불가)</label>
+                        <input type="text" className="bo-input" value={id} disabled style={{ height: '36px', fontSize: '13px', background: '#e2e8f0' }} />
+                      </div>
+                      <div className="bo-field" style={{ flex: 1 }}>
+                        <label className="bo-label">바코드 번호</label>
+                        <input type="text" className="bo-input" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="바코드 입력" style={{ height: '36px', fontSize: '13px' }} />
+                      </div>
+                    </div>
+
+                    {/* Second row: Emoji & Image URL */}
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <div className="bo-field" style={{ width: '80px', flexShrink: 0 }}>
+                        <label className="bo-label">이모지</label>
+                        <input type="text" className="bo-input bo-input--center" value={emoji} onChange={e => setEmoji(e.target.value)} placeholder="🍞" style={{ height: '36px', fontSize: '13px' }} />
+                      </div>
+                      <div className="bo-field" style={{ flex: 1 }}>
+                        <label className="bo-label">이미지 URL</label>
+                        <input type="text" className="bo-input" value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImageFile(null); }} placeholder="https://..." style={{ height: '36px', fontSize: '13px' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

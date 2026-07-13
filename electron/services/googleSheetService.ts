@@ -85,6 +85,7 @@ export const googleSheetService = {
     console.log('[LOG 6] saveReceiptToExcel 진입 (구글 시트 라우팅으로 대체)\n');
     
     const itemsSummary = receipt.items.map((item: any) => {
+      if (item.product.id === 'DISCOUNT') return '';
       if (item.discount && item.discountQty && item.discount > 0 && item.discountQty > 0) {
         const discountSum = item.discount * item.discountQty;
         if (item.isPercent) {
@@ -93,16 +94,26 @@ export const googleSheetService = {
         return `${item.product.name} x ${item.quantity} (개별할인: ${item.discountQty}개 대상 개당 -${item.discount.toLocaleString()}원, 총 -${discountSum.toLocaleString()}원)`;
       }
       return `${item.product.name} x ${item.quantity}`;
-    }).join(', ');
-    const totalQty = receipt.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+    }).filter(Boolean).join(', ');
+
+    const globalDiscountItem = receipt.items.find((item: any) => item.product.id === 'DISCOUNT');
+    let finalItemsSummary = itemsSummary;
+    if (globalDiscountItem) {
+      finalItemsSummary += `, [전체 할인: -${Math.abs(globalDiscountItem.product.price * globalDiscountItem.quantity).toLocaleString()}원]`;
+    }
+
+    const totalQty = receipt.items.reduce((sum: number, item: any) => {
+      if (item.product.id === 'DISCOUNT') return sum;
+      return sum + item.quantity;
+    }, 0);
 
     const payload = {
       orderId: receipt.id,
       paymentDateTime: new Date(receipt.date).toLocaleString('ko-KR'),
       paymentMethod: receipt.paymentMethod === 'CARD' ? '신용카드' : '계좌이체',
       totalAmount: receipt.total,
-      items: itemsSummary,
-      totalQuantity: receipt.totalQuantity || totalQty,
+      items: finalItemsSummary,
+      totalQuantity: totalQty,
       receivedAmount: receipt.receivedAmount,
       change: receipt.change,
       cashierName: receipt.cashierName || '시스템'

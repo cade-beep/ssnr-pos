@@ -182,7 +182,7 @@ const App: React.FC = () => {
         const seedData = STATIC_PRODUCTS.map((p, idx) => ({
           id: `P-${idx + 1}`,
           name: p.name,
-          price: 1500, // starting default price
+          price: p.price || 1500, // starting default price
           category: p.category,
           emoji: p.emoji,
           image_url: p.imageUrl,
@@ -293,15 +293,7 @@ const App: React.FC = () => {
 
   // Add to cart
   const handleAddToCart = (product: Product) => {
-    // Inventory check
-    const currentStock = product.stock !== undefined ? product.stock : 999;
     const existing = cart.find((item) => item.product.id === product.id);
-    const neededQty = existing ? existing.quantity + 1 : 1;
-
-    if (currentStock < neededQty) {
-      showToast(`⚠️ ${product.name}의 재고가 부족합니다. (남은 수량: ${currentStock}개)`, 'error');
-      return;
-    }
 
     setCart((prevCart) => {
       if (existing) {
@@ -321,12 +313,6 @@ const App: React.FC = () => {
     const product = products.find(p => p.id === productId);
     const existing = cart.find(item => item.product.id === productId);
     if (!product || !existing) return;
-
-    const currentStock = product.stock !== undefined ? product.stock : 999;
-    if (currentStock <= existing.quantity) {
-      showToast(`⚠️ 재고 용량을 초과할 수 없습니다. (최대 재고: ${currentStock}개)`, 'error');
-      return;
-    }
 
     setCart((prevCart) =>
       prevCart.map((item) =>
@@ -457,6 +443,9 @@ const App: React.FC = () => {
     setDiscountAmount(amount);
   };
 
+  const originalSubtotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const totalItemDiscount = cart.reduce((sum, item) => sum + ((item.discount || 0) * (item.discountQty || 0)), 0);
+
   const totalAmount = cart.reduce((sum, item) => {
     const discountSum = (item.discount || 0) * (item.discountQty || 0);
     const itemTotal = (item.product.price * item.quantity) - discountSum;
@@ -468,19 +457,6 @@ const App: React.FC = () => {
     if (isCheckoutSubmitting) return;
     setIsCheckoutSubmitting(true);
     console.log('[LOG] Initiating payment checkout flow with database RPC');
-
-    // 1. Stock Pre-check (Prevent Negative Inventory before sending request)
-    for (const item of cart) {
-      const currentProd = products.find(p => p.id === item.product.id);
-      if (currentProd) {
-        const currentStock = currentProd.stock !== undefined ? currentProd.stock : 999;
-        if (currentStock < item.quantity) {
-          alert(`⚠️ 결제 불가: [${item.product.name}] 상품의 재고가 부족합니다.\n(현재 재고: ${currentStock}개, 구매 수량: ${item.quantity}개)`);
-          setIsCheckoutSubmitting(false);
-          return;
-        }
-      }
-    }
 
     const finalAmount = Math.max(0, totalAmount - discountAmount);
     
@@ -499,6 +475,19 @@ const App: React.FC = () => {
         is_percent: !!item.isPercent,
         discount_percent: item.discountPercent || 0
       }));
+
+      if (discountAmount > 0) {
+        cartPayload.push({
+          product_id: 'DISCOUNT',
+          product_name: '[할인적용] 전체 할인',
+          price: -discountAmount,
+          quantity: 1,
+          discount: 0,
+          discount_qty: 0,
+          is_percent: false,
+          discount_percent: 0
+        });
+      }
 
       // Call database transaction RPC
       const { data: rpcData, error: rpcError } = (await withTimeout(
@@ -523,9 +512,27 @@ const App: React.FC = () => {
         throw new Error(rpcData?.message || '결제 등록에 실패했습니다.');
       }
 
+      const receiptItems = [...cart];
+      if (discountAmount > 0) {
+        receiptItems.push({
+          product: {
+            id: 'DISCOUNT',
+            name: '[할인적용] 전체 할인',
+            price: -discountAmount,
+            category: 'etc',
+            emoji: '🏷️'
+          },
+          quantity: 1,
+          discount: 0,
+          discountQty: 0,
+          isPercent: false,
+          discountPercent: 0
+        });
+      }
+
       const receipt: Receipt = {
         id: finalIdempotencyKey,
-        items: [...cart],
+        items: receiptItems,
         total: finalAmount,
         totalQuantity: cart.reduce((sum, item) => sum + item.quantity, 0),
         paymentMethod,
@@ -538,13 +545,17 @@ const App: React.FC = () => {
       // Best-effort Sync to Google Sheets
       const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
       if (webappUrl) {
-        const itemsSummary = cart.map((item: any) => {
+        let itemsSummary = cart.map((item: any) => {
           if (item.discount && item.discountQty && item.discount > 0 && item.discountQty > 0) {
             const discountSum = item.discount * item.discountQty;
             return `${item.product.name} x ${item.quantity} (할인: -${discountSum.toLocaleString()}원)`;
           }
           return `${item.product.name} x ${item.quantity}`;
         }).join(', ');
+        
+        if (discountAmount > 0) {
+          itemsSummary += `, [전체 할인: -${discountAmount.toLocaleString()}원]`;
+        }
         
         const payload = {
           orderId: finalIdempotencyKey,
@@ -797,7 +808,9 @@ const App: React.FC = () => {
       {/* Payment Selector Modal */}
       {isPaymentModalOpen && (
         <PaymentModal
-          totalAmount={Math.max(0, totalAmount - discountAmount)}
+          subtotal={originalSubtotal}
+          discount={totalItemDiscount + discountAmount}
+          totalAmount={Math.max(0, originalSubtotal - (totalItemDiscount + discountAmount))}
           onClose={() => !isCheckoutSubmitting && setIsPaymentModalOpen(false)}
           onPaymentComplete={handleCompletePayment}
           isSubmitting={isCheckoutSubmitting}
@@ -841,13 +854,15 @@ const App: React.FC = () => {
 
 // PaymentModal Subcomponent
 interface PaymentModalProps {
+  subtotal: number;
+  discount: number;
   totalAmount: number;
   onClose: () => void;
   onPaymentComplete: (method: PaymentMethod, receivedCash?: number, change?: number) => void;
   isSubmitting?: boolean;
 }
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ totalAmount, onClose, onPaymentComplete, isSubmitting = false }) => {
+const PaymentModal: React.FC<PaymentModalProps> = ({ subtotal, discount, totalAmount, onClose, onPaymentComplete, isSubmitting = false }) => {
   const [method, setMethod] = useState<PaymentMethod>('CARD');
   const [receivedCash, setReceivedCash] = useState<string>('');
   const [change, setChange] = useState<number>(0);
@@ -917,9 +932,26 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ totalAmount, onClose, onPay
               <p style={{ fontSize: '13.5px', marginBottom: '8px', color: 'var(--text-secondary)' }}>카드 단말기 결제를 진행합니다.</p>
             )}
 
-            <h3 style={{ color: 'var(--primary)', fontSize: '26px', fontWeight: '800' }}>
-              {totalAmount.toLocaleString()}원
-            </h3>
+            {/* Subtotal & Discount Breakdown */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13.5px', paddingBottom: '12px', marginBottom: '12px', borderBottom: '1px dashed #e2e8f0', textAlign: 'left' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                <span>상품 합계</span>
+                <span>{subtotal.toLocaleString()}원</span>
+              </div>
+              {discount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444', fontWeight: 'bold' }}>
+                  <span>총 할인 금액</span>
+                  <span>-{discount.toLocaleString()}원</span>
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 'bold', fontSize: '15px', color: 'var(--text-primary)' }}>최종 결제 금액</span>
+              <h3 style={{ color: 'var(--primary)', fontSize: '26px', fontWeight: '800', margin: 0 }}>
+                {totalAmount.toLocaleString()}원
+              </h3>
+            </div>
 
             {/* Change Calculator for Cash/Transfer payments */}
             {method === 'TRANSFER' && (

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Product, CartItem } from '../types';
-import { Search, Menu } from 'lucide-react';
+import { Search, Menu, X } from 'lucide-react';
 
 interface POSGridProps {
   products: Product[];
@@ -57,17 +57,44 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
       
       {/* Search Input and Category Button Row */}
       <div className="search-row">
-        <div className="search-container">
+        <div className="search-container" style={{ position: 'relative' }}>
           <div className="search-icon-wrapper">
             <Search size={18} />
           </div>
           <input
             type="text"
             className="search-input"
-            placeholder="상품명, 바코드 검색"
+            placeholder="상품명, 바코드 검색 (F1)"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ paddingRight: searchTerm ? '36px' : '14px' }}
           />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '50%',
+                transition: 'background 0.2s',
+                outline: 'none'
+              }}
+              title="검색어 지우기"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
         <button type="button" className="btn-category" onClick={() => {
           setSelectedCategory('all');
@@ -104,24 +131,18 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
           <div className="products-grid">
             {filteredProducts.map((product) => {
               const inCart = isProductInCart(product.id);
-              const stock = product.stock !== undefined ? product.stock : 999;
-              const threshold = product.lowStockThreshold !== undefined ? product.lowStockThreshold : 5;
-              const isLowStock = stock <= threshold;
-              const isSoldOut = stock === 0;
 
               return (
                 <button
                   key={product.id}
                   type="button"
-                  className={`product-card ${isSoldOut ? 'sold-out' : ''}`}
-                  onClick={() => !isSoldOut && onProductClick(product)}
-                  disabled={isSoldOut}
+                  className="product-card"
+                  onClick={() => onProductClick(product)}
                   style={{
-                    borderColor: isSoldOut ? '#e2e8f0' : inCart ? 'var(--primary)' : 'var(--border-color)',
+                    borderColor: inCart ? 'var(--primary)' : 'var(--border-color)',
                     boxShadow: inCart ? '0 0 0 2px rgba(26, 100, 244, 0.08)' : 'var(--shadow-sm)',
-                    opacity: isSoldOut ? 0.6 : 1,
                     position: 'relative',
-                    cursor: isSoldOut ? 'not-allowed' : 'pointer'
+                    cursor: 'pointer'
                   }}
                 >
                   {/* Product Photo */}
@@ -132,25 +153,6 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
                       className="product-image"
                       loading="lazy"
                     />
-                    {isSoldOut && (
-                      <div style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        background: 'rgba(0, 0, 0, 0.4)',
-                        color: '#ffffff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: '800',
-                        fontSize: '15px',
-                        borderRadius: 'var(--radius-md)'
-                      }}>
-                        품절 (SOLD OUT)
-                      </div>
-                    )}
                   </div>
 
                   <div className="product-info">
@@ -160,13 +162,6 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
                       <div className="product-price">{product.price.toLocaleString()}원</div>
-                      
-                      {/* Stock Warning Badge */}
-                      {!isSoldOut && (
-                        <span className={`product-stock-badge ${isLowStock ? 'low' : 'normal'}`}>
-                          {isLowStock ? `⚠️ ${stock}개` : `${stock}개`}
-                        </span>
-                      )}
                     </div>
                   </div>
                 </button>

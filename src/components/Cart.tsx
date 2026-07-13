@@ -36,6 +36,11 @@ const Cart: React.FC<CartProps> = ({
   const [isDiscountModalOpen, setIsDiscountModalOpen] = React.useState(false);
   const [customDiscountText, setCustomDiscountText] = React.useState('');
 
+  const originalSubtotal = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const itemDiscountTotal = items.reduce((sum, item) => sum + ((item.discount || 0) * (item.discountQty || 0)), 0);
+  const totalDiscount = itemDiscountTotal + discountAmount;
+  const finalPayable = Math.max(0, originalSubtotal - totalDiscount);
+
   // Bypass unused variable check for props not rendered in Toss UI
   if (false as boolean) {
     console.log(onViewHistory, historyCount);
@@ -191,7 +196,7 @@ const Cart: React.FC<CartProps> = ({
       <div className="cart-footer">
         <div className="summary-row">
           <span>상품 금액</span>
-          <span>{totalAmount.toLocaleString()}원</span>
+          <span>{originalSubtotal.toLocaleString()}원</span>
         </div>
         
         <div 
@@ -201,15 +206,15 @@ const Cart: React.FC<CartProps> = ({
           title="클릭하여 전체 할인 설정"
         >
           <span>할인 금액</span>
-          <span style={{ color: discountAmount > 0 ? '#ef4444' : 'inherit' }}>
-            - {discountAmount.toLocaleString()}원
+          <span style={{ color: totalDiscount > 0 ? '#ef4444' : 'inherit' }}>
+            - {totalDiscount.toLocaleString()}원
           </span>
         </div>
 
         <div className="summary-row total">
           <span>총 결제 금액</span>
           <span className="total-price">
-            {Math.max(0, totalAmount - discountAmount).toLocaleString()}원
+            {finalPayable.toLocaleString()}원
           </span>
         </div>
 

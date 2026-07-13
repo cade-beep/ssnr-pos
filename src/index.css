@@ -240,15 +240,15 @@ body {
   display: none;
 }
 .category-chip {
-  padding: 10px 20px;
+  padding: 9px 18px;
   border-radius: 24px;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   background: #f2f4f6;
   border: none;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
 }
 .category-chip:hover {
@@ -256,7 +256,7 @@ body {
   color: var(--text-primary);
 }
 .category-chip:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
 }
 .category-chip.active {
   background: var(--primary);
@@ -348,23 +348,7 @@ body {
   color: var(--primary);
   text-align: left;
 }
-.product-stock-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 4px 8px;
-  border-radius: 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.product-stock-badge.low {
-  color: #ef4444;
-  background: #fee2e2;
-}
-.product-stock-badge.normal {
-  color: #64748b;
-  background: #f1f5f9;
-}
+
 
 /* Bottom Control Row */
 .bottom-control-bar {
@@ -1138,8 +1122,8 @@ input:checked + .toggle-slider:before {
   flex: 1;
   overflow-y: auto;
   background: #ffffff;
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
@@ -1157,9 +1141,9 @@ input:checked + .toggle-slider:before {
 }
 
 .bo-table th {
-  padding: 14px 16px;
+  padding: 16px 20px;
   background: #f8fafc;
-  color: var(--text-muted);
+  color: #8b95a1;
   font-weight: 600;
   font-size: 12px;
   letter-spacing: 0.02em;
@@ -1179,14 +1163,14 @@ input:checked + .toggle-slider:before {
 }
 
 .bo-table td {
-  padding: 14px 16px;
+  padding: 16px 20px;
   border-bottom: 1px solid #f1f5f9;
   vertical-align: middle;
   color: var(--text-primary);
 }
 
 .bo-table tbody tr {
-  transition: background 0.1s ease;
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .bo-table tbody tr:hover {
@@ -1214,11 +1198,12 @@ input:checked + .toggle-slider:before {
 }
 
 .bo-table .cell-bold {
+  font-size: 14.5px;
   font-weight: 700;
 }
 
 .bo-table .cell-muted {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   margin-top: 2px;
 }
@@ -1292,58 +1277,7 @@ input:checked + .toggle-slider:before {
   border-radius: 20px;
 }
 
-/* ---- Stock controls ---- */
-.bo-stock-group {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
 
-.bo-stock-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  height: 28px;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  transition: all 0.12s ease;
-  padding: 0 6px;
-  font-family: var(--font-sans);
-}
-
-.bo-stock-btn:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-}
-
-.bo-stock-btn:active {
-  transform: scale(0.95);
-}
-
-.bo-stock-btn--accent {
-  background: #f1f5f9;
-  color: var(--text-secondary);
-}
-
-.bo-stock-value {
-  font-weight: 800;
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 40px;
-  justify-content: center;
-}
-
-.bo-stock-value.sold-out { color: #ef4444; }
-.bo-stock-value.low-stock { color: #f59e0b; }
 
 /* ---- Action buttons in table ---- */
 .bo-action-group {
@@ -1363,13 +1297,17 @@ input:checked + .toggle-slider:before {
   border-radius: 8px;
   cursor: pointer;
   color: var(--text-muted);
-  transition: all 0.12s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .bo-action-btn:hover {
   background: #f8fafc;
   color: var(--text-primary);
   border-color: #cbd5e1;
+}
+
+.bo-action-btn:active {
+  transform: scale(0.92);
 }
 
 .bo-action-btn--danger:hover {
@@ -1397,20 +1335,20 @@ input:checked + .toggle-slider:before {
   width: 100%;
   height: 44px;
   padding: 0 14px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid #e2e8f0;
   border-radius: 10px;
   font-size: 14px;
   font-family: var(--font-sans);
   color: var(--text-primary);
   background: #ffffff;
   outline: none;
-  transition: all 0.15s ease;
+  transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .bo-input:focus,
 .bo-select:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(26, 100, 244, 0.08);
+  box-shadow: 0 0 0 3.5px rgba(26, 100, 244, 0.12);
 }
 
 .bo-input:disabled {
@@ -1450,7 +1388,7 @@ input:checked + .toggle-slider:before {
   gap: 6px;
   height: 44px;
   padding: 0 16px;
-  border: 1.5px solid #e5e7eb;
+  border: 1.5px solid #e2e8f0;
   border-radius: 10px;
   background: #f8fafc;
   cursor: pointer;
@@ -1458,13 +1396,17 @@ input:checked + .toggle-slider:before {
   font-weight: 600;
   color: var(--text-secondary);
   font-family: var(--font-sans);
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
 }
 
 .bo-file-btn:hover {
   background: #f1f5f9;
   border-color: #cbd5e1;
+}
+
+.bo-file-btn:active {
+  transform: scale(0.97);
 }
 
 .bo-file-hint {
@@ -1519,10 +1461,10 @@ input:checked + .toggle-slider:before {
 
 .bo-modal {
   width: 100%;
-  max-width: 520px;
+  max-width: 560px;
   max-height: 90vh;
   background: #ffffff;
-  border-radius: 18px;
+  border-radius: 20px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.14);
   display: flex;
   flex-direction: column;
@@ -1541,25 +1483,25 @@ input:checked + .toggle-slider:before {
 }
 
 .bo-modal-header {
-  padding: 24px 28px 0;
+  padding: 28px 32px 0;
 }
 
 .bo-modal-title {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--text-primary);
-  letter-spacing: -0.3px;
+  letter-spacing: -0.4px;
 }
 
 .bo-modal-desc {
   font-size: 13px;
   color: var(--text-muted);
   margin-top: 6px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .bo-modal-body {
-  padding: 24px 28px;
+  padding: 24px 32px 28px;
   overflow-y: auto;
   flex: 1;
 }
@@ -1568,7 +1510,7 @@ input:checked + .toggle-slider:before {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px 28px 24px;
+  padding: 20px 32px 28px;
   border-top: 1px solid #f1f5f9;
 }
 
@@ -1578,6 +1520,11 @@ input:checked + .toggle-slider:before {
   border-radius: 12px;
   font-size: 15px;
   font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bo-modal-footer .btn:active {
+  transform: scale(0.97);
 }
 
 .bo-modal-footer .btn-primary {
@@ -2067,3 +2014,21 @@ input:checked + .toggle-slider:before {
 .login-spinner {
   animation: tossRotate 0.8s linear infinite !important;
 }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 20px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+

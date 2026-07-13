@@ -36,13 +36,63 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
     }
 
     // 임시 테스트용 로컬/바이패스 관리자 계정 지원 (VITE_ENABLE_DEV_LOGIN === 'true' 일 때만 허용)
+    // 브라우저 세션을 얻고 RLS 검증을 통과하기 위해 Supabase Auth로 로그인합니다.
     if (import.meta.env.VITE_ENABLE_DEV_LOGIN === 'true' && email.trim() === 'admin' && password === 'admin') {
-      auditLog({ action: 'LOGIN', result: 'SUCCESS', context: { email: 'admin@ssnr-pos.com', type: 'dev_bypass' } });
-      onLoginSuccess({
-        email: 'admin@ssnr-pos.com',
-        name: '임시관리자',
-        role: '관리자'
-      });
+      setIsLoggingIn(true);
+      try {
+        const devEmail = import.meta.env.VITE_DEV_ADMIN_EMAIL;
+        const devPassword = import.meta.env.VITE_DEV_ADMIN_PASSWORD;
+
+        if (!devEmail || !devPassword) {
+          throw new Error('개발자 로그인 환경변수(VITE_DEV_ADMIN_EMAIL, VITE_DEV_ADMIN_PASSWORD)가 설정되지 않았습니다. .env 파일을 확인해 주십시오.');
+        }
+
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: devEmail,
+          password: devPassword
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        if (data && data.user) {
+          const user = data.user;
+
+          // Debug prints as requested
+          const {
+            data: { session }
+          } = await supabase.auth.getSession();
+          console.log("Logged-in Session User ID (Dev Bypass):", session?.user.id);
+          console.log("Logged-in Session User Email (Dev Bypass):", session?.user.email);
+
+          if (session?.user.id) {
+            const { data: roleData, error: roleError } = await supabase
+              .from('user_roles')
+              .select('*')
+              .eq('user_id', session.user.id);
+            console.log("Query 'select * from user_roles where user_id = session.user.id' result (Dev Bypass):", roleData, roleError);
+          }
+
+          auditLog({ action: 'LOGIN', result: 'SUCCESS', context: { email: devEmail, type: 'dev_bypass' } });
+          
+          let displayName = user.user_metadata?.name || '임시관리자';
+          
+          onLoginSuccess({
+            email: devEmail,
+            name: displayName,
+            role: '관리자'
+          });
+          return;
+        } else {
+          throw new Error('사용자 세션 데이터를 찾을 수 없습니다.');
+        }
+      } catch (err: any) {
+        console.error('개발용 바이패스 로그인 에러:', err);
+        setLoginError(`개발용 계정 로그인 실패: ${err.message || err}`);
+      } finally {
+        setIsLoggingIn(false);
+      }
       return;
     }
 
@@ -67,6 +117,24 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
 
       if (data && data.user) {
         const user = data.user;
+
+        // Debug prints as requested
+        const {
+          data: { session }
+        } = await supabase.auth.getSession();
+
+        console.log("Logged-in Session User ID:", session?.user.id);
+        console.log("Logged-in Session User Email:", session?.user.email);
+
+        // Query user_roles table
+        if (session?.user.id) {
+          const { data: roleData, error: roleError } = await supabase
+            .from('user_roles')
+            .select('*')
+            .eq('user_id', session.user.id);
+          console.log("Query 'select * from user_roles where user_id = session.user.id' result:", roleData, roleError);
+        }
+
         // 메타데이터 이름이 없으면 이메일 ID 앞자리를 이름으로 사용 (rbflrbgh -> rbflrbgh)
         let displayName = user.user_metadata?.name || user.email?.split('@')[0] || '캐셔';
         if (user.email?.startsWith('rbflrbgh') && displayName === 'rbflrbgh') {

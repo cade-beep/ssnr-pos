@@ -2,7 +2,7 @@ export interface Product {
   id: string;
   name: string;
   price: number;
-  category: 'coffee' | 'beverage' | 'bakery' | 'food' | 'etc';
+  category: 'bakery' | 'food' | 'etc';
   emoji: string;
   color?: string; // Card accent color
   imageUrl?: string;

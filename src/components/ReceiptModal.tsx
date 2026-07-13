@@ -42,23 +42,66 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose }) => {
             </div>
 
             <div style={{ margin: '8px 0' }}>
-              {receipt.items.map((item) => (
-                <div key={item.product.id} className="bo-receipt-item-row">
-                  <div className="bo-receipt-item-name">{item.product.name}</div>
-                  <div className="bo-receipt-item-qty">{item.quantity}</div>
-                  <div className="bo-receipt-item-amount">
-                    {(item.product.price * item.quantity).toLocaleString()}
+              {receipt.items.map((item) => {
+                if (item.product.id === 'DISCOUNT') return null; // skip virtual global discount item from list
+
+                const hasDiscount = item.discount && item.discountQty && item.discount > 0 && item.discountQty > 0;
+                const itemTotal = (item.product.price * item.quantity) - (hasDiscount ? (item.discount || 0) * (item.discountQty || 0) : 0);
+
+                return (
+                  <div key={item.product.id} style={{ display: 'flex', flexDirection: 'column', marginBottom: '4px' }}>
+                    <div className="bo-receipt-item-row">
+                      <div className="bo-receipt-item-name">{item.product.name}</div>
+                      <div className="bo-receipt-item-qty">{item.quantity}</div>
+                      <div className="bo-receipt-item-amount">
+                        {itemTotal.toLocaleString()}
+                      </div>
+                    </div>
+                    {hasDiscount && (
+                      <div style={{ fontSize: '11px', color: '#ef4444', paddingLeft: '8px', marginTop: '-2px', textAlign: 'left' }}>
+                        └ 개별할인 적용: -{((item.discount || 0) * (item.discountQty || 0)).toLocaleString()}원
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="bo-receipt-divider"></div>
 
-            <div className="bo-receipt-row big" style={{ borderTop: 'none', paddingTop: 0, marginTop: 0 }}>
-              <span>청구합계</span>
-              <span>{receipt.total.toLocaleString()}원</span>
-            </div>
+            {(() => {
+              const originalSubtotal = receipt.items.reduce((sum, item) => {
+                if (item.product.id === 'DISCOUNT') return sum;
+                return sum + (item.product.price * item.quantity);
+              }, 0);
+              const itemDiscountSum = receipt.items.reduce((sum, item) => {
+                if (item.product.id === 'DISCOUNT') return sum;
+                return sum + ((item.discount || 0) * (item.discountQty || 0));
+              }, 0);
+              const globalDiscountItem = receipt.items.find(item => item.product.id === 'DISCOUNT');
+              const globalDiscountVal = globalDiscountItem ? Math.abs(globalDiscountItem.product.price * globalDiscountItem.quantity) : 0;
+              const totalDiscount = itemDiscountSum + globalDiscountVal;
+
+              return (
+                <>
+                  <div className="bo-receipt-row">
+                    <span>상품합계</span>
+                    <span>{originalSubtotal.toLocaleString()}원</span>
+                  </div>
+                  {totalDiscount > 0 && (
+                    <div className="bo-receipt-row" style={{ color: '#ef4444' }}>
+                      <span>할인합계</span>
+                      <span>-{totalDiscount.toLocaleString()}원</span>
+                    </div>
+                  )}
+                  <div className="bo-receipt-divider"></div>
+                  <div className="bo-receipt-row big" style={{ borderTop: 'none', paddingTop: 0, marginTop: 0 }}>
+                    <span>청구합계</span>
+                    <span>{receipt.total.toLocaleString()}원</span>
+                  </div>
+                </>
+              );
+            })()}
 
             <div className="bo-receipt-divider"></div>
 
