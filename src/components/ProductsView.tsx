@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Product } from '../types';
 import { supabase } from '../supabase';
 import { Plus, Edit2, Trash2, Search, ArrowUpDown, Upload, Check, AlertTriangle } from 'lucide-react';
+import { auditLog } from '../utils/auditLogger';
 
 interface ProductsViewProps {
   products: Product[];
@@ -263,19 +264,41 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
   };
 
   // Quick Stock Adjustment
+  // Quick Stock Adjustment (via secure RPC with audit logging)
   const adjustStock = async (product: Product, amount: number) => {
-    const newStock = Math.max(0, (product.stock || 0) + amount);
+    const reason = window.prompt(`[${product.name}] 재고를 ${amount > 0 ? '+' : ''}${amount}개 조정하는 사유를 입력해 주세요 (필수):`);
+    if (reason === null) return;
+    if (!reason.trim()) {
+      alert('재고 수동 조정 시에는 조치 사유를 반드시 기입해 주셔야 적용됩니다.');
+      return;
+    }
+
     try {
-      const { error } = await supabase
-        .from('products')
-        .update({ stock: newStock })
-        .eq('id', product.id);
+      const { error } = await supabase.rpc('adjust_product_stock', {
+        p_product_id: product.id,
+        p_amount: amount,
+        p_reason: reason.trim()
+      });
 
       if (error) throw error;
-      showToast(`📦 ${product.name} 재고 변경 완료: ${newStock}개`);
+      
+      auditLog({
+        action: 'INVENTORY_ADJUSTMENT',
+        result: 'SUCCESS',
+        context: { productId: product.id, productName: product.name, amount, reason: reason.trim() }
+      });
+
+      showToast(`📦 ${product.name} 재고 변경 완료: ${amount > 0 ? '+' : ''}${amount}개`);
       onRefresh();
     } catch (err: any) {
       console.error(err);
+      
+      auditLog({
+        action: 'API_FAILURE',
+        result: 'FAIL',
+        context: { actionType: 'INVENTORY_ADJUSTMENT', productId: product.id, error: err.message || String(err) }
+      });
+
       showToast(`⚠️ 재고 변경 실패: ${err.message || err}`);
     }
   };

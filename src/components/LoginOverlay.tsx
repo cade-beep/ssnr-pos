@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CashierUser } from '../types';
 import { supabase } from '../supabase';
+import { auditLog } from '../utils/auditLogger';
 
 interface LoginOverlayProps {
   onLoginSuccess: (user: CashierUser) => void;
@@ -27,6 +28,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
 
     // 임시 테스트용 로컬/바이패스 관리자 계정 지원 (VITE_ENABLE_DEV_LOGIN === 'true' 일 때만 허용)
     if (import.meta.env.VITE_ENABLE_DEV_LOGIN === 'true' && email.trim() === 'admin' && password === 'admin') {
+      auditLog({ action: 'LOGIN', result: 'SUCCESS', context: { email: 'admin@ssnr-pos.com', type: 'dev_bypass' } });
       onLoginSuccess({
         email: 'admin@ssnr-pos.com',
         name: '임시관리자',
@@ -69,6 +71,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
           user.email?.startsWith('rbflrbgh') || 
           displayName === '김규호';
 
+        auditLog({ action: 'LOGIN', result: 'SUCCESS', context: { email: user.email } });
         onLoginSuccess({
           email: user.email || '',
           name: displayName,
@@ -79,6 +82,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
       }
     } catch (err: any) {
       console.error('로그인 에러:', err);
+      auditLog({ action: 'AUTH_FAILURE', result: 'FAIL', context: { email: email.trim(), error: err.message } });
       // 사용자 이해를 돕기 위한 예외 에러 메시지 맵핑
       if (err.message?.includes('Invalid login credentials')) {
         setLoginError('아이디 또는 비밀번호가 올바르지 않습니다.');

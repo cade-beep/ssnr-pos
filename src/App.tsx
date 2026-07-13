@@ -10,6 +10,35 @@ import SettingsView from './components/SettingsView';
 import { RefreshCw, LogOut } from 'lucide-react';
 import { supabase } from './supabase';
 import { STATIC_PRODUCTS } from './productsData';
+import { auditLog } from './utils/auditLogger';
+
+const getFriendlyErrorMessage = (error: any): string => {
+  if (!error) return '알 수 없는 오류가 발생했습니다.';
+  const msg = error.message || String(error);
+  
+  if (msg.includes('재고가 부족합니다') || msg.includes('stock')) {
+    return '⚠️ 재고가 부족합니다. 구매 수량을 다시 확인해 주세요.';
+  }
+  if (msg.includes('JWT') || msg.includes('인증') || msg.includes('invalid claims')) {
+    return '⚠️ 로그인 세션이 만료되었습니다. 로그아웃 후 다시 로그인해 주세요.';
+  }
+  if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('network')) {
+    return '🌐 인터넷 연결이 원활하지 않거나 데이터베이스 서버와 통신할 수 없습니다. 공유기 신호 및 네트워크 환경을 확인해 주세요.';
+  }
+  if (msg.includes('duplicate key value') || msg.includes('order_number') || msg.includes('unique constraint') || msg.includes('idempotency')) {
+    return '🔒 이미 결제 처리 중이거나 완료된 주문 번호입니다. 중복 승인이 성공적으로 예방되었습니다.';
+  }
+  if (msg.includes('is_active')) {
+    return '⚠️ 비활성화되었거나 품절된 상품이 포함되어 있습니다. 최신 상품 상태를 확인해 주세요.';
+  }
+  if (msg.includes('가격 정보가 일치하지 않습니다')) {
+    return '⚠️ 상품 정보(단가)가 일치하지 않습니다. 포스기를 새로고침하여 상품 정보를 업데이트해 주세요.';
+  }
+  if (msg.includes('permission denied') || msg.includes('row-level security') || msg.includes('policy')) {
+    return '⚠️ 작업 처리 권한이 없습니다. (관리자 권한이 필요하거나 세션 인증 만료)';
+  }
+  return `데이터베이스 처리 중 오류가 발생했습니다.\n(${msg})`;
+};
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'sales' | 'history' | 'products' | 'settings'>('sales');
@@ -26,6 +55,8 @@ const App: React.FC = () => {
   // Cashier Authentication States
   const [currentCashier, setCurrentCashier] = useState<CashierUser | null>(null);
   const [isSessionLoading, setIsSessionLoading] = useState<boolean>(true);
+  const [activeIdempotencyKey, setActiveIdempotencyKey] = useState<string | null>(null);
+  const [isCheckoutSubmitting, setIsCheckoutSubmitting] = useState<boolean>(false);
 
   // Check auth session on startup
   useEffect(() => {
@@ -81,6 +112,55 @@ const App: React.FC = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    if (!currentCashier) return;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Focus Search input on F1
+      if (e.key === 'F1') {
+        e.preventDefault();
+        const searchInput = document.querySelector('.search-input') as HTMLInputElement | null;
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+      }
+
+      // Escape key to close payment modals
+      if (e.key === 'Escape') {
+        if (isPaymentModalOpen && !isCheckoutSubmitting) {
+          setIsPaymentModalOpen(false);
+        }
+      }
+
+      // F12 to trigger checkout
+      if (e.key === 'F12') {
+        if (cart.length > 0 && !isPaymentModalOpen && activeTab === 'sales') {
+          e.preventDefault();
+          const key = crypto.randomUUID ? crypto.randomUUID() : `SSNR-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+          setActiveIdempotencyKey(key);
+          setIsPaymentModalOpen(true);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [currentCashier, cart, isPaymentModalOpen, isCheckoutSubmitting, activeTab]);
+
+  // Auto-focus search input when activeTab is sales
+  useEffect(() => {
+    if (activeTab === 'sales' && currentCashier) {
+      setTimeout(() => {
+        const searchInput = document.querySelector('.search-input') as HTMLInputElement | null;
+        if (searchInput) {
+          searchInput.focus();
+        }
+      }, 150);
+    }
+  }, [activeTab, currentCashier]);
 
   // Fetch products from Supabase and auto-seed if database is empty
   const loadProducts = async () => {
@@ -277,6 +357,21 @@ const App: React.FC = () => {
     }
   };
 
+  // Set explicit quantity
+  const handleSetQty = (productId: string, quantity: number) => {
+    if (quantity <= 0) {
+      handleRemoveFromCart(productId);
+      return;
+    }
+    setCart((prevCart) =>
+      prevCart.map((item) =>
+        item.product.id === productId
+          ? { ...item, quantity }
+          : item
+      )
+    );
+  };
+
   // Clear cart
   const handleClearCart = () => {
     if (cart.length === 0) return;
@@ -365,81 +460,36 @@ const App: React.FC = () => {
     return sum + Math.max(0, itemTotal);
   }, 0);
 
-  // Payment process handler with database transaction and inventory deduction
-  const handleCompletePayment = async (paymentMethod: PaymentMethod) => {
-    console.log('[LOG] Initiating payment checkout flow');
-    
-    // 1. Stock Pre-check (Prevent Negative Inventory)
+  // Payment process handler with database RPC complete_sale (transaction-safe)
+  const handleCompletePayment = async (paymentMethod: PaymentMethod, receivedCashVal?: number, changeVal?: number) => {
+    if (isCheckoutSubmitting) return;
+    setIsCheckoutSubmitting(true);
+    console.log('[LOG] Initiating payment checkout flow with database RPC');
+
+    // 1. Stock Pre-check (Prevent Negative Inventory before sending request)
     for (const item of cart) {
       const currentProd = products.find(p => p.id === item.product.id);
       if (currentProd) {
         const currentStock = currentProd.stock !== undefined ? currentProd.stock : 999;
         if (currentStock < item.quantity) {
           alert(`⚠️ 결제 불가: [${item.product.name}] 상품의 재고가 부족합니다.\n(현재 재고: ${currentStock}개, 구매 수량: ${item.quantity}개)`);
+          setIsCheckoutSubmitting(false);
           return;
         }
       }
     }
 
     const finalAmount = Math.max(0, totalAmount - discountAmount);
-    const receipt: Receipt = {
-      id: `SSNR-${Date.now().toString().slice(-6)}`,
-      items: [...cart],
-      total: finalAmount,
-      totalQuantity: cart.reduce((sum, item) => sum + item.quantity, 0),
-      paymentMethod,
-      receivedAmount: finalAmount,
-      change: 0,
-      date: new Date()
-    };
     
-    const savedDiscount = discountAmount;
-    const plainReceipt = JSON.parse(JSON.stringify(receipt));
-    plainReceipt.cashierName = currentCashier ? currentCashier.name : '시스템';
-    
-    if (savedDiscount > 0) {
-      plainReceipt.items.push({
-        product: {
-          id: 'DISCOUNT',
-          name: `[할인적용: -${savedDiscount.toLocaleString()}원]`,
-          price: 0,
-          category: 'etc',
-          emoji: '🏷️'
-        },
-        quantity: 1
-      });
-    }
+    // Fallback key if activeIdempotencyKey is somehow not set
+    const finalIdempotencyKey = activeIdempotencyKey || (crypto.randomUUID ? crypto.randomUUID() : `SSNR-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
 
-    // 2. Transaction execution
     try {
-      // 2a. Insert Order Header and return generated ID
-      const { data: insertedOrder, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          order_number: plainReceipt.id,
-          payment_date_time: new Date(plainReceipt.date).toISOString(),
-          payment_method: plainReceipt.paymentMethod,
-          total_amount: plainReceipt.total,
-          total_quantity: plainReceipt.totalQuantity,
-          received_amount: plainReceipt.receivedAmount,
-          change: plainReceipt.change,
-          cashier_name: plainReceipt.cashierName
-        })
-        .select('id')
-        .single();
-
-      if (orderError) {
-        throw new Error(orderError.message);
-      }
-
-      const orderUUID = insertedOrder.id;
-
-      // 2b. Insert Order Items referencing orderUUID
-      const orderItemsPayload = plainReceipt.items.map((item: any) => ({
-        order_id: orderUUID,
+      // Prepare cart payload for RPC
+      const cartPayload = cart.map(item => ({
         product_id: item.product.id,
         product_name: item.product.name,
-        product_price: item.product.price,
+        price: item.product.price,
         quantity: item.quantity,
         discount: item.discount || 0,
         discount_qty: item.discountQty || 0,
@@ -447,87 +497,120 @@ const App: React.FC = () => {
         discount_percent: item.discountPercent || 0
       }));
 
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItemsPayload);
+      // Call database transaction RPC
+      const { data: rpcData, error: rpcError } = await supabase.rpc('complete_sale', {
+        p_idempotency_key: finalIdempotencyKey,
+        p_payment_method: paymentMethod,
+        p_total_amount: finalAmount,
+        p_total_quantity: cart.reduce((sum, item) => sum + item.quantity, 0),
+        p_received_amount: receivedCashVal !== undefined ? receivedCashVal : finalAmount,
+        p_change: changeVal !== undefined ? changeVal : 0,
+        p_items: cartPayload,
+        p_global_discount: discountAmount
+      });
 
-      if (itemsError) {
-        // Rollback Order Header to maintain transactional integrity
-        await supabase.from('orders').delete().eq('id', orderUUID);
-        throw new Error(itemsError.message);
+      if (rpcError) {
+        throw new Error(rpcError.message);
       }
 
-      // 2c. Update inventory values (stock deduction)
-      for (const item of cart) {
-        if (item.product.id === 'DISCOUNT' || item.product.id === 'GS') continue;
-        const currentProd = products.find(p => p.id === item.product.id);
-        if (currentProd) {
-          const originalStock = currentProd.stock !== undefined ? currentProd.stock : 0;
-          const updatedStock = Math.max(0, originalStock - item.quantity);
-          
-          const { error: stockErr } = await supabase
-            .from('products')
-            .update({ stock: updatedStock })
-            .eq('id', item.product.id);
-            
-          if (stockErr) {
-            console.error(`Failed to deduct inventory for ${item.product.name}:`, stockErr);
-          }
-        }
+      if (!rpcData || !rpcData.success) {
+        throw new Error(rpcData?.message || '결제 등록에 실패했습니다.');
       }
 
-    } catch (supabaseErr: any) {
-      console.error('Checkout aborted due to database error:', supabaseErr);
-      alert(`⚠️ 결제 실패: 데이터베이스 저장 및 재고 차감 처리에 실패하여 결제가 취소되었습니다.\n(${supabaseErr.message || supabaseErr})`);
-      return;
-    }
-
-    // 3. Google Sheets Write Fallback
-    const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
-    if (webappUrl) {
-      const itemsSummary = plainReceipt.items.map((item: any) => {
-        if (item.discount && item.discountQty && item.discount > 0 && item.discountQty > 0) {
-          const discountSum = item.discount * item.discountQty;
-          return `${item.product.name} x ${item.quantity} (할인: -${discountSum.toLocaleString()}원)`;
-        }
-        return `${item.product.name} x ${item.quantity}`;
-      }).join(', ');
-      
-      const payload = {
-        orderId: plainReceipt.id,
-        paymentDateTime: new Date().toLocaleString('ko-KR'),
-        paymentMethod: plainReceipt.paymentMethod === 'CARD' ? '신용카드' : '계좌이체',
-        totalAmount: plainReceipt.total,
-        items: itemsSummary,
-        totalQuantity: plainReceipt.totalQuantity,
-        receivedAmount: plainReceipt.receivedAmount,
-        change: plainReceipt.change,
-        cashierName: plainReceipt.cashierName
+      const receipt: Receipt = {
+        id: finalIdempotencyKey,
+        items: [...cart],
+        total: finalAmount,
+        totalQuantity: cart.reduce((sum, item) => sum + item.quantity, 0),
+        paymentMethod,
+        receivedAmount: receivedCashVal !== undefined ? receivedCashVal : finalAmount,
+        change: changeVal !== undefined ? changeVal : 0,
+        date: new Date(),
+        cashierName: currentCashier ? currentCashier.name : '시스템'
       };
 
-      try {
-        await fetch(webappUrl, {
+      // Best-effort Sync to Google Sheets
+      const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
+      if (webappUrl) {
+        const itemsSummary = cart.map((item: any) => {
+          if (item.discount && item.discountQty && item.discount > 0 && item.discountQty > 0) {
+            const discountSum = item.discount * item.discountQty;
+            return `${item.product.name} x ${item.quantity} (할인: -${discountSum.toLocaleString()}원)`;
+          }
+          return `${item.product.name} x ${item.quantity}`;
+        }).join(', ');
+        
+        const payload = {
+          orderId: finalIdempotencyKey,
+          paymentDateTime: new Date().toLocaleString('ko-KR'),
+          paymentMethod: paymentMethod === 'CARD' ? '신용카드' : '계좌이체',
+          totalAmount: finalAmount,
+          items: itemsSummary,
+          totalQuantity: receipt.totalQuantity,
+          receivedAmount: receipt.receivedAmount,
+          change: receipt.change,
+          cashierName: receipt.cashierName
+        };
+
+        fetch(webappUrl, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
-        });
-      } catch (sheetsErr: any) {
-        console.warn('Google Sheets log fallback failed:', sheetsErr);
+        }).catch(err => console.warn('Google Sheets sync fallback failed:', err));
       }
-    }
 
-    // Success actions
-    showToast('💳 결제가 완료되고 재고가 정상 차감되었습니다.', 'success');
-    setCurrentReceipt(receipt);
-    setIsPaymentModalOpen(false);
-    setCart([]);
-    setDiscountAmount(0);
-    loadProducts(); // Reload products to get latest stock levels
+      // Log audit transaction
+      auditLog({
+        action: 'SALE',
+        result: 'SUCCESS',
+        context: {
+          orderId: finalIdempotencyKey,
+          amount: finalAmount,
+          itemsCount: cart.length,
+          method: paymentMethod
+        }
+      });
+
+      showToast('💳 결제가 완료되고 재고가 정상 차감되었습니다.', 'success');
+      if (isReceiptChecked) {
+        setCurrentReceipt(receipt);
+      }
+      setIsPaymentModalOpen(false);
+      setCart([]);
+      setDiscountAmount(0);
+      setActiveIdempotencyKey(null);
+      loadProducts();
+
+      // Auto-focus search input after checkout
+      setTimeout(() => {
+        const searchInput = document.querySelector('.search-input') as HTMLInputElement | null;
+        if (searchInput) {
+          searchInput.focus();
+        }
+      }, 150);
+    } catch (err: any) {
+      console.error('Checkout error:', err);
+      
+      // Log failed transaction
+      auditLog({
+        action: 'API_FAILURE',
+        result: 'FAIL',
+        context: {
+          actionType: 'CHECKOUT',
+          error: err.message || String(err)
+        }
+      });
+
+      alert(getFriendlyErrorMessage(err));
+    } finally {
+      setIsCheckoutSubmitting(false);
+    }
   };
 
   const handleLogout = async () => {
     if (window.confirm('근무를 종료하고 로그아웃 하시겠습니까?')) {
+      auditLog({ action: 'LOGOUT', result: 'SUCCESS' });
       await supabase.auth.signOut();
       setCurrentCashier(null);
       showToast('👋 근무 종료 및 로그아웃 완료', 'info');
@@ -632,17 +715,21 @@ const App: React.FC = () => {
                 onDecrease={handleDecreaseQty}
                 onDelete={handleRemoveFromCart}
                 onClear={handleClearCart}
-                onCheckout={() => setIsPaymentModalOpen(true)}
+                onCheckout={() => {
+                  const key = crypto.randomUUID ? crypto.randomUUID() : `SSNR-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                  setActiveIdempotencyKey(key);
+                  setIsPaymentModalOpen(true);
+                }}
                 onViewHistory={() => setActiveTab('history')}
                 historyCount={0}
                 onApplyDiscount={handleApplyGlobalDiscount}
                 onApplyItemDiscount={handleApplyItemDiscount}
+                onSetQuantity={handleSetQty}
               />
             </aside>
           </>
         ) : activeTab === 'history' ? (
           <HistoryView 
-            currentCashierName={currentCashier.name}
             onSelectReceipt={(r) => setCurrentReceipt(r)}
             showToast={showToast}
           />
@@ -705,8 +792,9 @@ const App: React.FC = () => {
       {isPaymentModalOpen && (
         <PaymentModal
           totalAmount={Math.max(0, totalAmount - discountAmount)}
-          onClose={() => setIsPaymentModalOpen(false)}
+          onClose={() => !isCheckoutSubmitting && setIsPaymentModalOpen(false)}
           onPaymentComplete={handleCompletePayment}
+          isSubmitting={isCheckoutSubmitting}
         />
       )}
 
@@ -749,17 +837,19 @@ const App: React.FC = () => {
 interface PaymentModalProps {
   totalAmount: number;
   onClose: () => void;
-  onPaymentComplete: (method: PaymentMethod) => void;
+  onPaymentComplete: (method: PaymentMethod, receivedCash?: number, change?: number) => void;
+  isSubmitting?: boolean;
 }
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ totalAmount, onClose, onPaymentComplete }) => {
+const PaymentModal: React.FC<PaymentModalProps> = ({ totalAmount, onClose, onPaymentComplete, isSubmitting = false }) => {
   const [method, setMethod] = useState<PaymentMethod>('CARD');
   const [receivedCash, setReceivedCash] = useState<string>('');
   const [change, setChange] = useState<number>(0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onPaymentComplete(method);
+    if (isSubmitting) return;
+    onPaymentComplete(method, Number(receivedCash) || totalAmount, change);
   };
 
   useEffect(() => {
@@ -777,11 +867,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ totalAmount, onClose, onPay
         <div className="modal-body">
           <div className="modal-title">결제 처리</div>
           
-          <div className="payment-selector">
+          <div className="payment-selector" style={{ pointerEvents: isSubmitting ? 'none' : 'auto' }}>
             <button 
               type="button"
               className={`payment-option ${method === 'CARD' ? 'selected' : ''}`}
               onClick={() => setMethod('CARD')}
+              disabled={isSubmitting}
             >
               <span style={{ fontSize: '24px' }}>💳</span>
               <span className="payment-option-title">신용카드</span>
@@ -790,6 +881,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ totalAmount, onClose, onPay
               type="button"
               className={`payment-option ${method === 'TRANSFER' ? 'selected' : ''}`}
               onClick={() => setMethod('TRANSFER')}
+              disabled={isSubmitting}
             >
               <span style={{ fontSize: '24px' }}>🏦</span>
               <span className="payment-option-title">계좌이체</span>
@@ -830,6 +922,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ totalAmount, onClose, onPay
                     value={receivedCash} 
                     onChange={e => setReceivedCash(e.target.value)} 
                     placeholder="예: 20000"
+                    disabled={isSubmitting}
                     style={{ padding: '8px 12px', width: '130px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', textAlign: 'right' }} 
                   />
                 </div>
@@ -845,13 +938,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ totalAmount, onClose, onPay
         </div>
 
         <div className="modal-footer">
-          <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={onClose}>취소</button>
+          <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={onClose} disabled={isSubmitting}>취소</button>
           <button 
             type="submit" 
             className="btn btn-primary" 
             style={{ flex: 2 }}
+            disabled={isSubmitting}
           >
-            결제 완료
+            {isSubmitting ? '결제 처리 중...' : '결제 완료'}
           </button>
         </div>
       </form>

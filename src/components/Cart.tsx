@@ -15,6 +15,7 @@ interface CartProps {
   historyCount: number;
   onApplyDiscount: (amount: number) => void;
   onApplyItemDiscount: (productId: string, amount: number, qty: number, isPercent?: boolean, percentVal?: number) => void;
+  onSetQuantity: (productId: string, quantity: number) => void;
 }
 
 const Cart: React.FC<CartProps> = ({
@@ -30,6 +31,7 @@ const Cart: React.FC<CartProps> = ({
   historyCount,
   onApplyDiscount,
   onApplyItemDiscount,
+  onSetQuantity,
 }) => {
   const [isDiscountModalOpen, setIsDiscountModalOpen] = React.useState(false);
   const [customDiscountText, setCustomDiscountText] = React.useState('');
@@ -138,7 +140,22 @@ const Cart: React.FC<CartProps> = ({
                 >
                   <Minus size={12} />
                 </button>
-                <span className="cart-item-quantity">{item.quantity}</span>
+                <span 
+                  className="cart-item-quantity"
+                  onClick={() => {
+                    const newQtyInput = window.prompt(`[${item.product.name}] 구매 수량을 변경해 주세요 (직접 입력):`, String(item.quantity));
+                    if (newQtyInput !== null) {
+                      const parsed = parseInt(newQtyInput, 10);
+                      if (!isNaN(parsed) && parsed >= 0) {
+                        onSetQuantity(item.product.id, parsed);
+                      }
+                    }
+                  }}
+                  style={{ cursor: 'pointer', textDecoration: 'underline dotted' }}
+                  title="클릭하여 수량 직접 입력"
+                >
+                  {item.quantity}
+                </span>
                 <button
                   type="button"
                   className="quantity-btn"

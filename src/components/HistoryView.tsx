@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Receipt, PaymentMethod, CartItem } from '../types';
 import { supabase } from '../supabase';
 import { Search, Calendar, RefreshCw, Undo, Coins, TrendingUp, Award, ShoppingBag, Eye } from 'lucide-react';
+import { auditLog } from '../utils/auditLogger';
 
 interface HistoryViewProps {
-  currentCashierName: string;
   onSelectReceipt: (receipt: Receipt) => void;
   showToast: (msg: string) => void;
 }
 
-const HistoryView: React.FC<HistoryViewProps> = ({ currentCashierName, onSelectReceipt, showToast }) => {
+const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast }) => {
   const [viewMode, setViewMode] = useState<'list' | 'dashboard'>('list');
   const [isLoading, setIsLoading] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
@@ -181,58 +181,56 @@ const HistoryView: React.FC<HistoryViewProps> = ({ currentCashierName, onSelectR
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
 
-  // Refund Order & restore inventory
+  // Refund Order & restore inventory (atomic database transaction)
   const handleRefund = async (order: any) => {
     if (order.is_refunded) return;
-    const confirmRefund = window.confirm(
-      `⚠️ 주문번호 [${order.order_number}] 결제건을 환불하시겠습니까?\n이 주문에 포함된 ${order.total_quantity}개의 상품 재고가 원래대로 복구됩니다.`
-    );
-    if (!confirmRefund) return;
+    
+    const reason = window.prompt(`⚠️ 주문번호 [${order.order_number}] 결제건을 환불하시겠습니까?\n사유를 입력해 주세요 (필수):`, '고객 단순 변심');
+    if (reason === null) return;
+    if (!reason.trim()) {
+      alert('환불 사유를 작성해야 환불 처리가 가능합니다.');
+      return;
+    }
 
     setIsLoading(true);
     try {
-      // 1. Mark Order Header as refunded in Supabase
-      const { error: refundError } = await supabase
-        .from('orders')
-        .update({
-          is_refunded: true,
-          refunded_at: new Date().toISOString(),
-          refunded_by: currentCashierName
-        })
-        .eq('id', order.id);
+      // Call secure atomic refund RPC
+      const { data: rpcData, error: rpcError } = await supabase.rpc('refund_order', {
+        p_order_number: order.order_number,
+        p_reason: reason.trim()
+      });
 
-      if (refundError) throw refundError;
+      if (rpcError) throw rpcError;
 
-      // 2. Restore Stock Levels for each item in the order
-      for (const item of order.order_items) {
-        if (item.product_id === 'DISCOUNT' || item.product_id === 'GS') continue;
-        
-        // Fetch current stock
-        const { data: prodData, error: prodFetchError } = await supabase
-          .from('products')
-          .select('stock, name')
-          .eq('id', item.product_id)
-          .single();
-
-        if (prodFetchError) {
-          console.warn(`Could not find product ${item.product_id} to restore inventory, skipping.`, prodFetchError);
-          continue;
-        }
-
-        const restoredStock = (prodData.stock || 0) + item.quantity;
-        
-        // Update product stock
-        await supabase
-          .from('products')
-          .update({ stock: restoredStock })
-          .eq('id', item.product_id);
+      if (!rpcData || !rpcData.success) {
+        throw new Error(rpcData?.message || '서버 환불 처리에 실패했습니다.');
       }
+
+      auditLog({
+        action: 'REFUND',
+        result: 'SUCCESS',
+        context: { orderNumber: order.order_number, reason: reason.trim() }
+      });
 
       showToast(`↩️ 주문번호 [${order.order_number}] 환불 완료 및 재고가 복원되었습니다.`);
       fetchHistory();
     } catch (err: any) {
       console.error(err);
-      alert(`⚠️ 환불 처리 중 오류가 발생했습니다: ${err.message || err}`);
+      const errMsg = err.message || String(err);
+      
+      auditLog({
+        action: 'API_FAILURE',
+        result: 'FAIL',
+        context: { actionType: 'REFUND', orderNumber: order.order_number, error: errMsg }
+      });
+
+      if (errMsg.includes('permission denied') || errMsg.includes('row-level security') || errMsg.includes('policy')) {
+        alert('⚠️ 환불 권한이 없습니다. 관리자(어드민) 계정만 결제 취소 및 환불 처리가 가능합니다.');
+      } else if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) {
+        alert('🌐 인터넷 연결이 원활하지 않습니다. 네트워크 설정을 점검한 후 다시 시도해 주세요.');
+      } else {
+        alert(`⚠️ 환불 처리 실패: ${errMsg}`);
+      }
     } finally {
       setIsLoading(false);
     }

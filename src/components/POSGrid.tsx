@@ -93,86 +93,87 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
       </div>
 
       {/* Products Grid */}
-      <div className="products-grid-container">
-        <div className="products-grid">
-          {filteredProducts.map((product) => {
-            const inCart = isProductInCart(product.id);
-            const stock = product.stock !== undefined ? product.stock : 999;
-            const threshold = product.lowStockThreshold !== undefined ? product.lowStockThreshold : 5;
-            const isLowStock = stock <= threshold;
-            const isSoldOut = stock === 0;
+      <div className="products-grid-container" style={{ display: 'flex', flexDirection: 'column' }}>
+        {filteredProducts.length === 0 ? (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 20px', color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: '48px', marginBottom: '12px' }}>🔍</span>
+            <strong style={{ fontSize: '16px', color: 'var(--text-primary)', marginBottom: '4px' }}>일치하는 상품이 없습니다</strong>
+            <span style={{ fontSize: '13px' }}>다른 검색어를 입력하시거나 카테고리를 확인해 주세요.</span>
+          </div>
+        ) : (
+          <div className="products-grid">
+            {filteredProducts.map((product) => {
+              const inCart = isProductInCart(product.id);
+              const stock = product.stock !== undefined ? product.stock : 999;
+              const threshold = product.lowStockThreshold !== undefined ? product.lowStockThreshold : 5;
+              const isLowStock = stock <= threshold;
+              const isSoldOut = stock === 0;
 
-            return (
-              <button
-                key={product.id}
-                type="button"
-                className={`product-card ${isSoldOut ? 'sold-out' : ''}`}
-                onClick={() => !isSoldOut && onProductClick(product)}
-                disabled={isSoldOut}
-                style={{
-                  borderColor: isSoldOut ? '#e2e8f0' : inCart ? 'var(--primary)' : 'var(--border-color)',
-                  boxShadow: inCart ? '0 0 0 2px rgba(26, 100, 244, 0.08)' : 'var(--shadow-sm)',
-                  opacity: isSoldOut ? 0.6 : 1,
-                  position: 'relative',
-                  cursor: isSoldOut ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {/* Product Photo */}
-                <div className="product-image-container" style={{ position: 'relative' }}>
-                  <img
-                    src={product.imageUrl || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80'}
-                    alt={product.name}
-                    className="product-image"
-                    loading="lazy"
-                  />
-                  {isSoldOut && (
-                    <div style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      background: 'rgba(0, 0, 0, 0.4)',
-                      color: '#ffffff',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: '800',
-                      fontSize: '15px',
-                      borderRadius: 'var(--radius-md)'
-                    }}>
-                      품절 (SOLD OUT)
-                    </div>
-                  )}
-                </div>
-
-                <div className="product-info">
-                  <div className="product-name" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>{product.name}</span>
-                    {product.emoji && <span>{product.emoji}</span>}
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                    <div className="product-price">{product.price.toLocaleString()}원</div>
-                    
-                    {/* Stock Warning Badge */}
-                    {!isSoldOut && (
-                      <span style={{ 
-                        fontSize: '11px', 
-                        fontWeight: 'bold', 
-                        color: isLowStock ? '#ef4444' : '#64748b',
-                        background: isLowStock ? '#fee2e2' : '#f1f5f9',
-                        padding: '2px 6px',
-                        borderRadius: '4px'
+              return (
+                <button
+                  key={product.id}
+                  type="button"
+                  className={`product-card ${isSoldOut ? 'sold-out' : ''}`}
+                  onClick={() => !isSoldOut && onProductClick(product)}
+                  disabled={isSoldOut}
+                  style={{
+                    borderColor: isSoldOut ? '#e2e8f0' : inCart ? 'var(--primary)' : 'var(--border-color)',
+                    boxShadow: inCart ? '0 0 0 2px rgba(26, 100, 244, 0.08)' : 'var(--shadow-sm)',
+                    opacity: isSoldOut ? 0.6 : 1,
+                    position: 'relative',
+                    cursor: isSoldOut ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {/* Product Photo */}
+                  <div className="product-image-container" style={{ position: 'relative' }}>
+                    <img
+                      src={product.imageUrl || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80'}
+                      alt={product.name}
+                      className="product-image"
+                      loading="lazy"
+                    />
+                    {isSoldOut && (
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(0, 0, 0, 0.4)',
+                        color: '#ffffff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: '800',
+                        fontSize: '15px',
+                        borderRadius: 'var(--radius-md)'
                       }}>
-                        {isLowStock ? `⚠️ ${stock}개` : `${stock}개`}
-                      </span>
+                        품절 (SOLD OUT)
+                      </div>
                     )}
                   </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+
+                  <div className="product-info">
+                    <div className="product-name" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>{product.name}</span>
+                      {product.emoji && <span>{product.emoji}</span>}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                      <div className="product-price">{product.price.toLocaleString()}원</div>
+                      
+                      {/* Stock Warning Badge */}
+                      {!isSoldOut && (
+                        <span className={`product-stock-badge ${isLowStock ? 'low' : 'normal'}`}>
+                          {isLowStock ? `⚠️ ${stock}개` : `${stock}개`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

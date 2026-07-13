@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Product } from '../types';
 import { supabase } from '../supabase';
 import { FileSpreadsheet, Lock, RefreshCw, BarChart, AlertTriangle, ShieldCheck, Printer } from 'lucide-react';
+import { auditLog } from '../utils/auditLogger';
 
 interface SettingsViewProps {
   products: Product[];
@@ -194,11 +195,28 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
       if (error) throw error;
 
+      auditLog({
+        action: 'BUSINESS_CLOSE',
+        result: 'SUCCESS',
+        context: {
+          salesAmount: closingData.sales_amount,
+          refundAmount: closingData.refund_amount,
+          salesCount: closingData.sales_count
+        }
+      });
+
       showToast('📊 금일 영업 마감 보고서가 정상 기입되었습니다!');
       setIsCloseModalOpen(false);
       fetchReports();
     } catch (err: any) {
       console.error(err);
+      
+      auditLog({
+        action: 'API_FAILURE',
+        result: 'FAIL',
+        context: { actionType: 'BUSINESS_CLOSE', error: err.message || String(err) }
+      });
+
       alert(`마감 보고서 저장 실패: ${err.message || err}`);
     } finally {
       setSavingClose(false);
