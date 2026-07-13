@@ -80,6 +80,7 @@ const App: React.FC = () => {
           name: displayName,
           role: isAdmin ? '관리자' : '캐셔'
         });
+        loadProducts(); // Load products using authenticated session headers
       }
       setIsSessionLoading(false);
     }).catch(err => {
@@ -106,6 +107,7 @@ const App: React.FC = () => {
           name: displayName,
           role: isAdmin ? '관리자' : '캐셔'
         });
+        loadProducts(); // Refresh products on login
       } else {
         setCurrentCashier(null);
       }
@@ -164,7 +166,7 @@ const App: React.FC = () => {
   }, [activeTab, currentCashier]);
 
   // Fetch products from Supabase and auto-seed if database is empty
-  const loadProducts = async () => {
+  async function loadProducts() {
     try {
       const { data, error } = await withTimeout(
         supabase
