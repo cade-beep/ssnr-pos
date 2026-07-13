@@ -3,6 +3,7 @@ import { Product } from '../types';
 import { supabase } from '../supabase';
 import { FileSpreadsheet, Lock, RefreshCw, BarChart, AlertTriangle, ShieldCheck, Printer } from 'lucide-react';
 import { auditLog } from '../utils/auditLogger';
+import { withTimeout } from '../utils/asyncHelper';
 
 interface SettingsViewProps {
   products: Product[];
@@ -177,21 +178,23 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
     setSavingClose(true);
     try {
-      const { error } = await supabase
-        .from('closing_reports')
-        .insert({
-          cashier_name: closingData.cashier_name,
-          total_sales: closingData.total_sales,
-          card_sales: closingData.card_sales,
-          transfer_sales: closingData.transfer_sales,
-          cash_sales: closingData.cash_sales,
-          total_quantity: closingData.total_quantity,
-          refund_count: closingData.refund_count,
-          refund_amount: closingData.refund_amount,
-          sales_count: closingData.sales_count,
-          item_details: closingData.item_details,
-          inventory_snapshot: closingData.inventory_snapshot
-        });
+      const { error } = (await withTimeout(
+        supabase
+          .from('closing_reports')
+          .insert({
+            cashier_name: closingData.cashier_name,
+            total_sales: closingData.total_sales,
+            card_sales: closingData.card_sales,
+            transfer_sales: closingData.transfer_sales,
+            cash_sales: closingData.cash_sales,
+            total_quantity: closingData.total_quantity,
+            refund_count: closingData.refund_count,
+            refund_amount: closingData.refund_amount,
+            sales_count: closingData.sales_count,
+            item_details: closingData.item_details,
+            inventory_snapshot: closingData.inventory_snapshot
+          })
+      )) as any;
 
       if (error) throw error;
 
@@ -228,62 +231,53 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '20px', height: '100%', overflow: 'hidden', padding: '10px' }}>
+    <div className="bo-page-grid">
       
-      {/* LEFT COLUMN: System Config & Cashier info */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
+      {/* LEFT COLUMN */}
+      <div className="bo-page-col">
         
         {/* Cashier profile card */}
-        <div style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div className="bo-card">
+          <div className="bo-card-header">
             <Lock size={16} color="var(--primary)" /> 근무자 정보 및 보안
-          </h3>
+          </div>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13.5px', marginBottom: '16px' }}>
-            <div>
-              <span style={{ color: 'var(--text-secondary)' }}>로그인 이름:</span>{' '}
-              <strong style={{ fontWeight: '700' }}>{currentCashier.name}</strong>
+          <div className="bo-info-list">
+            <div className="bo-info-row">
+              <span className="bo-info-key">로그인 이름</span>
+              <span className="bo-info-value">{currentCashier.name}</span>
             </div>
-            <div>
-              <span style={{ color: 'var(--text-secondary)' }}>이메일 계정:</span>{' '}
-              <strong style={{ fontWeight: '600' }}>{currentCashier.email}</strong>
+            <div className="bo-info-row">
+              <span className="bo-info-key">이메일 계정</span>
+              <span className="bo-info-value">{currentCashier.email}</span>
             </div>
-            <div>
-              <span style={{ color: 'var(--text-secondary)' }}>부여된 권한:</span>{' '}
-              <span style={{ fontSize: '12px', padding: '2px 8px', borderRadius: '4px', background: 'var(--primary-glow)', color: 'var(--primary)', fontWeight: 'bold' }}>
-                {currentCashier.role}
-              </span>
+            <div className="bo-info-row">
+              <span className="bo-info-key">부여된 권한</span>
+              <span className="bo-badge bo-badge--primary">{currentCashier.role}</span>
             </div>
           </div>
 
-          <button 
-            type="button" 
-            className="btn btn-secondary" 
-            style={{ width: '100%', padding: '12px', borderRadius: '8px', color: '#ef4444', borderColor: '#fca5a5', fontWeight: 'bold' }}
-            onClick={onLogout}
-          >
+          <button type="button" className="btn--danger-outline" onClick={onLogout}>
             👋 근무자 로그아웃
           </button>
         </div>
 
         {/* Database linkages */}
-        <div style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div className="bo-card">
+          <div className="bo-card-header">
             <FileSpreadsheet size={16} color="var(--success)" /> 데이터베이스 관리 연동
-          </h3>
+          </div>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13.5px', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Supabase DB 상태:</span>
+          <div className="bo-info-list">
+            <div className="bo-info-row">
+              <span className="bo-info-key">Supabase DB 상태</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {dbConnected === null ? (
                   <span style={{ color: 'var(--text-muted)' }}>확인 중...</span>
                 ) : dbConnected ? (
-                  <span style={{ color: 'var(--success)', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <ShieldCheck size={14} /> 양호
-                  </span>
+                  <span className="bo-badge bo-badge--success"><ShieldCheck size={12} /> 양호</span>
                 ) : (
-                  <span style={{ color: '#ef4444', fontWeight: '700' }}>오류</span>
+                  <span className="bo-badge bo-badge--danger">오류</span>
                 )}
                 <button type="button" onClick={checkSupabaseConnection} disabled={checkingDb} style={{ border: 'none', background: 'transparent', padding: '2px', cursor: 'pointer' }}>
                   <RefreshCw size={12} className={checkingDb ? 'spin' : ''} />
@@ -291,7 +285,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               </div>
             </div>
 
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', background: '#f8fafc', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', wordBreak: 'break-all' }}>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', background: '#f8fafc', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', wordBreak: 'break-all', fontFamily: 'monospace' }}>
               API: bhnlbfwajdrlxmjjqnio.supabase.co
             </div>
           </div>
@@ -301,7 +295,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             target="_blank" 
             rel="noopener noreferrer"
             className="btn btn-secondary" 
-            style={{ width: '100%', padding: '12px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', textDecoration: 'none', fontWeight: 'bold' }}
+            style={{ width: '100%', height: '44px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', textDecoration: 'none', fontWeight: '600' }}
           >
             <FileSpreadsheet size={14} />
             <span>구글 스프레드시트 이동</span>
@@ -309,18 +303,18 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
 
         {/* Business close trigger */}
-        <div style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div className="bo-card">
+          <div className="bo-card-header">
             <BarChart size={16} color="var(--primary)" /> 영업 정산 및 마감
-          </h3>
-          <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: '1.4' }}>
+          </div>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: '1.5' }}>
             금일 발생한 매출 합산과 재고 상태를 마감 정산 보고서로 집계하고 데이터베이스에 영구적으로 보존합니다.
           </p>
 
           <button 
             type="button" 
             className="btn btn-primary" 
-            style={{ width: '100%', padding: '12px', borderRadius: '8px', fontWeight: 'bold' }}
+            style={{ width: '100%', height: '48px', borderRadius: '10px', fontWeight: '600', fontSize: '15px' }}
             onClick={handleCalculateClose}
           >
             📊 금일 영업 마감 정산 실행
@@ -329,32 +323,32 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
       </div>
 
-      {/* RIGHT COLUMN: Low Stock Warning panel & Past Close Reports */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto' }}>
+      {/* RIGHT COLUMN */}
+      <div className="bo-page-col">
         
         {/* Stock Alerts panel */}
-        <div style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow-sm)' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div className="bo-card">
+          <div className="bo-card-header">
             <AlertTriangle size={16} color="#f59e0b" /> 실시간 재고 부족 알림
-            <span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '10px', background: lowStockProducts.length > 0 ? '#fee2e2' : '#dcfce7', color: lowStockProducts.length > 0 ? '#ef4444' : '#16a34a', fontWeight: 'bold' }}>
+            <span className={`bo-badge bo-badge--pill ${lowStockProducts.length > 0 ? 'bo-badge--danger' : 'bo-badge--success'}`}>
               {lowStockProducts.length}건
             </span>
-          </h3>
+          </div>
           
           <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {lowStockProducts.length === 0 ? (
-              <div style={{ padding: '12px', background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '13px', textAlign: 'center', fontWeight: 'bold' }}>
+              <div style={{ padding: '14px', background: '#f0fdf4', color: '#059669', border: '1px solid #bbf7d0', borderRadius: '10px', fontSize: '13px', textAlign: 'center', fontWeight: '600' }}>
                 ✅ 모든 활성 상품의 재고가 여유롭습니다.
               </div>
             ) : (
               lowStockProducts.map(p => (
-                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '8px', fontSize: '13px' }}>
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '10px', fontSize: '13px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span>{p.emoji || '🍞'}</span>
                     <strong style={{ fontWeight: '700' }}>{p.name}</strong>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>ID: {p.id}</span>
+                    <span className="bo-badge bo-badge--neutral" style={{ fontSize: '10px', padding: '2px 6px' }}>ID: {p.id}</span>
                   </div>
-                  <span style={{ color: (p.stock || 0) === 0 ? '#ef4444' : '#d97706', fontWeight: '800' }}>
+                  <span style={{ color: (p.stock || 0) === 0 ? '#ef4444' : '#d97706', fontWeight: '800', fontSize: '12px' }}>
                     {(p.stock || 0) === 0 ? '품절' : `${p.stock}개 남음`} (경고: {p.lowStockThreshold}개)
                   </span>
                 </div>
@@ -364,29 +358,34 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
 
         {/* History of close reports */}
-        <div style={{ background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow-sm)', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+        <div className="bo-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="bo-card-header" style={{ flexShrink: 0 }}>
             <BarChart size={16} color="var(--primary)" /> 최근 10건 마감 보고서 이력
-          </h3>
+          </div>
           
-          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
             {loadingReports ? (
-              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)' }}>이력을 가져오는 중...</div>
+              <div className="bo-empty" style={{ padding: '20px' }}>
+                <div className="bo-empty-text">이력을 가져오는 중...</div>
+              </div>
             ) : reports.length === 0 ? (
-              <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12.5px' }}>기록된 마감 보고서가 존재하지 않습니다.</div>
+              <div className="bo-empty" style={{ padding: '20px' }}>
+                <div className="bo-empty-text">기록된 마감 보고서가 존재하지 않습니다.</div>
+              </div>
             ) : (
               reports.map(r => (
                 <div 
                   key={r.id}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', border: '1px solid var(--border-color)', borderRadius: '8px', background: '#f8fafc', cursor: 'pointer' }}
+                  className="bo-report-item"
+                  style={{ padding: '14px 4px', cursor: 'pointer' }}
                   onClick={() => setActiveCloseReport(r)}
                   title="자세히 보기"
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '12.5px' }}>
-                    <strong style={{ fontWeight: '700' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    <span className="bo-report-date">
                       {new Date(r.closed_at).toLocaleDateString('ko-KR')} 마감 보고
-                    </strong>
-                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    </span>
+                    <span className="bo-report-meta">
                       담당: {r.cashier_name} | 거래건수: {r.sales_count}건
                     </span>
                   </div>
@@ -401,83 +400,86 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
       </div>
 
-      {/* MID-CALCULATION / CLOSE REPORT BUILDER MODAL */}
+      {/* CLOSE REPORT BUILDER MODAL */}
       {isCloseModalOpen && (
-        <div className="modal-overlay" style={{ zIndex: 1100 }}>
-          <div className="modal-content" style={{ maxWidth: '440px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div className="modal-body">
-              <div className="modal-title" style={{ textAlign: 'center', marginBottom: '8px' }}>📊 영업 마감 정산 보고</div>
-              <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                마감 완료를 누르면 보고서가 저장되며 출력 가능 상태가 됩니다.
-              </p>
+        <div className="bo-modal-overlay">
+          <div className="bo-modal" style={{ maxWidth: '460px' }}>
+            <div className="bo-modal-header">
+              <div className="bo-modal-title">영업 마감 정산 보고</div>
+              <div className="bo-modal-desc">마감 완료를 누르면 보고서가 저장되며 출력 가능 상태가 됩니다.</div>
+            </div>
 
+            <div className="bo-modal-body">
               {closingData ? (
-                <div style={{ border: '1px solid var(--border-color)', padding: '16px', borderRadius: '10px', background: '#f9fafb', display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px' }}>
-                    <span>정산 시간</span>
-                    <strong style={{ fontWeight: '700' }}>{new Date(closingData.closed_at).toLocaleString('ko-KR')}</strong>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                  <div className="bo-data-row">
+                    <span className="bo-data-key">정산 시간</span>
+                    <span className="bo-data-value">{new Date(closingData.closed_at).toLocaleString('ko-KR')}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px' }}>
-                    <span>담당자</span>
-                    <strong style={{ fontWeight: '700' }}>{closingData.cashier_name}</strong>
+                  <div className="bo-data-row">
+                    <span className="bo-data-key">담당자</span>
+                    <span className="bo-data-value">{closingData.cashier_name}</span>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px' }}>
-                    <span style={{ fontWeight: 'bold' }}>총 매출액 (환불 제외)</span>
-                    <strong style={{ fontSize: '16px', color: 'var(--primary)', fontWeight: '800' }}>
+                  <hr className="bo-divider" />
+
+                  <div className="bo-data-row" style={{ borderBottom: 'none' }}>
+                    <span className="bo-data-key" style={{ fontWeight: '600' }}>총 매출액 (환불 제외)</span>
+                    <span className="bo-data-value" style={{ fontSize: '18px', color: 'var(--primary)' }}>
                       {closingData.total_sales.toLocaleString()}원
-                    </strong>
+                    </span>
                   </div>
 
-                  <div style={{ paddingLeft: '10px', borderLeft: '2px solid var(--primary)', display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  <div style={{ paddingLeft: '12px', borderLeft: '3px solid var(--primary)', display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px', color: 'var(--text-muted)', margin: '8px 0 12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>💳 신용카드 매출</span>
-                      <span>{closingData.card_sales.toLocaleString()}원</span>
+                      <span style={{ fontWeight: '600' }}>{closingData.card_sales.toLocaleString()}원</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span>🏦 계좌이체 매출</span>
-                      <span>{closingData.transfer_sales.toLocaleString()}원</span>
+                      <span style={{ fontWeight: '600' }}>{closingData.transfer_sales.toLocaleString()}원</span>
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px dashed #cbd5e1', paddingTop: '8px' }}>
-                    <span>총 거래 / 아이템 건수</span>
-                    <strong style={{ fontWeight: '700' }}>{closingData.sales_count}건 ({closingData.total_quantity}개)</strong>
+                  <div className="bo-data-row">
+                    <span className="bo-data-key">총 거래 / 아이템 건수</span>
+                    <span className="bo-data-value">{closingData.sales_count}건 ({closingData.total_quantity}개)</span>
                   </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>환불 처리 건수 / 금액</span>
-                    <strong style={{ color: '#ef4444', fontWeight: '700' }}>
+                  <div className="bo-data-row">
+                    <span className="bo-data-key">환불 처리 건수 / 금액</span>
+                    <span className="bo-data-value" style={{ color: '#ef4444' }}>
                       {closingData.refund_count}건 (-{closingData.refund_amount.toLocaleString()}원)
-                    </strong>
+                    </span>
                   </div>
 
-                  {/* Sold items details list */}
-                  <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: '6px' }}>
-                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 'bold' }}>🥖 금일 품목별 판매 수량</div>
-                    <div style={{ maxHeight: '100px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {(Object.entries(closingData.item_details) as [string, number][]).length === 0 ? (
-                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>판매 이력 없음</div>
-                      ) : (
-                        (Object.entries(closingData.item_details) as [string, number][]).map(([name, qty]) => (
-                          <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                            <span>{name}</span>
-                            <span style={{ fontWeight: 'bold' }}>{qty}개</span>
-                          </div>
-                        ))
-                      )}
-                    </div>
+                  <hr className="bo-divider" />
+                  
+                  <div className="bo-section-title" style={{ fontSize: '13px' }}>🥖 금일 품목별 판매 수량</div>
+                  <div style={{ maxHeight: '100px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {(Object.entries(closingData.item_details) as [string, number][]).length === 0 ? (
+                      <div className="bo-empty" style={{ padding: '8px' }}>
+                        <div className="bo-empty-text" style={{ fontSize: '12px' }}>판매 이력 없음</div>
+                      </div>
+                    ) : (
+                      (Object.entries(closingData.item_details) as [string, number][]).map(([name, qty]) => (
+                        <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                          <span style={{ color: 'var(--text-secondary)' }}>{name}</span>
+                          <span style={{ fontWeight: '700' }}>{qty}개</span>
+                        </div>
+                      ))
+                    )}
                   </div>
-
                 </div>
               ) : (
-                <div style={{ padding: '30px', textAlign: 'center' }}>데이터를 준비하는 중...</div>
+                <div className="bo-empty">
+                  <div className="bo-empty-text">데이터를 준비하는 중...</div>
+                </div>
               )}
             </div>
 
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setIsCloseModalOpen(false)} disabled={savingClose}>취소</button>
-              <button type="button" className="btn btn-primary" style={{ flex: 1.5 }} onClick={handleSaveCloseReport} disabled={savingClose || !closingData}>
+            <div className="bo-modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setIsCloseModalOpen(false)} disabled={savingClose}>취소</button>
+              <button type="button" className="btn btn-primary" onClick={handleSaveCloseReport} disabled={savingClose || !closingData}>
                 {savingClose ? '저장 중...' : '마감 완료'}
               </button>
             </div>
@@ -487,23 +489,23 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
       {/* VIEW CLOSE REPORT PRINT-PREVIEW MODAL */}
       {activeCloseReport && (
-        <div className="modal-overlay" style={{ zIndex: 1100 }}>
-          <div className="modal-content" style={{ maxWidth: '420px', minHeight: '600px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div className="modal-body" style={{ padding: '24px', overflowY: 'auto' }}>
+        <div className="bo-modal-overlay">
+          <div className="bo-modal" style={{ maxWidth: '420px' }}>
+            <div className="bo-modal-body" style={{ padding: '28px' }}>
               <div className="receipt-paper">
-                <div style={{ textAlign: 'center', marginBottom: '14px' }}>
+                <div style={{ textAlign: 'center', marginBottom: '16px' }}>
                   <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0 }}>일일 마감 정산서</h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '11px', margin: '2px 0 0 0' }}>서산나래 미니 포스</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '12px', margin: '4px 0 0 0' }}>서산나래 미니 포스</p>
                 </div>
 
-                <div className="receipt-meta" style={{ fontSize: '11px', color: '#475569', borderBottom: '1px solid #cbd5e1', paddingBottom: '6px', marginBottom: '8px' }}>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', borderBottom: '1px solid #e5e7eb', paddingBottom: '8px', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                   <div>마감일시: {new Date(activeCloseReport.closed_at).toLocaleString('ko-KR')}</div>
                   <div>마감담당: {activeCloseReport.cashier_name}</div>
                   <div>보고서번호: {activeCloseReport.id?.substring(0, 8).toUpperCase()}</div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12.5px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: '800', borderBottom: '2px solid #000', paddingBottom: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: '800', borderBottom: '2px solid #000', paddingBottom: '6px' }}>
                     <span>총 매출액</span>
                     <span>{Number(activeCloseReport.total_sales).toLocaleString()}원</span>
                   </div>
@@ -521,34 +523,34 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                     <span>{activeCloseReport.sales_count}건 ({activeCloseReport.total_quantity}개)</span>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e11d48', borderBottom: '1px solid #cbd5e1', paddingBottom: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', color: '#e11d48', borderBottom: '1px solid #e5e7eb', paddingBottom: '8px' }}>
                     <span>환불 건수 / 금액</span>
                     <span>{activeCloseReport.refund_count}건 (-{Number(activeCloseReport.refund_amount).toLocaleString()}원)</span>
                   </div>
                 </div>
 
-                <div style={{ marginTop: '12px' }}>
-                  <h4 style={{ fontSize: '12px', margin: '0 0 6px 0', borderBottom: '1px solid #e2e8f0', paddingBottom: '2px' }}>품목별 판매 현황</h4>
+                <div style={{ marginTop: '14px' }}>
+                  <h4 style={{ fontSize: '12px', margin: '0 0 8px 0', borderBottom: '1px solid #e5e7eb', paddingBottom: '4px' }}>품목별 판매 현황</h4>
                   {(Object.entries(activeCloseReport.item_details || {}) as [string, number][]).map(([name, qty]) => (
-                    <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', margin: '2px 0' }}>
+                    <div key={name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', margin: '3px 0' }}>
                       <span>{name}</span>
                       <span>{Number(qty)}개</span>
                     </div>
                   ))}
                 </div>
 
-                <div style={{ marginTop: '14px', borderTop: '1px dashed #94a3b8', paddingTop: '8px', fontSize: '10px', color: '#64748b', textAlign: 'center' }}>
+                <div style={{ marginTop: '16px', borderTop: '1px dashed #94a3b8', paddingTop: '10px', fontSize: '10px', color: '#94a3b8', textAlign: 'center' }}>
                   본 정산서는 Supabase 클라우드에 안전하게 보존되었습니다.
                 </div>
               </div>
             </div>
 
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={handlePrintReport}>
+            <div className="bo-modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={handlePrintReport} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                 <Printer size={14} />
                 <span>정산서 출력</span>
               </button>
-              <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={() => setActiveCloseReport(null)}>
+              <button type="button" className="btn btn-primary" onClick={() => setActiveCloseReport(null)}>
                 닫기
               </button>
             </div>

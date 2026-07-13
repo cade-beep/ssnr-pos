@@ -11,6 +11,7 @@ import { RefreshCw, LogOut } from 'lucide-react';
 import { supabase } from './supabase';
 import { STATIC_PRODUCTS } from './productsData';
 import { auditLog } from './utils/auditLogger';
+import { withTimeout } from './utils/asyncHelper';
 
 const getFriendlyErrorMessage = (error: any): string => {
   if (!error) return '알 수 없는 오류가 발생했습니다.';
@@ -165,16 +166,18 @@ const App: React.FC = () => {
   // Fetch products from Supabase and auto-seed if database is empty
   const loadProducts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('name', { ascending: true });
+      const { data, error } = await withTimeout(
+        supabase
+          .from('products')
+          .select('*')
+          .order('name', { ascending: true })
+      );
 
       if (error) {
         throw error;
       }
 
-      if (!data || data.length === 0) {
+      if (!data || (data as any[]).length === 0) {
         console.log('Database products empty. Auto-seeding initial products...');
         const seedData = STATIC_PRODUCTS.map((p, idx) => ({
           id: `P-${idx + 1}`,
@@ -204,7 +207,7 @@ const App: React.FC = () => {
         })));
         showToast('📦 상품 데이터를 기본 목록으로 자동 초기화했습니다.', 'info');
       } else {
-        const mapped = data.map(d => ({
+        const mapped = (data as any[]).map((d: any) => ({
           id: d.id,
           name: d.name,
           price: Number(d.price) || 0,
@@ -498,16 +501,19 @@ const App: React.FC = () => {
       }));
 
       // Call database transaction RPC
-      const { data: rpcData, error: rpcError } = await supabase.rpc('complete_sale', {
-        p_idempotency_key: finalIdempotencyKey,
-        p_payment_method: paymentMethod,
-        p_total_amount: finalAmount,
-        p_total_quantity: cart.reduce((sum, item) => sum + item.quantity, 0),
-        p_received_amount: receivedCashVal !== undefined ? receivedCashVal : finalAmount,
-        p_change: changeVal !== undefined ? changeVal : 0,
-        p_items: cartPayload,
-        p_global_discount: discountAmount
-      });
+      const { data: rpcData, error: rpcError } = (await withTimeout(
+        supabase.rpc('complete_sale', {
+          p_idempotency_key: finalIdempotencyKey,
+          p_payment_method: paymentMethod,
+          p_total_amount: finalAmount,
+          p_total_quantity: cart.reduce((sum, item) => sum + item.quantity, 0),
+          p_received_amount: receivedCashVal !== undefined ? receivedCashVal : finalAmount,
+          p_change: changeVal !== undefined ? changeVal : 0,
+          p_items: cartPayload,
+          p_global_discount: discountAmount
+        }),
+        12000
+      )) as any;
 
       if (rpcError) {
         throw new Error(rpcError.message);

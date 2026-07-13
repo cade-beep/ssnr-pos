@@ -3,6 +3,7 @@ import { Product } from '../types';
 import { supabase } from '../supabase';
 import { Plus, Edit2, Trash2, Search, ArrowUpDown, Upload, Check, AlertTriangle } from 'lucide-react';
 import { auditLog } from '../utils/auditLogger';
+import { withTimeout } from '../utils/asyncHelper';
 
 interface ProductsViewProps {
   products: Product[];
@@ -274,11 +275,14 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
     }
 
     try {
-      const { error } = await supabase.rpc('adjust_product_stock', {
-        p_product_id: product.id,
-        p_amount: amount,
-        p_reason: reason.trim()
-      });
+      const { error } = (await withTimeout(
+        supabase.rpc('adjust_product_stock', {
+          p_product_id: product.id,
+          p_amount: amount,
+          p_reason: reason.trim()
+        }),
+        8000
+      )) as any;
 
       if (error) throw error;
       
@@ -304,10 +308,10 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%', overflow: 'hidden', padding: '10px' }}>
+    <div className="bo-page">
       
-      {/* Search and Action Row */}
-      <div className="search-row" style={{ flexShrink: 0 }}>
+      {/* Toolbar */}
+      <div className="bo-toolbar">
         <div className="search-container">
           <div className="search-icon-wrapper">
             <Search size={18} />
@@ -323,7 +327,7 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
         <button 
           type="button" 
           className="btn btn-primary" 
-          style={{ width: 'auto', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '10px', height: '48px' }}
+          style={{ width: 'auto', padding: '0 20px', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '10px', height: '44px' }}
           onClick={() => { resetForm(); setIsAddModalOpen(true); }}
         >
           <Plus size={16} />
@@ -345,40 +349,31 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
         ))}
       </div>
 
-      {/* Products Table Area */}
-      <div style={{ flex: 1, overflowY: 'auto', background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13.5px' }}>
+      {/* Products Table */}
+      <div className="bo-table-wrap">
+        <table className="bo-table">
           <thead>
-            <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-color)', position: 'sticky', top: 0, zIndex: 10 }}>
-              <th style={{ padding: '14px 16px', color: 'var(--text-secondary)' }}>이미지</th>
-              <th 
-                style={{ padding: '14px 16px', color: 'var(--text-secondary)', cursor: 'pointer' }}
-                onClick={() => toggleSort('name')}
-              >
-                상품명/코드 <ArrowUpDown size={12} style={{ marginLeft: '4px', display: 'inline' }} />
+            <tr>
+              <th>이미지</th>
+              <th className="sortable" onClick={() => toggleSort('name')}>
+                상품명/코드 <ArrowUpDown size={11} style={{ marginLeft: '3px', display: 'inline', opacity: 0.5 }} />
               </th>
-              <th 
-                style={{ padding: '14px 16px', color: 'var(--text-secondary)', cursor: 'pointer', textAlign: 'right' }}
-                onClick={() => toggleSort('price')}
-              >
-                가격 <ArrowUpDown size={12} style={{ marginLeft: '4px', display: 'inline' }} />
+              <th className="sortable text-right" onClick={() => toggleSort('price')}>
+                가격 <ArrowUpDown size={11} style={{ marginLeft: '3px', display: 'inline', opacity: 0.5 }} />
               </th>
-              <th style={{ padding: '14px 16px', color: 'var(--text-secondary)' }}>카테고리</th>
-              <th 
-                style={{ padding: '14px 16px', color: 'var(--text-secondary)', cursor: 'pointer', textAlign: 'center' }}
-                onClick={() => toggleSort('stock')}
-              >
-                재고 현황 <ArrowUpDown size={12} style={{ marginLeft: '4px', display: 'inline' }} />
+              <th>카테고리</th>
+              <th className="sortable text-center" onClick={() => toggleSort('stock')}>
+                재고 현황 <ArrowUpDown size={11} style={{ marginLeft: '3px', display: 'inline', opacity: 0.5 }} />
               </th>
-              <th style={{ padding: '14px 16px', color: 'var(--text-secondary)' }}>바코드</th>
-              <th style={{ padding: '14px 16px', color: 'var(--text-secondary)', textAlign: 'center' }}>상태</th>
-              <th style={{ padding: '14px 16px', color: 'var(--text-secondary)', textAlign: 'center' }}>관리</th>
+              <th>바코드</th>
+              <th className="text-center">상태</th>
+              <th className="text-center">관리</th>
             </tr>
           </thead>
           <tbody>
             {sortedProducts.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <td colSpan={8} className="cell-empty">
                   검색 결과에 맞는 상품이 존재하지 않습니다.
                 </td>
               </tr>
@@ -388,107 +383,65 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                 const isSoldOut = (p.stock || 0) === 0;
 
                 return (
-                  <tr key={p.id} style={{ borderBottom: '1px solid var(--border-color)', background: p.isActive === false ? '#f1f5f9' : '#ffffff' }}>
+                  <tr key={p.id} className={p.isActive === false ? 'inactive' : ''}>
                     {/* Image / Emoji */}
-                    <td style={{ padding: '12px 16px' }}>
+                    <td>
                       {p.imageUrl ? (
-                        <img 
-                          src={p.imageUrl} 
-                          alt={p.name} 
-                          style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '6px', border: '1px solid var(--border-color)' }} 
-                        />
+                        <img src={p.imageUrl} alt={p.name} className="bo-product-thumb" />
                       ) : (
-                        <div style={{ width: '40px', height: '40px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', borderRadius: '6px' }}>
-                          {p.emoji || '🍞'}
-                        </div>
+                        <div className="bo-product-emoji">{p.emoji || '🍞'}</div>
                       )}
                     </td>
 
                     {/* Name & ID */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontWeight: '700', color: p.isActive === false ? 'var(--text-muted)' : 'var(--text-primary)' }}>{p.name}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>ID: {p.id}</div>
+                    <td>
+                      <div className="cell-bold">{p.name}</div>
+                      <div className="cell-muted">ID: {p.id}</div>
                     </td>
 
                     {/* Price */}
-                    <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 'bold' }}>
-                      {p.price.toLocaleString()}원
-                    </td>
+                    <td className="text-right cell-bold">{p.price.toLocaleString()}원</td>
 
                     {/* Category */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{ fontSize: '12px', padding: '4px 8px', borderRadius: '4px', background: '#f1f5f9', fontWeight: '600' }}>
+                    <td>
+                      <span className="bo-badge bo-badge--neutral">
                         {CATEGORIES.find(c => c.value === p.category)?.label || p.category}
                       </span>
                     </td>
 
-                    {/* Stock level controller */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                        <button 
-                          type="button" 
-                          style={{ border: '1px solid var(--border-color)', background: 'transparent', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}
-                          onClick={() => adjustStock(p, -1)}
-                        >-</button>
-                        
-                        <span style={{ 
-                          fontWeight: '800',
-                          color: isSoldOut ? '#ef4444' : isLowStock ? '#f59e0b' : 'var(--text-primary)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}>
+                    {/* Stock controls */}
+                    <td>
+                      <div className="bo-stock-group">
+                        <button type="button" className="bo-stock-btn" onClick={() => adjustStock(p, -1)}>−</button>
+                        <span className={`bo-stock-value ${isSoldOut ? 'sold-out' : isLowStock ? 'low-stock' : ''}`}>
                           {p.stock}개
-                          {isLowStock && <AlertTriangle size={12} color={isSoldOut ? '#ef4444' : '#f59e0b'} />}
+                          {isLowStock && <AlertTriangle size={12} />}
                         </span>
-                        
-                        <button 
-                          type="button" 
-                          style={{ border: '1px solid var(--border-color)', background: 'transparent', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px' }}
-                          onClick={() => adjustStock(p, 1)}
-                        >+</button>
-                        <button 
-                          type="button" 
-                          style={{ border: '1px solid var(--border-color)', background: 'var(--border-color)', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', color: 'var(--text-secondary)' }}
-                          onClick={() => adjustStock(p, 10)}
-                        >+10</button>
+                        <button type="button" className="bo-stock-btn" onClick={() => adjustStock(p, 1)}>+</button>
+                        <button type="button" className="bo-stock-btn bo-stock-btn--accent" onClick={() => adjustStock(p, 10)}>+10</button>
                       </div>
                     </td>
 
                     {/* Barcode */}
-                    <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
-                      {p.barcode || '-'}
-                    </td>
+                    <td style={{ color: 'var(--text-muted)' }}>{p.barcode || '—'}</td>
 
                     {/* Active/Inactive */}
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <td className="text-center">
                       {p.isActive !== false ? (
-                        <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '20px', background: 'var(--success-glow)', color: 'var(--success)', fontWeight: '700' }}>판매중</span>
+                        <span className="bo-badge bo-badge--success bo-badge--pill">판매중</span>
                       ) : (
-                        <span style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '20px', background: '#e2e8f0', color: '#64748b', fontWeight: '700' }}>숨김</span>
+                        <span className="bo-badge bo-badge--neutral bo-badge--pill">숨김</span>
                       )}
                     </td>
 
                     {/* Actions */}
-                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-                        <button 
-                          type="button" 
-                          className="btn btn-secondary" 
-                          style={{ padding: '6px', minWidth: 'auto', borderRadius: '6px' }}
-                          onClick={() => openEditModal(p)}
-                          title="수정"
-                        >
-                          <Edit2 size={13} />
+                    <td className="text-center">
+                      <div className="bo-action-group">
+                        <button type="button" className="bo-action-btn" onClick={() => openEditModal(p)} title="수정">
+                          <Edit2 size={14} />
                         </button>
-                        <button 
-                          type="button" 
-                          className="btn btn-secondary" 
-                          style={{ padding: '6px', minWidth: 'auto', borderRadius: '6px', color: '#ef4444' }}
-                          onClick={() => handleDeleteProduct(p.id, p.name)}
-                          title="삭제"
-                        >
-                          <Trash2 size={13} />
+                        <button type="button" className="bo-action-btn bo-action-btn--danger" onClick={() => handleDeleteProduct(p.id, p.name)} title="삭제">
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>
@@ -502,30 +455,29 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
 
       {/* ADD MODAL */}
       {isAddModalOpen && (
-        <div className="modal-overlay" style={{ zIndex: 1100 }}>
-          <form className="modal-content" style={{ maxWidth: '500px' }} onSubmit={handleAddProduct}>
-            <div className="modal-body">
-              <div className="modal-title">📦 신규 상품 등록</div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>상품코드 (필수, 고유값)</label>
-                  <input type="text" value={id} onChange={e => setId(e.target.value)} placeholder="예: P-0041" style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px' }} required />
+        <div className="bo-modal-overlay">
+          <form className="bo-modal" onSubmit={handleAddProduct}>
+            <div className="bo-modal-header">
+              <div className="bo-modal-title">신규 상품 등록</div>
+              <div className="bo-modal-desc">새로운 상품의 기본 정보를 입력해 주세요.</div>
+            </div>
+
+            <div className="bo-modal-body">
+              <div className="bo-form-grid bo-form-grid--2">
+                <div className="bo-field">
+                  <label className="bo-label">상품코드 (필수, 고유값)</label>
+                  <input type="text" className="bo-input" value={id} onChange={e => setId(e.target.value)} placeholder="예: P-0041" required />
                 </div>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>상품명 (필수)</label>
-                  <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="예: 생크림 소보로" style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px' }} required />
+                <div className="bo-field">
+                  <label className="bo-label">상품명 (필수)</label>
+                  <input type="text" className="bo-input" value={name} onChange={e => setName(e.target.value)} placeholder="예: 생크림 소보로" required />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '12px', marginBottom: '12px' }}>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>카테고리</label>
-                  <select 
-                    value={category} 
-                    onChange={e => setCategory(e.target.value as any)} 
-                    style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px', background: '#fff' }}
-                  >
+              <div className="bo-form-grid bo-form-grid--2-wide">
+                <div className="bo-field">
+                  <label className="bo-label">카테고리</label>
+                  <select className="bo-select" value={category} onChange={e => setCategory(e.target.value as any)}>
                     <option value="bakery">베이커리</option>
                     <option value="coffee">커피</option>
                     <option value="beverage">음료</option>
@@ -533,61 +485,60 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                     <option value="etc">기타</option>
                   </select>
                 </div>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>가격 (원 단위)</label>
-                  <input type="number" value={price} onChange={e => setPrice(Math.max(0, Number(e.target.value)))} style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px' }} min="0" required />
+                <div className="bo-field">
+                  <label className="bo-label">가격 (원 단위)</label>
+                  <input type="number" className="bo-input" value={price} onChange={e => setPrice(Math.max(0, Number(e.target.value)))} min="0" required />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>초기 재고 (개)</label>
-                  <input type="number" value={stock} onChange={e => setStock(Math.max(0, Number(e.target.value)))} style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px' }} min="0" required />
+              <div className="bo-form-grid bo-form-grid--2">
+                <div className="bo-field">
+                  <label className="bo-label">초기 재고 (개)</label>
+                  <input type="number" className="bo-input" value={stock} onChange={e => setStock(Math.max(0, Number(e.target.value)))} min="0" required />
                 </div>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>재고 경고 임계값 (개)</label>
-                  <input type="number" value={lowStockThreshold} onChange={e => setLowStockThreshold(Math.max(0, Number(e.target.value)))} style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px' }} min="0" required />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px', marginBottom: '12px' }}>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>기본 이모지</label>
-                  <input type="text" value={emoji} onChange={e => setEmoji(e.target.value)} placeholder="🍞" style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px', textAlign: 'center' }} />
-                </div>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>바코드 번호 (스캐너 연동)</label>
-                  <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="선택 사항" style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px' }} />
+                <div className="bo-field">
+                  <label className="bo-label">재고 경고 임계값 (개)</label>
+                  <input type="number" className="bo-input" value={lowStockThreshold} onChange={e => setLowStockThreshold(Math.max(0, Number(e.target.value)))} min="0" required />
                 </div>
               </div>
 
-              {/* Image upload selector */}
-              <div className="form-group" style={{ marginBottom: '16px' }}>
-                <label>상품 이미지 등록 (파일 업로드 또는 직접 URL 기입)</label>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <input type="text" value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImageFile(null); }} placeholder="https://..." style={{ flex: 1, padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px' }} />
-                  <label style={{ padding: '11px 14px', border: '1px solid var(--border-color)', borderRadius: '8px', background: '#f8fafc', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', fontWeight: 'bold' }}>
+              <div className="bo-form-grid bo-form-grid--3-wide">
+                <div className="bo-field">
+                  <label className="bo-label">기본 이모지</label>
+                  <input type="text" className="bo-input bo-input--center" value={emoji} onChange={e => setEmoji(e.target.value)} placeholder="🍞" />
+                </div>
+                <div className="bo-field">
+                  <label className="bo-label">바코드 번호 (스캐너 연동)</label>
+                  <input type="text" className="bo-input" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="선택 사항" />
+                </div>
+              </div>
+
+              <div className="bo-field" style={{ marginBottom: '16px' }}>
+                <label className="bo-label">상품 이미지 등록 (파일 업로드 또는 직접 URL 기입)</label>
+                <div className="bo-form-row">
+                  <input type="text" className="bo-input" style={{ flex: 1 }} value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImageFile(null); }} placeholder="https://..." />
+                  <label className="bo-file-btn">
                     <Upload size={14} />
                     파일 선택
                     <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
                   </label>
                 </div>
                 {imageFile && (
-                  <div style={{ fontSize: '12px', color: 'var(--primary)', marginTop: '4px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div className="bo-file-hint">
                     <Check size={12} /> 업로드 대기 중: {imageFile.name}
                   </div>
                 )}
               </div>
 
-              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+              <div className="bo-checkbox-row">
                 <input type="checkbox" id="isActive" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
-                <label htmlFor="isActive" style={{ margin: 0, fontWeight: '700', cursor: 'pointer' }}>포스기 화면에 노출 (판매 가능 상태)</label>
+                <label htmlFor="isActive">포스기 화면에 노출 (판매 가능 상태)</label>
               </div>
             </div>
 
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setIsAddModalOpen(false)} disabled={isSubmitting}>취소</button>
-              <button type="submit" className="btn btn-primary" style={{ flex: 2 }} disabled={isSubmitting}>
+            <div className="bo-modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setIsAddModalOpen(false)} disabled={isSubmitting}>취소</button>
+              <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                 {isSubmitting ? '상품 등록 중...' : '등록 완료'}
               </button>
             </div>
@@ -597,30 +548,29 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
 
       {/* EDIT MODAL */}
       {isEditModalOpen && editingProduct && (
-        <div className="modal-overlay" style={{ zIndex: 1100 }}>
-          <form className="modal-content" style={{ maxWidth: '500px' }} onSubmit={handleEditProduct}>
-            <div className="modal-body">
-              <div className="modal-title">✏️ 상품 정보 수정</div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>상품코드 (수정 불가)</label>
-                  <input type="text" value={id} disabled style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px', background: '#f1f5f9', color: '#64748b' }} />
+        <div className="bo-modal-overlay">
+          <form className="bo-modal" onSubmit={handleEditProduct}>
+            <div className="bo-modal-header">
+              <div className="bo-modal-title">상품 정보 수정</div>
+              <div className="bo-modal-desc">{editingProduct.name}의 정보를 수정합니다.</div>
+            </div>
+
+            <div className="bo-modal-body">
+              <div className="bo-form-grid bo-form-grid--2">
+                <div className="bo-field">
+                  <label className="bo-label">상품코드 (수정 불가)</label>
+                  <input type="text" className="bo-input" value={id} disabled />
                 </div>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>상품명</label>
-                  <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="예: 생크림 소보로" style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px' }} required />
+                <div className="bo-field">
+                  <label className="bo-label">상품명</label>
+                  <input type="text" className="bo-input" value={name} onChange={e => setName(e.target.value)} placeholder="예: 생크림 소보로" required />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '12px', marginBottom: '12px' }}>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>카테고리</label>
-                  <select 
-                    value={category} 
-                    onChange={e => setCategory(e.target.value as any)} 
-                    style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px', background: '#fff' }}
-                  >
+              <div className="bo-form-grid bo-form-grid--2-wide">
+                <div className="bo-field">
+                  <label className="bo-label">카테고리</label>
+                  <select className="bo-select" value={category} onChange={e => setCategory(e.target.value as any)}>
                     <option value="bakery">베이커리</option>
                     <option value="coffee">커피</option>
                     <option value="beverage">음료</option>
@@ -628,60 +578,60 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                     <option value="etc">기타</option>
                   </select>
                 </div>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>가격 (원 단위)</label>
-                  <input type="number" value={price} onChange={e => setPrice(Math.max(0, Number(e.target.value)))} style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px' }} min="0" required />
+                <div className="bo-field">
+                  <label className="bo-label">가격 (원 단위)</label>
+                  <input type="number" className="bo-input" value={price} onChange={e => setPrice(Math.max(0, Number(e.target.value)))} min="0" required />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>현재 재고 (개)</label>
-                  <input type="number" value={stock} onChange={e => setStock(Math.max(0, Number(e.target.value)))} style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px' }} min="0" required />
+              <div className="bo-form-grid bo-form-grid--2">
+                <div className="bo-field">
+                  <label className="bo-label">현재 재고 (개)</label>
+                  <input type="number" className="bo-input" value={stock} onChange={e => setStock(Math.max(0, Number(e.target.value)))} min="0" required />
                 </div>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>재고 경고 임계값 (개)</label>
-                  <input type="number" value={lowStockThreshold} onChange={e => setLowStockThreshold(Math.max(0, Number(e.target.value)))} style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px' }} min="0" required />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px', marginBottom: '12px' }}>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>기본 이모지</label>
-                  <input type="text" value={emoji} onChange={e => setEmoji(e.target.value)} placeholder="🍞" style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px', textAlign: 'center' }} />
-                </div>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label>바코드 번호</label>
-                  <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="바코드 입력" style={{ width: '100%', padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px' }} />
+                <div className="bo-field">
+                  <label className="bo-label">재고 경고 임계값 (개)</label>
+                  <input type="number" className="bo-input" value={lowStockThreshold} onChange={e => setLowStockThreshold(Math.max(0, Number(e.target.value)))} min="0" required />
                 </div>
               </div>
 
-              <div className="form-group" style={{ marginBottom: '16px' }}>
-                <label>상품 이미지 수정 (파일 업로드 또는 직접 URL 기입)</label>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <input type="text" value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImageFile(null); }} placeholder="https://..." style={{ flex: 1, padding: '10px', border: '1px solid var(--border-color)', borderRadius: '8px' }} />
-                  <label style={{ padding: '11px 14px', border: '1px solid var(--border-color)', borderRadius: '8px', background: '#f8fafc', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', fontWeight: 'bold' }}>
+              <div className="bo-form-grid bo-form-grid--3-wide">
+                <div className="bo-field">
+                  <label className="bo-label">기본 이모지</label>
+                  <input type="text" className="bo-input bo-input--center" value={emoji} onChange={e => setEmoji(e.target.value)} placeholder="🍞" />
+                </div>
+                <div className="bo-field">
+                  <label className="bo-label">바코드 번호</label>
+                  <input type="text" className="bo-input" value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="바코드 입력" />
+                </div>
+              </div>
+
+              <div className="bo-field" style={{ marginBottom: '16px' }}>
+                <label className="bo-label">상품 이미지 수정 (파일 업로드 또는 직접 URL 기입)</label>
+                <div className="bo-form-row">
+                  <input type="text" className="bo-input" style={{ flex: 1 }} value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImageFile(null); }} placeholder="https://..." />
+                  <label className="bo-file-btn">
                     <Upload size={14} />
                     파일 선택
                     <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
                   </label>
                 </div>
                 {imageFile && (
-                  <div style={{ fontSize: '12px', color: 'var(--primary)', marginTop: '4px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div className="bo-file-hint">
                     <Check size={12} /> 업로드 대기 중: {imageFile.name}
                   </div>
                 )}
               </div>
 
-              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+              <div className="bo-checkbox-row">
                 <input type="checkbox" id="editIsActive" checked={isActive} onChange={e => setIsActive(e.target.checked)} />
-                <label htmlFor="editIsActive" style={{ margin: 0, fontWeight: '700', cursor: 'pointer' }}>포스기 화면에 노출 (판매 가능 상태)</label>
+                <label htmlFor="editIsActive">포스기 화면에 노출 (판매 가능 상태)</label>
               </div>
             </div>
 
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={() => { setIsEditModalOpen(false); setEditingProduct(null); }} disabled={isSubmitting}>취소</button>
-              <button type="submit" className="btn btn-primary" style={{ flex: 2 }} disabled={isSubmitting}>
+            <div className="bo-modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => { setIsEditModalOpen(false); setEditingProduct(null); }} disabled={isSubmitting}>취소</button>
+              <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
                 {isSubmitting ? '저장 중...' : '저장 완료'}
               </button>
             </div>
@@ -694,3 +644,4 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
 };
 
 export default ProductsView;
+

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { CashierUser } from '../types';
 import { supabase } from '../supabase';
 import { auditLog } from '../utils/auditLogger';
@@ -12,6 +12,15 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+  const emailInputRef = useRef<HTMLInputElement>(null);
+
+  // Autofocus the email input on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      emailInputRef.current?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,64 +108,107 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
   return (
     <div className="login-overlay">
       <div className="login-card">
+        {/* Brand header */}
         <div className="login-header">
-          <div className="login-logo">🛒</div>
-          <h2>서산나래 미니 POS</h2>
-          <p>안전한 매장 정산 및 로그인을 위해 계정을 입력해 주십시오.</p>
+          <div className="login-brand-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <path d="M16 10a4 4 0 01-8 0" />
+            </svg>
+          </div>
+          <h1 className="login-title">서산나래 미니 POS</h1>
+          <p className="login-subtitle">안전한 매장 운영을 위해 로그인하세요</p>
         </div>
 
-        <form onSubmit={handleLogin} className="login-form">
-          <div className="form-group">
-            <label>아이디</label>
-            <input
-              type="text"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                setLoginError('');
-              }}
-              placeholder="아이디 또는 이메일 입력"
-              className="login-input"
-              disabled={isLoggingIn}
-              required
-            />
+        {/* Login form */}
+        <form onSubmit={handleLogin} className="login-form" autoComplete="off">
+          <div className="login-field">
+            <label className="login-label" htmlFor="login-email">아이디</label>
+            <div className={`login-input-wrapper ${isLoggingIn ? 'disabled' : ''}`}>
+              <svg className="login-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              <input
+                ref={emailInputRef}
+                id="login-email"
+                type="text"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setLoginError('');
+                }}
+                placeholder="아이디 또는 이메일"
+                className="login-input"
+                disabled={isLoggingIn}
+                autoComplete="username"
+                tabIndex={1}
+              />
+            </div>
           </div>
 
-          <div className="form-group">
-            <label>비밀번호</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setLoginError('');
-              }}
-              placeholder="비밀번호를 입력하세요"
-              className="login-input"
-              maxLength={30}
-              disabled={isLoggingIn}
-              required
-            />
+          <div className="login-field">
+            <label className="login-label" htmlFor="login-password">비밀번호</label>
+            <div className={`login-input-wrapper ${isLoggingIn ? 'disabled' : ''}`}>
+              <svg className="login-input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0110 0v4" />
+              </svg>
+              <input
+                id="login-password"
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setLoginError('');
+                }}
+                placeholder="비밀번호 입력"
+                className="login-input"
+                maxLength={30}
+                disabled={isLoggingIn}
+                autoComplete="current-password"
+                tabIndex={2}
+              />
+            </div>
           </div>
 
-          {loginError && <div className="form-error">⚠️ {loginError}</div>}
+          {/* Error message */}
+          {loginError && (
+            <div className="login-error" role="alert">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <span>{loginError}</span>
+            </div>
+          )}
 
-          <button 
-            type="submit" 
-            className="btn btn-primary login-submit-btn" 
+          {/* Submit button */}
+          <button
+            type="submit"
+            className="login-submit-btn"
             disabled={isLoggingIn}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+            tabIndex={3}
           >
             {isLoggingIn ? (
               <>
-                <div className="spinner" style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', margin: 0 }}></div>
-                인증 중...
+                <div className="login-spinner" />
+                <span>인증 중...</span>
               </>
             ) : (
-              '로그인 및 영업 개시'
+              <span>로그인</span>
             )}
           </button>
         </form>
+
+        {/* Footer */}
+        <div className="login-footer">
+          <span>© 서산나래</span>
+          <span className="login-footer-dot">·</span>
+          <span>POS v1.0</span>
+        </div>
       </div>
     </div>
   );
