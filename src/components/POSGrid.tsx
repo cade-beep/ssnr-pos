@@ -22,6 +22,16 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filteredProducts.length > 0) {
+        onProductClick(filteredProducts[0]);
+        setSearchTerm('');
+      }
+    }
+  };
+
   const filteredProducts = products.filter(p => {
     // Search Term Filter
     if (searchTerm.trim() !== '') {
@@ -67,6 +77,7 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
             placeholder="상품명, 바코드 검색 (F1)"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={handleKeyDown}
             style={{ paddingRight: searchTerm ? '36px' : '14px' }}
           />
           {searchTerm && (

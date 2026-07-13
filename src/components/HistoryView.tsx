@@ -376,9 +376,35 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast })
       {/* Main Content Area */}
       <div style={{ flex: 1, overflow: 'hidden' }}>
         {isLoading ? (
-          <div className="bo-empty" style={{ height: '100%' }}>
-            <RefreshCw size={24} style={{ animation: 'spin 2s linear infinite' }} />
-            <div className="bo-empty-text">매출 데이터를 안전하게 조회하는 중...</div>
+          <div className="bo-table-wrap" style={{ height: '100%', overflow: 'hidden' }}>
+            <table className="bo-table">
+              <thead>
+                <tr>
+                  <th>결제 시간</th>
+                  <th>주문번호</th>
+                  <th>담당 캐셔</th>
+                  <th>판매 내역</th>
+                  <th className="text-right">결제액</th>
+                  <th className="text-center">결제수단</th>
+                  <th className="text-center">상태</th>
+                  <th className="text-center">관리</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+                  <tr key={n}>
+                    <td><div className="skeleton" style={{ width: '80px', height: '14px', borderRadius: '4px' }} /></td>
+                    <td><div className="skeleton" style={{ width: '120px', height: '14px', borderRadius: '4px' }} /></td>
+                    <td><div className="skeleton" style={{ width: '60px', height: '14px', borderRadius: '4px' }} /></td>
+                    <td><div className="skeleton" style={{ width: '150px', height: '14px', borderRadius: '4px' }} /></td>
+                    <td className="text-right"><div className="skeleton" style={{ width: '60px', height: '14px', borderRadius: '4px', marginLeft: 'auto' }} /></td>
+                    <td className="text-center"><div className="skeleton" style={{ width: '50px', height: '18px', borderRadius: '4px', margin: '0 auto' }} /></td>
+                    <td className="text-center"><div className="skeleton" style={{ width: '50px', height: '18px', borderRadius: '4px', margin: '0 auto' }} /></td>
+                    <td className="text-center"><div className="skeleton" style={{ width: '40px', height: '24px', borderRadius: '4px', margin: '0 auto' }} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : viewMode === 'list' ? (
           /* TRANSACTION LIST VIEW */

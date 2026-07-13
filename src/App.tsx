@@ -716,9 +716,16 @@ const App: React.FC = () => {
           <>
             <div className="pos-main-panel">
               {products.length === 0 ? (
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', gap: '12px' }}>
-                  <RefreshCw size={36} style={{ animation: 'spin 2s linear infinite' }} />
-                  <div>상품 카탈로그를 빌드하는 중...</div>
+                <div className="products-grid">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+                    <div key={n} className="product-card" style={{ pointerEvents: 'none', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', width: '100%' }}>
+                      <div className="product-image-container skeleton" style={{ width: '100%', height: '100px', marginBottom: '12px' }} />
+                      <div className="product-info" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div className="skeleton" style={{ width: '70%', height: '16px', borderRadius: '4px' }} />
+                        <div className="skeleton" style={{ width: '40%', height: '14px', borderRadius: '4px' }} />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <POSGrid products={products.filter(p => p.isActive !== false)} onProductClick={handleAddToCart} cart={cart} />
@@ -829,25 +836,9 @@ const App: React.FC = () => {
 
       {/* Notification Toast */}
       {toast && (
-        <div className={`toast toast-${toast.type}`} style={{
-          position: 'fixed',
-          bottom: '24px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          padding: '12px 24px',
-          borderRadius: '24px',
-          background: toast.type === 'error' ? '#ef4444' : toast.type === 'success' ? '#1a64f4' : '#334155',
-          color: '#ffffff',
-          fontWeight: 'bold',
-          fontSize: '13.5px',
-          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-          zIndex: 2000,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          animation: 'fadeInUp 0.3s ease-out'
-        }}>
-          {toast.message}
+        <div className={`toast toast-${toast.type}`}>
+          <span>{toast.type === 'success' ? '✅' : toast.type === 'error' ? '⚠️' : 'ℹ️'}</span>
+          <span>{toast.message}</span>
         </div>
       )}
     </div>
@@ -883,6 +874,22 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ subtotal, discount, totalAm
       setChange(0);
     }
   }, [receivedCash, totalAmount]);
+
+  useEffect(() => {
+    const handleModalKeyDown = (e: KeyboardEvent) => {
+      if (isSubmitting) return;
+
+      if (e.key === '1' || e.key === 'F5') {
+        e.preventDefault();
+        setMethod('CARD');
+      } else if (e.key === '2' || e.key === 'F6') {
+        e.preventDefault();
+        setMethod('TRANSFER');
+      }
+    };
+    window.addEventListener('keydown', handleModalKeyDown);
+    return () => window.removeEventListener('keydown', handleModalKeyDown);
+  }, [isSubmitting]);
 
   return (
     <div className="bo-modal-overlay">
