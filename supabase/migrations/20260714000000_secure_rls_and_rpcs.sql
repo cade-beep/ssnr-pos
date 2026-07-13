@@ -48,9 +48,11 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- 3. Policies for user_roles
+DROP POLICY IF EXISTS "Allow authenticated select user_roles" ON public.user_roles;
 CREATE POLICY "Allow authenticated select user_roles" ON public.user_roles
   FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Allow admin all user_roles" ON public.user_roles;
 CREATE POLICY "Allow admin all user_roles" ON public.user_roles
   FOR ALL TO authenticated USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
 
@@ -90,24 +92,30 @@ ON CONFLICT (user_id) DO NOTHING;
 -- 4. Explicit minimum permission RLS policies for business tables
 
 -- Products table: Authenticated users can read. Admins can perform CRUD.
+DROP POLICY IF EXISTS "Allow authenticated read products" ON public.products;
 CREATE POLICY "Allow authenticated read products" ON public.products
   FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Allow admin CRUD products" ON public.products;
 CREATE POLICY "Allow admin CRUD products" ON public.products
   FOR ALL TO authenticated USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
 
 -- Orders table: Authenticated cashiers and admins can read orders. Direct inserts are blocked.
+DROP POLICY IF EXISTS "Allow authenticated read orders" ON public.orders;
 CREATE POLICY "Allow authenticated read orders" ON public.orders
   FOR SELECT TO authenticated USING (true);
 
 -- Order Items table: Authenticated users can read order items. Direct inserts are blocked.
+DROP POLICY IF EXISTS "Allow authenticated read order_items" ON public.order_items;
 CREATE POLICY "Allow authenticated read order_items" ON public.order_items
   FOR SELECT TO authenticated USING (true);
 
 -- Closing Reports table: Authenticated users can read reports. Admin can insert.
+DROP POLICY IF EXISTS "Allow authenticated read closing_reports" ON public.closing_reports;
 CREATE POLICY "Allow authenticated read closing_reports" ON public.closing_reports
   FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Allow admin insert closing_reports" ON public.closing_reports;
 CREATE POLICY "Allow admin insert closing_reports" ON public.closing_reports
   FOR INSERT TO authenticated WITH CHECK (public.is_admin(auth.uid()));
 
@@ -166,9 +174,11 @@ ALTER TABLE public.inventory_movements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Policies for audit tables (Authenticated users read movements, only admin reads change audit logs)
+DROP POLICY IF EXISTS "Allow auth read inventory_movements" ON public.inventory_movements;
 CREATE POLICY "Allow auth read inventory_movements" ON public.inventory_movements
   FOR SELECT TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Allow admin read product_audit_logs" ON public.product_audit_logs;
 CREATE POLICY "Allow admin read product_audit_logs" ON public.product_audit_logs
   FOR SELECT TO authenticated USING (public.is_admin(auth.uid()));
 
