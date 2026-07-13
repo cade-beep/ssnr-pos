@@ -178,13 +178,13 @@ RETURNS TRIGGER AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     INSERT INTO public.product_audit_logs (actor_user_id, action, product_id, after_data)
-    VALUES (auth.uid(), 'CREATE', NEW.id, ROW_TO_JSONB(NEW));
+    VALUES (auth.uid(), 'CREATE', NEW.id, TO_JSONB(NEW));
   ELSIF TG_OP = 'UPDATE' THEN
     INSERT INTO public.product_audit_logs (actor_user_id, action, product_id, before_data, after_data)
-    VALUES (auth.uid(), 'UPDATE', NEW.id, ROW_TO_JSONB(OLD), ROW_TO_JSONB(NEW));
+    VALUES (auth.uid(), 'UPDATE', NEW.id, TO_JSONB(OLD), TO_JSONB(NEW));
   ELSIF TG_OP = 'DELETE' THEN
     INSERT INTO public.product_audit_logs (actor_user_id, action, product_id, before_data)
-    VALUES (auth.uid(), 'DELETE', OLD.id, ROW_TO_JSONB(OLD));
+    VALUES (auth.uid(), 'DELETE', OLD.id, TO_JSONB(OLD));
   END IF;
   RETURN NULL;
 END;

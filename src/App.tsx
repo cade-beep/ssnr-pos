@@ -868,74 +868,78 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ totalAmount, onClose, onPay
   }, [receivedCash, totalAmount]);
 
   return (
-    <div className="modal-overlay">
-      <form className="modal-content" onSubmit={handleSubmit}>
-        <div className="modal-body">
-          <div className="modal-title">결제 처리</div>
-          
-          <div className="payment-selector" style={{ pointerEvents: isSubmitting ? 'none' : 'auto' }}>
+    <div className="bo-modal-overlay">
+      <form className="bo-modal" style={{ maxWidth: '440px' }} onSubmit={handleSubmit}>
+        <div className="bo-modal-header">
+          <div className="bo-modal-title">결제 처리</div>
+          <div className="bo-modal-desc">결제 수단을 선택하고 결제액을 확인합니다.</div>
+        </div>
+
+        <div className="bo-modal-body" style={{ paddingBottom: '10px' }}>
+          <div className="bo-payment-selector" style={{ pointerEvents: isSubmitting ? 'none' : 'auto' }}>
             <button 
               type="button"
-              className={`payment-option ${method === 'CARD' ? 'selected' : ''}`}
+              className={`bo-payment-option ${method === 'CARD' ? 'selected' : ''}`}
               onClick={() => setMethod('CARD')}
               disabled={isSubmitting}
             >
               <span style={{ fontSize: '24px' }}>💳</span>
-              <span className="payment-option-title">신용카드</span>
+              <span className="bo-payment-option-title">신용카드</span>
             </button>
             <button 
               type="button"
-              className={`payment-option ${method === 'TRANSFER' ? 'selected' : ''}`}
+              className={`bo-payment-option ${method === 'TRANSFER' ? 'selected' : ''}`}
               onClick={() => setMethod('TRANSFER')}
               disabled={isSubmitting}
             >
               <span style={{ fontSize: '24px' }}>🏦</span>
-              <span className="payment-option-title">계좌이체</span>
+              <span className="bo-payment-option-title">계좌이체</span>
             </button>
           </div>
 
           <div style={{ 
-            background: '#f9fafb', 
-            borderRadius: 'var(--radius-md)', 
-            padding: '24px 16px', 
+            background: '#f8fafc', 
+            borderRadius: '12px', 
+            padding: '20px 16px', 
             textAlign: 'center',
-            marginBottom: '24px',
+            marginBottom: '16px',
             border: '1px solid var(--border-color)',
             color: 'var(--text-secondary)'
           }}>
             {method === 'TRANSFER' ? (
               <>
-                <p style={{ fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>아래 계좌로 송금을 확인한 뒤 완료해 주세요.</p>
-                <div style={{ margin: '12px 0', padding: '12px', background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '15px', color: 'var(--text-primary)', fontWeight: '700' }}>
+                <p style={{ fontSize: '13.5px', marginBottom: '8px', color: 'var(--text-secondary)' }}>아래 계좌로 송금을 확인한 뒤 완료해 주세요.</p>
+                <div style={{ margin: '8px 0 12px 0', padding: '12px', background: '#ffffff', border: '1px solid var(--border-color)', borderRadius: '8px', fontSize: '14.5px', color: 'var(--text-primary)', fontWeight: '700' }}>
                   농협 351-8770-93 예금주: 서산나래
                 </div>
               </>
             ) : (
-              <p style={{ fontSize: '14px', marginBottom: '8px', color: 'var(--text-secondary)' }}>카드 단말기 결제를 진행합니다.</p>
+              <p style={{ fontSize: '13.5px', marginBottom: '8px', color: 'var(--text-secondary)' }}>카드 단말기 결제를 진행합니다.</p>
             )}
 
-            <h3 style={{ color: 'var(--text-primary)', fontSize: '24px', fontWeight: '800' }}>
+            <h3 style={{ color: 'var(--primary)', fontSize: '26px', fontWeight: '800' }}>
               {totalAmount.toLocaleString()}원
             </h3>
 
             {/* Change Calculator for Cash/Transfer payments */}
             {method === 'TRANSFER' && (
-              <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' }}>
+              <div style={{ marginTop: '14px', borderTop: '1px dashed #e2e8f0', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '700' }}>받은 금액 (원)</label>
+                  <label className="bo-label" style={{ fontWeight: '700' }}>받은 금액 (원)</label>
                   <input 
                     type="number" 
                     value={receivedCash} 
                     onChange={e => setReceivedCash(e.target.value)} 
                     placeholder="예: 20000"
                     disabled={isSubmitting}
-                    style={{ padding: '8px 12px', width: '130px', border: '1px solid var(--border-color)', borderRadius: '6px', fontSize: '14px', textAlign: 'right' }} 
+                    className="bo-input"
+                    style={{ width: '130px', height: '36px', padding: '0 10px', textAlign: 'right' }} 
                   />
                 </div>
                 {Number(receivedCash) > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold' }}>
-                    <span>거스름돈</span>
-                    <span style={{ color: 'var(--primary)', fontSize: '15px' }}>{change.toLocaleString()}원</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>거스름돈</span>
+                    <span style={{ color: '#ef4444', fontSize: '15px' }}>{change.toLocaleString()}원</span>
                   </div>
                 )}
               </div>
@@ -943,12 +947,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ totalAmount, onClose, onPay
           </div>
         </div>
 
-        <div className="modal-footer">
-          <button type="button" className="btn btn-secondary" style={{ flex: 1 }} onClick={onClose} disabled={isSubmitting}>취소</button>
+        <div className="bo-modal-footer">
+          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>취소</button>
           <button 
             type="submit" 
             className="btn btn-primary" 
-            style={{ flex: 2 }}
             disabled={isSubmitting}
           >
             {isSubmitting ? '결제 처리 중...' : '결제 완료'}
