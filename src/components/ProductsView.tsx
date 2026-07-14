@@ -22,6 +22,16 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortOption, setSortOption] = useState<'code' | 'name' | 'category' | 'price_asc' | 'price_desc'>('code');
+
+  const sanitizeImageUrl = (value: string): string => {
+    if (!value) return '';
+    try {
+      const parsed = new URL(value);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? value : '';
+    } catch {
+      return '';
+    }
+  };
   
   // CRUD Modals States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -598,16 +608,19 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                     overflow: 'hidden',
                     position: 'relative'
                   }}>
-                    {imageFile ? (
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'center', padding: '4px' }}>
-                        업로드 대기<br/>
-                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{imageFile.name.slice(0, 12)}...</span>
-                      </div>
-                    ) : imageUrl ? (
-                      <img src={imageUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <div style={{ fontSize: '48px' }}>{emoji || '🍞'}</div>
-                    )}
+                    {(() => {
+                      const safeImageUrl = sanitizeImageUrl(imageUrl);
+                      return imageFile ? (
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'center', padding: '4px' }}>
+                          업로드 대기<br/>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{imageFile.name.slice(0, 12)}...</span>
+                        </div>
+                      ) : safeImageUrl ? (
+                        <img src={safeImageUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <div style={{ fontSize: '48px' }}>{emoji || '🍞'}</div>
+                      );
+                    })()}
                   </div>
                   {role !== 'Manager' && (
                     <label className="bo-file-btn" style={{ width: '100%', justifyContent: 'center', cursor: 'pointer', height: '36px', borderRadius: '8px', fontSize: '12.5px' }}>
