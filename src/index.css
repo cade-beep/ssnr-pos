@@ -682,11 +682,11 @@ input:checked + .toggle-slider:before {
 .cart-item {
   background: #ffffff;
   border-bottom: 1px solid #f2f4f6;
-  padding: 20px 0;
+  padding: 12px 0;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   box-shadow: none;
   border-radius: 0;
   transition: background-color 0.15s ease;
@@ -777,6 +777,43 @@ input:checked + .toggle-slider:before {
   transition: all 0.15s ease;
   width: 32px;
   flex-shrink: 0;
+}
+.delete-item-btn:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.item-discount-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  height: 28px;
+  border-radius: 14px; /* pill shape */
+  border: none;
+  background: #fff4e6; /* light orange background */
+  color: #d9480f;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+}
+.item-discount-btn:hover {
+  background: #ffe8cc;
+  transform: translateY(-0.5px);
+}
+.item-discount-btn:active {
+  background: #ffd8a8;
+  transform: translateY(0);
+}
+.item-discount-btn.discounted {
+  background: #ffe8cc;
+  color: #e8590c;
+  border: 1.5px solid #ffd8a8;
+}
+.item-discount-btn.discounted:hover {
+  background: #ffd8a8;
 }
 .delete-item-btn:hover {
   color: var(--danger);
