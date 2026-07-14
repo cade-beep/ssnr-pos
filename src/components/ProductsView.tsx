@@ -474,13 +474,13 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                         업로드 대기<br/>
                         <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{imageFile.name.slice(0, 12)}...</span>
                       </div>
-                    ) : safeImageUrl ? (
-                      <img src={safeImageUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : getSafeImageUrl(imageUrl) ? (
+                      <img src={getSafeImageUrl(imageUrl)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
                       <div style={{ fontSize: '48px' }}>{emoji || '🍞'}</div>
                     )}
                   </div>
-                  {role !== 'Manager' && (
+                  {role === 'Owner' && (
                     <label className="bo-file-btn" style={{ width: '100%', justifyContent: 'center', cursor: 'pointer', height: '36px', borderRadius: '8px', fontSize: '12.5px' }}>
                       <Upload size={13} />
                       이미지 업로드
