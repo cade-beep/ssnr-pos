@@ -46,12 +46,18 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
     const raw = value.trim();
     if (!raw) return '';
 
-    // Allow root-relative URLs used by local assets.
-    if (raw.startsWith('/')) return raw;
+    // Reject characters that can break attribute/HTML context.
+    if (/[<>"'`\s\u0000-\u001F\u007F]/.test(raw)) return '';
+
+    // Allow only safe root-relative URLs used by local assets.
+    if (raw.startsWith('/')) {
+      return /^\/[A-Za-z0-9\-._~:/?#[\]@!$&()*+,;=%]*$/.test(raw) ? raw : '';
+    }
 
     try {
       const parsed = new URL(raw);
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? raw : '';
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+      return parsed.toString();
     } catch {
       return '';
     }
