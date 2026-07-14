@@ -58,6 +58,12 @@ export interface Receipt {
   isRefunded?: boolean;
   refundedAt?: string;
   refundedBy?: string;
+  subtotal?: number;
+  itemDiscountAmount?: number;
+  cartDiscountPercent?: number;
+  cartDiscountAmount?: number;
+  totalDiscount?: number;
+  finalTotal?: number;
 }
 
 // Extend global window object for type safety in React renderer

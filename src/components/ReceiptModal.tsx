@@ -70,28 +70,57 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose }) => {
             <div className="bo-receipt-divider"></div>
 
             {(() => {
-              const originalSubtotal = receipt.items.reduce((sum, item) => {
-                if (item.product.id === 'DISCOUNT') return sum;
-                return sum + (item.product.price * item.quantity);
-              }, 0);
-              const itemDiscountSum = receipt.items.reduce((sum, item) => {
-                if (item.product.id === 'DISCOUNT') return sum;
-                return sum + ((item.discount || 0) * (item.discountQty || 0));
-              }, 0);
+              const subtotalVal = receipt.subtotal !== undefined && receipt.subtotal !== null && receipt.subtotal > 0
+                ? receipt.subtotal
+                : receipt.items.reduce((sum, item) => {
+                    if (item.product.id === 'DISCOUNT') return sum;
+                    return sum + (item.product.price * item.quantity);
+                  }, 0);
+
+              const itemDiscountVal = receipt.itemDiscountAmount !== undefined && receipt.itemDiscountAmount !== null
+                ? receipt.itemDiscountAmount
+                : receipt.items.reduce((sum, item) => {
+                    if (item.product.id === 'DISCOUNT') return sum;
+                    return sum + ((item.discount || 0) * (item.discountQty || 0));
+                  }, 0);
+
               const globalDiscountItem = receipt.items.find(item => item.product.id === 'DISCOUNT');
-              const globalDiscountVal = globalDiscountItem ? Math.abs(globalDiscountItem.product.price * globalDiscountItem.quantity) : 0;
-              const totalDiscount = itemDiscountSum + globalDiscountVal;
+              const oldGlobalDiscountVal = globalDiscountItem ? Math.abs(globalDiscountItem.product.price * globalDiscountItem.quantity) : 0;
+
+              const cartDiscountVal = receipt.cartDiscountAmount !== undefined && receipt.cartDiscountAmount !== null
+                ? receipt.cartDiscountAmount
+                : oldGlobalDiscountVal;
+
+              const totalDiscountVal = receipt.totalDiscount !== undefined && receipt.totalDiscount !== null
+                ? receipt.totalDiscount
+                : (itemDiscountVal + cartDiscountVal);
+
+              const cartDiscountPct = receipt.cartDiscountPercent !== undefined && receipt.cartDiscountPercent !== null
+                ? receipt.cartDiscountPercent
+                : (globalDiscountItem && subtotalVal > 0 ? Math.round((cartDiscountVal / (subtotalVal - itemDiscountVal)) * 100) : 0);
 
               return (
                 <>
                   <div className="bo-receipt-row">
                     <span>상품합계</span>
-                    <span>{originalSubtotal.toLocaleString()}원</span>
+                    <span>{subtotalVal.toLocaleString()}원</span>
                   </div>
-                  {totalDiscount > 0 && (
+                  {itemDiscountVal > 0 && (
                     <div className="bo-receipt-row" style={{ color: '#ef4444' }}>
+                      <span>품목할인합계</span>
+                      <span>-{itemDiscountVal.toLocaleString()}원</span>
+                    </div>
+                  )}
+                  {cartDiscountVal > 0 && (
+                    <div className="bo-receipt-row" style={{ color: '#ef4444' }}>
+                      <span>전체할인{cartDiscountPct > 0 ? ` (${cartDiscountPct}%)` : ''}</span>
+                      <span>-{cartDiscountVal.toLocaleString()}원</span>
+                    </div>
+                  )}
+                  {totalDiscountVal > 0 && (
+                    <div className="bo-receipt-row" style={{ color: '#ef4444', fontWeight: 'bold', borderTop: '1px dotted #e2e8f0', paddingTop: '4px', marginTop: '2px' }}>
                       <span>할인합계</span>
-                      <span>-{totalDiscount.toLocaleString()}원</span>
+                      <span>-{totalDiscountVal.toLocaleString()}원</span>
                     </div>
                   )}
                   <div className="bo-receipt-divider"></div>

@@ -76,6 +76,12 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast })
           is_refunded,
           refunded_at,
           refunded_by,
+          subtotal,
+          item_discount_amount,
+          cart_discount_percent,
+          cart_discount_amount,
+          total_discount,
+          final_total,
           order_items (
             product_id,
             product_name,
@@ -140,19 +146,57 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast })
 
   // Aggregating statistics for dashboard
   const stats = filteredOrders.reduce((acc, curr) => {
+    // Resolve fields with backward-compatibility fallbacks
+    const subtotalVal = Number(curr.subtotal) || curr.order_items?.reduce((sum: number, item: any) => {
+      if (item.product_id === 'DISCOUNT') return sum;
+      return sum + (Number(item.product_price) * Number(item.quantity));
+    }, 0) || Number(curr.total_amount) || 0;
+
+    const itemDiscountVal = Number(curr.item_discount_amount) || curr.order_items?.reduce((sum: number, item: any) => {
+      if (item.product_id === 'DISCOUNT') return sum;
+      return sum + (Number(item.discount || 0) * Number(item.discount_qty || 0));
+    }, 0) || 0;
+
+    const globalDiscountItem = curr.order_items?.find((item: any) => item.product_id === 'DISCOUNT');
+    const oldGlobalDiscountVal = globalDiscountItem ? Math.abs(Number(globalDiscountItem.product_price) * Number(globalDiscountItem.quantity)) : 0;
+
+    const cartDiscountVal = curr.cart_discount_amount !== undefined && curr.cart_discount_amount !== null
+      ? Number(curr.cart_discount_amount)
+      : oldGlobalDiscountVal;
+
+    const totalDiscountVal = curr.total_discount !== undefined && curr.total_discount !== null
+      ? Number(curr.total_discount)
+      : (itemDiscountVal + cartDiscountVal);
+
+    const netSalesVal = Number(curr.final_total) || Number(curr.total_amount) || 0;
+
     if (curr.is_refunded) {
       acc.refundCount += 1;
-      acc.refundAmount += Number(curr.total_amount) || 0;
+      acc.refundAmount += netSalesVal;
     } else {
-      acc.totalSales += Number(curr.total_amount) || 0;
+      acc.grossSales += subtotalVal;
+      acc.totalDiscount += totalDiscountVal;
+      acc.netSales += netSalesVal;
       acc.salesCount += 1;
       acc.totalQty += Number(curr.total_quantity) || 0;
+
+      // Check if order date is today (local date)
+      const orderDate = new Date(curr.payment_date_time);
+      const today = new Date();
+      if (orderDate.toDateString() === today.toDateString()) {
+        acc.todayDiscount += totalDiscountVal;
+      }
+
+      // Check if order date is current month/year
+      if (orderDate.getMonth() === today.getMonth() && orderDate.getFullYear() === today.getFullYear()) {
+        acc.monthlyDiscount += totalDiscountVal;
+      }
       
       if (curr.payment_method === 'CARD') {
-        acc.cardAmount += Number(curr.total_amount) || 0;
+        acc.cardAmount += netSalesVal;
         acc.cardCount += 1;
       } else {
-        acc.transferAmount += Number(curr.total_amount) || 0;
+        acc.transferAmount += netSalesVal;
         acc.transferCount += 1;
       }
 
@@ -166,7 +210,11 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast })
     }
     return acc;
   }, {
-    totalSales: 0,
+    grossSales: 0,
+    totalDiscount: 0,
+    netSales: 0,
+    todayDiscount: 0,
+    monthlyDiscount: 0,
     salesCount: 0,
     totalQty: 0,
     cardAmount: 0,
@@ -178,7 +226,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast })
     itemsSold: {} as Record<string, number>
   });
 
-  const avgPurchase = stats.salesCount > 0 ? Math.round(stats.totalSales / stats.salesCount) : 0;
+  const avgPurchase = stats.salesCount > 0 ? Math.round(stats.netSales / stats.salesCount) : 0;
   const topProducts = (Object.entries(stats.itemsSold) as [string, number][])
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
@@ -269,7 +317,13 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast })
       cashierName: o.cashier_name,
       isRefunded: o.is_refunded,
       refundedAt: o.refunded_at,
-      refundedBy: o.refunded_by
+      refundedBy: o.refunded_by,
+      subtotal: o.subtotal !== undefined && o.subtotal !== null ? Number(o.subtotal) : undefined,
+      itemDiscountAmount: o.item_discount_amount !== undefined && o.item_discount_amount !== null ? Number(o.item_discount_amount) : undefined,
+      cartDiscountPercent: o.cart_discount_percent !== undefined && o.cart_discount_percent !== null ? Number(o.cart_discount_percent) : undefined,
+      cartDiscountAmount: o.cart_discount_amount !== undefined && o.cart_discount_amount !== null ? Number(o.cart_discount_amount) : undefined,
+      totalDiscount: o.total_discount !== undefined && o.total_discount !== null ? Number(o.total_discount) : undefined,
+      finalTotal: o.final_total !== undefined && o.final_total !== null ? Number(o.final_total) : undefined
     };
 
     onSelectReceipt(receipt);
@@ -481,18 +535,34 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast })
           <div style={{ height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             
             {/* Top Stat Cards */}
-            <div className="bo-stats-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+            <div className="bo-stats-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
               <div className="bo-stat-card">
                 <div className="bo-stat-label"><Coins size={16} color="var(--primary)" /> 순 매출 총액 (환불 제외)</div>
-                <div className="bo-stat-value">{stats.totalSales.toLocaleString()}원</div>
+                <div className="bo-stat-value">{stats.netSales.toLocaleString()}원</div>
+              </div>
+              <div className="bo-stat-card">
+                <div className="bo-stat-label"><Coins size={16} color="var(--success)" /> 총 매출액 (할인 전)</div>
+                <div className="bo-stat-value">{stats.grossSales.toLocaleString()}원</div>
+              </div>
+              <div className="bo-stat-card">
+                <div className="bo-stat-label"><TrendingUp size={16} color="#ef4444" /> 할인 총액</div>
+                <div className="bo-stat-value" style={{ color: '#ef4444' }}>-{stats.totalDiscount.toLocaleString()}원</div>
+              </div>
+              <div className="bo-stat-card">
+                <div className="bo-stat-label"><TrendingUp size={16} color="#d97706" /> 오늘 할인액 / 이번 달 할인액</div>
+                <div className="bo-stat-value" style={{ fontSize: '15px', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}><span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>오늘:</span> <span style={{ color: '#ef4444', fontWeight: 'bold' }}>-{stats.todayDiscount.toLocaleString()}원</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}><span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>이번달:</span> <span style={{ color: '#ef4444', fontWeight: 'bold' }}>-{stats.monthlyDiscount.toLocaleString()}원</span></div>
+                </div>
               </div>
               <div className="bo-stat-card">
                 <div className="bo-stat-label"><ShoppingBag size={16} color="var(--success)" /> 총 결제 건수 / 아이템수</div>
-                <div className="bo-stat-value">{stats.salesCount}건 ({stats.totalQty}개)</div>
-              </div>
-              <div className="bo-stat-card">
-                <div className="bo-stat-label"><TrendingUp size={16} color="#d97706" /> 주문당 평균 결제액 (객단가)</div>
-                <div className="bo-stat-value">{avgPurchase.toLocaleString()}원</div>
+                <div className="bo-stat-value">
+                  {stats.salesCount}건 ({stats.totalQty}개)
+                  <div style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    객단가: {avgPurchase.toLocaleString()}원
+                  </div>
+                </div>
               </div>
               <div className="bo-stat-card">
                 <div className="bo-stat-label"><Undo size={16} color="#e11d48" /> 환불 처리 건수 / 금액</div>
@@ -515,7 +585,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast })
                       <span style={{ fontWeight: '700' }}>{stats.cardAmount.toLocaleString()}원</span>
                     </div>
                     <div style={{ height: '10px', background: '#f1f5f9', borderRadius: '5px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', background: 'var(--primary)', borderRadius: '5px', width: stats.totalSales > 0 ? `${(stats.cardAmount / stats.totalSales) * 100}%` : '0%', transition: 'width 0.3s ease' }} />
+                      <div style={{ height: '100%', background: 'var(--primary)', borderRadius: '5px', width: stats.netSales > 0 ? `${(stats.cardAmount / stats.netSales) * 100}%` : '0%', transition: 'width 0.3s ease' }} />
                     </div>
                   </div>
                   <div>
@@ -524,7 +594,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast })
                       <span style={{ fontWeight: '700' }}>{stats.transferAmount.toLocaleString()}원</span>
                     </div>
                     <div style={{ height: '10px', background: '#f1f5f9', borderRadius: '5px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', background: 'var(--success)', borderRadius: '5px', width: stats.totalSales > 0 ? `${(stats.transferAmount / stats.totalSales) * 100}%` : '0%', transition: 'width 0.3s ease' }} />
+                      <div style={{ height: '100%', background: 'var(--success)', borderRadius: '5px', width: stats.netSales > 0 ? `${(stats.transferAmount / stats.netSales) * 100}%` : '0%', transition: 'width 0.3s ease' }} />
                     </div>
                   </div>
                 </div>

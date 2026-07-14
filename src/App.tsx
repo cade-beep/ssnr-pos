@@ -40,6 +40,28 @@ const getFriendlyErrorMessage = (error: any): string => {
   }
   return `데이터베이스 처리 중 오류가 발생했습니다.\n(${msg})`;
 };
+export const normalizeCategory = (cat: string, name?: string): 'bakery' | 'food' | 'etc' => {
+  if (!cat) return 'etc';
+  const c = cat.trim();
+  
+  if (name) {
+    const n = name.toLowerCase();
+    if (n.includes('쿠키') || n.includes('머핀') || n.includes('마들렌') || n.includes('브라우니')) {
+      return 'bakery';
+    }
+  }
+
+  if (c === '베이커리' || c === '쿠키/제과' || c === 'bakery') return 'bakery';
+  if (c === '간식및선물세트' || c === 'food') return 'food';
+  if (c === '기타' || c === 'etc') return 'etc';
+  return 'etc';
+};
+
+export const mapCategoryToDB = (cat: 'bakery' | 'food' | 'etc'): string => {
+  if (cat === 'bakery') return '베이커리';
+  if (cat === 'food') return '간식및선물세트';
+  return '기타';
+};
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'sales' | 'history' | 'products' | 'settings'>('sales');
@@ -51,7 +73,7 @@ const App: React.FC = () => {
   // Custom Toast State
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'error' } | null>(null);
   const [isReceiptChecked, setIsReceiptChecked] = useState<boolean>(true);
-  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [cartDiscountPercent, setCartDiscountPercent] = useState<number>(0);
 
   // Cashier Authentication States
   const [currentCashier, setCurrentCashier] = useState<CashierUser | null>(null);
@@ -185,7 +207,7 @@ const App: React.FC = () => {
           id: `P-${idx + 1}`,
           name: p.name,
           price: p.price || 1500, // starting default price
-          category: p.category,
+          category: mapCategoryToDB(p.category),
           emoji: p.emoji,
           image_url: p.imageUrl,
           stock: 50, // default stock levels
@@ -200,7 +222,7 @@ const App: React.FC = () => {
           id: s.id,
           name: s.name,
           price: s.price,
-          category: s.category as any,
+          category: normalizeCategory(s.category, s.name),
           emoji: s.emoji,
           imageUrl: s.image_url,
           stock: s.stock,
@@ -213,7 +235,7 @@ const App: React.FC = () => {
           id: d.id,
           name: d.name,
           price: Number(d.price) || 0,
-          category: d.category as any,
+          category: normalizeCategory(d.category, d.name),
           emoji: d.emoji,
           imageUrl: d.image_url,
           stock: d.stock,
@@ -415,6 +437,34 @@ const App: React.FC = () => {
     }
   };
 
+  // Helper to safely calculate item discount details
+  const getItemDiscountInfo = (item: CartItem) => {
+    if (item.discountPercent && item.discountPercent > 0) {
+      const pct = Math.min(100, Math.max(0, item.discountPercent));
+      const unitDiscount = Math.round(item.product.price * (pct / 100));
+      return {
+        unitDiscount,
+        totalDiscount: unitDiscount * item.quantity,
+        discountPercent: pct,
+        isPercent: true
+      };
+    } else if (item.discount && item.discount > 0) {
+      const discountQty = item.discountQty ?? item.quantity;
+      return {
+        unitDiscount: item.discount,
+        totalDiscount: item.discount * discountQty,
+        discountPercent: 0,
+        isPercent: false
+      };
+    }
+    return {
+      unitDiscount: 0,
+      totalDiscount: 0,
+      discountPercent: 0,
+      isPercent: false
+    };
+  };
+
   // Apply custom item discount
   const handleApplyItemDiscount = (productId: string, amount: number, qty: number, isPercent?: boolean, percentVal?: number) => {
     setCart((prevCart) =>
@@ -432,27 +482,22 @@ const App: React.FC = () => {
     );
   };
 
-  // Apply global discount
-  const handleApplyGlobalDiscount = (amount: number) => {
-    if (amount > 0 && cart.some((i) => i.discount && i.discountQty && i.discount > 0 && i.discountQty > 0)) {
-      const confirmOverlap = window.confirm(
-        '이미 개별 할인이 적용된 상품이 장바구니에 있습니다.\n전체 할인을 추가로 중복 적용하시겠습니까?'
-      );
-      if (!confirmOverlap) {
-        return;
-      }
-    }
-    setDiscountAmount(amount);
+  // Apply global discount percent
+  const handleApplyGlobalDiscount = (percent: number) => {
+    setCartDiscountPercent(Math.min(100, Math.max(0, percent)));
   };
 
-  const originalSubtotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-  const totalItemDiscount = cart.reduce((sum, item) => sum + ((item.discount || 0) * (item.discountQty || 0)), 0);
+  const safeNumber = (val: number): number => {
+    if (isNaN(val) || !isFinite(val)) return 0;
+    return val;
+  };
 
-  const totalAmount = cart.reduce((sum, item) => {
-    const discountSum = (item.discount || 0) * (item.discountQty || 0);
-    const itemTotal = (item.product.price * item.quantity) - discountSum;
-    return sum + Math.max(0, itemTotal);
-  }, 0);
+  const originalSubtotal = safeNumber(cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0));
+  const totalItemDiscount = safeNumber(cart.reduce((sum, item) => sum + getItemDiscountInfo(item).totalDiscount, 0));
+  const subtotalAfterItemDiscounts = Math.max(0, originalSubtotal - totalItemDiscount);
+  const cartDiscountAmount = safeNumber(Math.round(subtotalAfterItemDiscounts * (Math.min(100, Math.max(0, cartDiscountPercent)) / 100)));
+  const totalDiscount = safeNumber(totalItemDiscount + cartDiscountAmount);
+  const finalTotal = Math.max(0, subtotalAfterItemDiscounts - cartDiscountAmount);
 
   // Payment process handler with database RPC complete_sale (transaction-safe)
   const handleCompletePayment = async (paymentMethod: PaymentMethod, receivedCashVal?: number, changeVal?: number) => {
@@ -460,29 +505,30 @@ const App: React.FC = () => {
     setIsCheckoutSubmitting(true);
     console.log('[LOG] Initiating payment checkout flow with database RPC');
 
-    const finalAmount = Math.max(0, totalAmount - discountAmount);
-    
     // Fallback key if activeIdempotencyKey is somehow not set
     const finalIdempotencyKey = activeIdempotencyKey || (crypto.randomUUID ? crypto.randomUUID() : `SSNR-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
 
     try {
       // Prepare cart payload for RPC
-      const cartPayload = cart.map(item => ({
-        product_id: item.product.id,
-        product_name: item.product.name,
-        price: item.product.price,
-        quantity: item.quantity,
-        discount: item.discount || 0,
-        discount_qty: item.discountQty || 0,
-        is_percent: !!item.isPercent,
-        discount_percent: item.discountPercent || 0
-      }));
+      const cartPayload = cart.map(item => {
+        const info = getItemDiscountInfo(item);
+        return {
+          product_id: item.product.id,
+          product_name: item.product.name,
+          price: item.product.price,
+          quantity: item.quantity,
+          discount: info.unitDiscount,
+          discount_qty: info.isPercent ? item.quantity : (item.discountQty || 0),
+          is_percent: info.isPercent,
+          discount_percent: info.discountPercent
+        };
+      });
 
-      if (discountAmount > 0) {
+      if (cartDiscountAmount > 0) {
         cartPayload.push({
           product_id: 'DISCOUNT',
-          product_name: '[할인적용] 전체 할인',
-          price: -discountAmount,
+          product_name: `[할인적용] 전체 할인 (${cartDiscountPercent}%)`,
+          price: -cartDiscountAmount,
           quantity: 1,
           discount: 0,
           discount_qty: 0,
@@ -496,12 +542,18 @@ const App: React.FC = () => {
         supabase.rpc('complete_sale', {
           p_idempotency_key: finalIdempotencyKey,
           p_payment_method: paymentMethod,
-          p_total_amount: finalAmount,
+          p_total_amount: finalTotal,
           p_total_quantity: cart.reduce((sum, item) => sum + item.quantity, 0),
-          p_received_amount: receivedCashVal !== undefined ? receivedCashVal : finalAmount,
+          p_received_amount: receivedCashVal !== undefined ? receivedCashVal : finalTotal,
           p_change: changeVal !== undefined ? changeVal : 0,
           p_items: cartPayload,
-          p_global_discount: discountAmount
+          p_global_discount: cartDiscountAmount,
+          p_subtotal: originalSubtotal,
+          p_item_discount_amount: totalItemDiscount,
+          p_cart_discount_percent: cartDiscountPercent,
+          p_cart_discount_amount: cartDiscountAmount,
+          p_total_discount: totalDiscount,
+          p_final_total: finalTotal
         }),
         12000
       )) as any;
@@ -514,13 +566,22 @@ const App: React.FC = () => {
         throw new Error(rpcData?.message || '결제 등록에 실패했습니다.');
       }
 
-      const receiptItems = [...cart];
-      if (discountAmount > 0) {
+      const receiptItems = cart.map(item => {
+        const info = getItemDiscountInfo(item);
+        return {
+          ...item,
+          discount: info.unitDiscount,
+          discountQty: info.isPercent ? item.quantity : (item.discountQty || 0),
+          isPercent: info.isPercent,
+          discountPercent: info.discountPercent
+        };
+      });
+      if (cartDiscountAmount > 0) {
         receiptItems.push({
           product: {
             id: 'DISCOUNT',
-            name: '[할인적용] 전체 할인',
-            price: -discountAmount,
+            name: `[할인적용] 전체 할인 (${cartDiscountPercent}%)`,
+            price: -cartDiscountAmount,
             category: 'etc',
             emoji: '🏷️'
           },
@@ -535,35 +596,44 @@ const App: React.FC = () => {
       const receipt: Receipt = {
         id: finalIdempotencyKey,
         items: receiptItems,
-        total: finalAmount,
+        total: finalTotal,
         totalQuantity: cart.reduce((sum, item) => sum + item.quantity, 0),
         paymentMethod,
-        receivedAmount: receivedCashVal !== undefined ? receivedCashVal : finalAmount,
+        receivedAmount: receivedCashVal !== undefined ? receivedCashVal : finalTotal,
         change: changeVal !== undefined ? changeVal : 0,
         date: new Date(),
-        cashierName: currentCashier ? currentCashier.name : '시스템'
+        cashierName: currentCashier ? currentCashier.name : '시스템',
+        subtotal: originalSubtotal,
+        itemDiscountAmount: totalItemDiscount,
+        cartDiscountPercent,
+        cartDiscountAmount,
+        totalDiscount,
+        finalTotal
       };
 
       // Best-effort Sync to Google Sheets
       const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
       if (webappUrl) {
         let itemsSummary = cart.map((item: any) => {
-          if (item.discount && item.discountQty && item.discount > 0 && item.discountQty > 0) {
-            const discountSum = item.discount * item.discountQty;
-            return `${item.product.name} x ${item.quantity} (할인: -${discountSum.toLocaleString()}원)`;
+          const info = getItemDiscountInfo(item);
+          if (info.totalDiscount > 0) {
+            if (info.isPercent) {
+              return `${item.product.name} x ${item.quantity} (개별할인: ${item.quantity}개 대상 ${info.discountPercent}% 개당 -${info.unitDiscount.toLocaleString()}원, 총 -${info.totalDiscount.toLocaleString()}원)`;
+            }
+            return `${item.product.name} x ${item.quantity} (개별할인: ${item.discountQty}개 대상 개당 -${info.unitDiscount.toLocaleString()}원, 총 -${info.totalDiscount.toLocaleString()}원)`;
           }
           return `${item.product.name} x ${item.quantity}`;
         }).join(', ');
         
-        if (discountAmount > 0) {
-          itemsSummary += `, [전체 할인: -${discountAmount.toLocaleString()}원]`;
+        if (cartDiscountAmount > 0) {
+          itemsSummary += `, [전체 할인: ${cartDiscountPercent}% -${cartDiscountAmount.toLocaleString()}원]`;
         }
         
         const payload = {
           orderId: finalIdempotencyKey,
           paymentDateTime: new Date().toLocaleString('ko-KR'),
           paymentMethod: paymentMethod === 'CARD' ? '신용카드' : '계좌이체',
-          totalAmount: finalAmount,
+          totalAmount: finalTotal,
           items: itemsSummary,
           totalQuantity: receipt.totalQuantity,
           receivedAmount: receipt.receivedAmount,
@@ -585,7 +655,7 @@ const App: React.FC = () => {
         result: 'SUCCESS',
         context: {
           orderId: finalIdempotencyKey,
-          amount: finalAmount,
+          amount: finalTotal,
           itemsCount: cart.length,
           method: paymentMethod
         }
@@ -597,7 +667,7 @@ const App: React.FC = () => {
       }
       setIsPaymentModalOpen(false);
       setCart([]);
-      setDiscountAmount(0);
+      setCartDiscountPercent(0);
       setActiveIdempotencyKey(null);
       loadProducts();
 
@@ -735,8 +805,11 @@ const App: React.FC = () => {
             <aside className="pos-side-panel">
               <Cart
                 items={cart}
-                totalAmount={totalAmount}
-                discountAmount={discountAmount}
+                totalAmount={finalTotal}
+                discountAmount={totalDiscount}
+                cartDiscountPercent={cartDiscountPercent}
+                cartDiscountAmount={cartDiscountAmount}
+                itemDiscountAmount={totalItemDiscount}
                 onIncrease={handleIncreaseQty}
                 onDecrease={handleDecreaseQty}
                 onDelete={handleRemoveFromCart}
@@ -818,8 +891,11 @@ const App: React.FC = () => {
       {isPaymentModalOpen && (
         <PaymentModal
           subtotal={originalSubtotal}
-          discount={totalItemDiscount + discountAmount}
-          totalAmount={Math.max(0, originalSubtotal - (totalItemDiscount + discountAmount))}
+          discount={totalDiscount}
+          totalAmount={finalTotal}
+          cartDiscountPercent={cartDiscountPercent}
+          cartDiscountAmount={cartDiscountAmount}
+          itemDiscountAmount={totalItemDiscount}
           onClose={() => !isCheckoutSubmitting && setIsPaymentModalOpen(false)}
           onPaymentComplete={handleCompletePayment}
           isSubmitting={isCheckoutSubmitting}
@@ -850,12 +926,25 @@ interface PaymentModalProps {
   subtotal: number;
   discount: number;
   totalAmount: number;
+  cartDiscountPercent: number;
+  cartDiscountAmount: number;
+  itemDiscountAmount: number;
   onClose: () => void;
   onPaymentComplete: (method: PaymentMethod, receivedCash?: number, change?: number) => void;
   isSubmitting?: boolean;
 }
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ subtotal, discount, totalAmount, onClose, onPaymentComplete, isSubmitting = false }) => {
+const PaymentModal: React.FC<PaymentModalProps> = ({ 
+  subtotal, 
+  discount, 
+  totalAmount, 
+  cartDiscountPercent, 
+  cartDiscountAmount, 
+  itemDiscountAmount, 
+  onClose, 
+  onPaymentComplete, 
+  isSubmitting = false 
+}) => {
   const [method, setMethod] = useState<PaymentMethod>('CARD');
   const [receivedCash, setReceivedCash] = useState<string>('');
   const [change, setChange] = useState<number>(0);
@@ -947,8 +1036,20 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ subtotal, discount, totalAm
                 <span>상품 합계</span>
                 <span>{subtotal.toLocaleString()}원</span>
               </div>
+              {itemDiscountAmount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444' }}>
+                  <span>품목 할인 합계</span>
+                  <span>-{itemDiscountAmount.toLocaleString()}원</span>
+                </div>
+              )}
+              {cartDiscountAmount > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444' }}>
+                  <span>전체 할인 ({cartDiscountPercent}%)</span>
+                  <span>-{cartDiscountAmount.toLocaleString()}원</span>
+                </div>
+              )}
               {discount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444', fontWeight: 'bold' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444', fontWeight: 'bold', borderTop: '1px dotted #e2e8f0', paddingTop: '6px', marginTop: '2px' }}>
                   <span>총 할인 금액</span>
                   <span>-{discount.toLocaleString()}원</span>
                 </div>

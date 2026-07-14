@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Product } from '../types';
 import { supabase } from '../supabase';
 import { Plus, Edit2, Trash2, Search, Upload } from 'lucide-react';
+import { mapCategoryToDB } from '../App';
 
 interface ProductsViewProps {
   products: Product[];
@@ -172,7 +173,7 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
           id: id.trim(),
           name: name.trim(),
           price,
-          category,
+          category: mapCategoryToDB(category),
           emoji,
           image_url: finalImgUrl,
           stock,
@@ -230,7 +231,7 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
         .update({
           name: name.trim(),
           price,
-          category,
+          category: mapCategoryToDB(category),
           emoji,
           image_url: finalImgUrl,
           stock,
