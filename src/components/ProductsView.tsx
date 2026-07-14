@@ -42,6 +42,27 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
 
+  const getSafeImageUrl = (value: string): string => {
+    const raw = value.trim();
+    if (!raw) return '';
+
+    // Reject characters that can break attribute/HTML context.
+    if (/[<>"'`\s\u0000-\u001F\u007F]/.test(raw)) return '';
+
+    // Allow only safe root-relative URLs used by local assets.
+    if (raw.startsWith('/')) {
+      return /^\/[A-Za-z0-9\-._~:/?#[\]@!$&()*+,;=%]*$/.test(raw) ? raw : '';
+    }
+
+    try {
+      const parsed = new URL(raw);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+      return parsed.toString();
+    } catch {
+      return '';
+    }
+  };
+
   // Sorting and Filtering products
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -443,8 +464,8 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                         업로드 대기<br/>
                         <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{imageFile.name.slice(0, 12)}...</span>
                       </div>
-                    ) : imageUrl ? (
-                      <img src={imageUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : safeImageUrl ? (
+                      <img src={safeImageUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
                       <div style={{ fontSize: '48px' }}>{emoji || '🍞'}</div>
                     )}
