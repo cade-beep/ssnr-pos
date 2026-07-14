@@ -42,6 +42,21 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
 
+  const getSafeImageUrl = (value: string): string => {
+    const raw = value.trim();
+    if (!raw) return '';
+
+    // Allow root-relative URLs used by local assets.
+    if (raw.startsWith('/')) return raw;
+
+    try {
+      const parsed = new URL(raw);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? raw : '';
+    } catch {
+      return '';
+    }
+  };
+
   // Sorting and Filtering products
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -443,8 +458,8 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                         업로드 대기<br/>
                         <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{imageFile.name.slice(0, 12)}...</span>
                       </div>
-                    ) : imageUrl ? (
-                      <img src={imageUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : getSafeImageUrl(imageUrl) ? (
+                      <img src={getSafeImageUrl(imageUrl)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
                       <div style={{ fontSize: '48px' }}>{emoji || '🍞'}</div>
                     )}
