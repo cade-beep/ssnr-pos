@@ -104,7 +104,7 @@ export const normalizeCategory = (cat: string, name?: string): 'bakery' | 'food'
     }
   }
 
-  if (c === '베이커리' || c === '쿠키/제과' || c === 'bakery') return 'bakery';
+  if (c === '베이커리' || c === '쿠키/제과' || c === '제과류' || c === 'bakery') return 'bakery';
   if (c === '간식및선물세트' || c === 'food') return 'food';
   if (c === '기타' || c === 'etc') return 'etc';
   return 'etc';
