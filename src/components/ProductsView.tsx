@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { Product } from '../types';
 import { supabase } from '../supabase';
 import { Plus, Edit2, Trash2, Search, Upload } from 'lucide-react';
-import { mapCategoryToDB } from '../App';
+import { mapCategoryToDB } from '../types';
 
 interface ProductsViewProps {
   products: Product[];
   onRefresh: () => void;
   showToast: (msg: string) => void;
+  role: 'Owner' | 'Manager' | 'Staff';
 }
 
 const CATEGORIES = [
@@ -17,7 +18,7 @@ const CATEGORIES = [
   { value: 'etc', label: '기타' }
 ];
 
-const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showToast }) => {
+const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showToast, role }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortOption, setSortOption] = useState<'code' | 'name' | 'category' | 'price_asc' | 'price_desc'>('code');
@@ -35,8 +36,6 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
   const [category, setCategory] = useState<'bakery' | 'food' | 'etc'>('bakery');
   const [emoji, setEmoji] = useState('🍞');
   const [imageUrl, setImageUrl] = useState('');
-  const [stock, setStock] = useState(9999);
-  const [lowStockThreshold, setLowStockThreshold] = useState(0);
   const [barcode, setBarcode] = useState('');
   const [isActive, setIsActive] = useState(true);
   
@@ -96,8 +95,6 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
     setCategory('bakery');
     setEmoji('🍞');
     setImageUrl('');
-    setStock(9999);
-    setLowStockThreshold(0);
     setBarcode('');
     setIsActive(true);
     setImageFile(null);
@@ -176,8 +173,6 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
           category: mapCategoryToDB(category),
           emoji,
           image_url: finalImgUrl,
-          stock,
-          low_stock_threshold: lowStockThreshold,
           is_active: isActive,
           barcode: barcode.trim() || null
         });
@@ -205,8 +200,6 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
     setCategory(product.category);
     setEmoji(product.emoji || '🍞');
     setImageUrl(product.imageUrl || '');
-    setStock(product.stock !== undefined ? product.stock : 9999);
-    setLowStockThreshold(product.lowStockThreshold !== undefined ? product.lowStockThreshold : 0);
     setBarcode(product.barcode || '');
     setIsActive(product.isActive !== false);
     setImageFile(null);
@@ -234,8 +227,6 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
           category: mapCategoryToDB(category),
           emoji,
           image_url: finalImgUrl,
-          stock,
-          low_stock_threshold: lowStockThreshold,
           is_active: isActive,
           barcode: barcode.trim() || null
         })
@@ -312,15 +303,17 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
           </select>
         </div>
 
-        <button 
-          type="button" 
-          className="btn btn-primary" 
-          style={{ width: 'auto', padding: '0 20px', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '10px', height: '46px' }}
-          onClick={() => { resetForm(); setIsAddModalOpen(true); }}
-        >
-          <Plus size={16} />
-          <span>상품 등록</span>
-        </button>
+        {role !== 'Staff' && (
+          <button 
+            type="button" 
+            className="btn btn-primary" 
+            style={{ width: 'auto', padding: '0 20px', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '10px', height: '46px' }}
+            onClick={() => { resetForm(); setIsAddModalOpen(true); }}
+          >
+            <Plus size={16} />
+            <span>상품 등록</span>
+          </button>
+        )}
       </div>
 
       {/* Category Tabs */}
@@ -347,7 +340,7 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
               <th className="text-right">가격</th>
               <th>카테고리</th>
               <th className="text-center">상태</th>
-              <th className="text-center">관리</th>
+              {role !== 'Staff' && <th className="text-center">관리</th>}
             </tr>
           </thead>
           <tbody>
@@ -396,16 +389,20 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                     </td>
 
                     {/* Actions */}
-                    <td className="text-center">
-                      <div className="bo-action-group">
-                        <button type="button" className="bo-action-btn" onClick={() => openEditModal(p)} title="수정">
-                          <Edit2 size={14} />
-                        </button>
-                        <button type="button" className="bo-action-btn bo-action-btn--danger" onClick={() => handleDeleteProduct(p.id, p.name)} title="삭제">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
+                    {role !== 'Staff' && (
+                      <td className="text-center">
+                        <div className="bo-action-group">
+                          <button type="button" className="bo-action-btn" onClick={() => openEditModal(p)} title="수정">
+                            <Edit2 size={14} />
+                          </button>
+                          {role === 'Owner' && (
+                            <button type="button" className="bo-action-btn bo-action-btn--danger" onClick={() => handleDeleteProduct(p.id, p.name)} title="삭제">
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })
@@ -452,11 +449,13 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                       <div style={{ fontSize: '48px' }}>{emoji || '🍞'}</div>
                     )}
                   </div>
-                  <label className="bo-file-btn" style={{ width: '100%', justifyContent: 'center', cursor: 'pointer', height: '36px', borderRadius: '8px', fontSize: '12.5px' }}>
-                    <Upload size={13} />
-                    이미지 업로드
-                    <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
-                  </label>
+                  {role !== 'Manager' && (
+                    <label className="bo-file-btn" style={{ width: '100%', justifyContent: 'center', cursor: 'pointer', height: '36px', borderRadius: '8px', fontSize: '12.5px' }}>
+                      <Upload size={13} />
+                      이미지 업로드
+                      <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+                    </label>
+                  )}
                 </div>
 
                 {/* Right Side: Primary Info Fields */}
@@ -469,7 +468,7 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                   <div style={{ display: 'flex', gap: '12px' }}>
                     <div className="bo-field" style={{ flex: 1 }}>
                       <label className="bo-label">카테고리</label>
-                      <select className="bo-select" value={category} onChange={e => setCategory(e.target.value as any)} style={{ height: '40px' }}>
+                      <select className="bo-select" value={category} onChange={e => setCategory(e.target.value as any)} disabled={role === 'Manager'} style={{ height: '40px' }}>
                         <option value="bakery">베이커리</option>
                         <option value="food">선물세트</option>
                         <option value="etc">기타</option>
@@ -477,7 +476,7 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                     </div>
                     <div className="bo-field" style={{ flex: 1 }}>
                       <label className="bo-label">가격 (원)</label>
-                      <input type="number" className="bo-input" value={price} onChange={e => setPrice(Math.max(0, Number(e.target.value)))} min="0" required style={{ height: '40px' }} />
+                      <input type="number" className="bo-input" value={price} onChange={e => setPrice(Math.max(0, Number(e.target.value)))} disabled={role === 'Manager'} min="0" required style={{ height: '40px' }} />
                     </div>
                   </div>
 
@@ -529,11 +528,11 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                     <div style={{ display: 'flex', gap: '12px' }}>
                       <div className="bo-field" style={{ width: '80px', flexShrink: 0 }}>
                         <label className="bo-label">이모지</label>
-                        <input type="text" className="bo-input bo-input--center" value={emoji} onChange={e => setEmoji(e.target.value)} placeholder="🍞" style={{ height: '36px', fontSize: '13px' }} />
+                        <input type="text" className="bo-input bo-input--center" value={emoji} onChange={e => setEmoji(e.target.value)} disabled={role === 'Manager'} placeholder="🍞" style={{ height: '36px', fontSize: '13px' }} />
                       </div>
                       <div className="bo-field" style={{ flex: 1 }}>
                         <label className="bo-label">이미지 URL</label>
-                        <input type="text" className="bo-input" value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImageFile(null); }} placeholder="https://..." style={{ height: '36px', fontSize: '13px' }} />
+                        <input type="text" className="bo-input" value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImageFile(null); }} disabled={role === 'Manager'} placeholder="https://..." style={{ height: '36px', fontSize: '13px' }} />
                       </div>
                     </div>
                   </div>
@@ -589,11 +588,13 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                       <div style={{ fontSize: '48px' }}>{emoji || '🍞'}</div>
                     )}
                   </div>
-                  <label className="bo-file-btn" style={{ width: '100%', justifyContent: 'center', cursor: 'pointer', height: '36px', borderRadius: '8px', fontSize: '12.5px' }}>
-                    <Upload size={13} />
-                    이미지 업로드
-                    <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
-                  </label>
+                  {role !== 'Manager' && (
+                    <label className="bo-file-btn" style={{ width: '100%', justifyContent: 'center', cursor: 'pointer', height: '36px', borderRadius: '8px', fontSize: '12.5px' }}>
+                      <Upload size={13} />
+                      이미지 업로드
+                      <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+                    </label>
+                  )}
                 </div>
 
                 {/* Right Side: Primary Info Fields */}
@@ -666,11 +667,11 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                     <div style={{ display: 'flex', gap: '12px' }}>
                       <div className="bo-field" style={{ width: '80px', flexShrink: 0 }}>
                         <label className="bo-label">이모지</label>
-                        <input type="text" className="bo-input bo-input--center" value={emoji} onChange={e => setEmoji(e.target.value)} placeholder="🍞" style={{ height: '36px', fontSize: '13px' }} />
+                        <input type="text" className="bo-input bo-input--center" value={emoji} onChange={e => setEmoji(e.target.value)} disabled={role === 'Manager'} placeholder="🍞" style={{ height: '36px', fontSize: '13px' }} />
                       </div>
                       <div className="bo-field" style={{ flex: 1 }}>
                         <label className="bo-label">이미지 URL</label>
-                        <input type="text" className="bo-input" value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImageFile(null); }} placeholder="https://..." style={{ height: '36px', fontSize: '13px' }} />
+                        <input type="text" className="bo-input" value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImageFile(null); }} disabled={role === 'Manager'} placeholder="https://..." style={{ height: '36px', fontSize: '13px' }} />
                       </div>
                     </div>
                   </div>

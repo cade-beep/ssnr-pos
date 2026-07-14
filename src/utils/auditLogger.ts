@@ -1,7 +1,7 @@
 export interface AuditLogEntry {
   timestamp: string;
   user: string;
-  action: 'LOGIN' | 'LOGOUT' | 'SALE' | 'REFUND' | 'INVENTORY_ADJUSTMENT' | 'BUSINESS_CLOSE' | 'AUTH_FAILURE' | 'NETWORK_FAILURE' | 'API_FAILURE' | 'UNEXPECTED_EXCEPTION';
+  action: 'LOGIN' | 'LOGOUT' | 'SALE' | 'REFUND' | 'INVENTORY_ADJUSTMENT' | 'BUSINESS_CLOSE' | 'AUTH_FAILURE' | 'NETWORK_FAILURE' | 'API_FAILURE' | 'UNEXPECTED_EXCEPTION' | 'SIGNUP';
   result: 'SUCCESS' | 'FAIL';
   duration?: number; // in ms
   context?: any;

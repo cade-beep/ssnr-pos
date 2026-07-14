@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Product, CartItem, PaymentMethod, Receipt, CashierUser } from './types';
+import { Product, CartItem, PaymentMethod, Receipt, CashierUser, normalizeCategory, mapCategoryToDB } from './types';
 import POSGrid from './components/POSGrid';
 import Cart from './components/Cart';
 import ReceiptModal from './components/ReceiptModal';
@@ -7,6 +7,8 @@ import LoginOverlay from './components/LoginOverlay';
 import ProductsView from './components/ProductsView';
 import HistoryView from './components/HistoryView';
 import SettingsView from './components/SettingsView';
+import CustomersView from './components/CustomersView';
+import EmployeesView from './components/EmployeesView';
 import { RefreshCw, LogOut } from 'lucide-react';
 import { supabase } from './supabase';
 import { STATIC_PRODUCTS } from './productsData';
@@ -17,9 +19,6 @@ const getFriendlyErrorMessage = (error: any): string => {
   if (!error) return '알 수 없는 오류가 발생했습니다.';
   const msg = error.message || String(error);
   
-  if (msg.includes('재고가 부족합니다') || msg.includes('stock')) {
-    return '⚠️ 재고가 부족합니다. 구매 수량을 다시 확인해 주세요.';
-  }
   if (msg.includes('JWT') || msg.includes('인증') || msg.includes('invalid claims')) {
     return '⚠️ 로그인 세션이 만료되었습니다. 로그아웃 후 다시 로그인해 주세요.';
   }
@@ -40,31 +39,10 @@ const getFriendlyErrorMessage = (error: any): string => {
   }
   return `데이터베이스 처리 중 오류가 발생했습니다.\n(${msg})`;
 };
-export const normalizeCategory = (cat: string, name?: string): 'bakery' | 'food' | 'etc' => {
-  if (!cat) return 'etc';
-  const c = cat.trim();
-  
-  if (name) {
-    const n = name.toLowerCase();
-    if (n.includes('쿠키') || n.includes('머핀') || n.includes('마들렌') || n.includes('브라우니')) {
-      return 'bakery';
-    }
-  }
 
-  if (c === '베이커리' || c === '쿠키/제과' || c === 'bakery') return 'bakery';
-  if (c === '간식및선물세트' || c === 'food') return 'food';
-  if (c === '기타' || c === 'etc') return 'etc';
-  return 'etc';
-};
-
-export const mapCategoryToDB = (cat: 'bakery' | 'food' | 'etc'): string => {
-  if (cat === 'bakery') return '베이커리';
-  if (cat === 'food') return '간식및선물세트';
-  return '기타';
-};
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'sales' | 'history' | 'products' | 'settings'>('sales');
+  const [activeTab, setActiveTab] = useState<'sales' | 'history' | 'products' | 'customers' | 'employees' | 'settings'>('sales');
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
@@ -81,27 +59,62 @@ const App: React.FC = () => {
   const [activeIdempotencyKey, setActiveIdempotencyKey] = useState<string | null>(null);
   const [isCheckoutSubmitting, setIsCheckoutSubmitting] = useState<boolean>(false);
 
-  // Check auth session on startup
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session && session.user) {
-        const user = session.user;
-        let displayName = user.user_metadata?.name || user.email?.split('@')[0] || '캐셔';
-        if (user.email?.startsWith('rbflrbgh') && displayName === 'rbflrbgh') {
-          displayName = '김규호';
-        }
+  // Helper to fetch user role and store_id from the database
+  const fetchUserRoleAndStore = async (user: any): Promise<CashierUser> => {
+    let displayName = user.user_metadata?.name || user.email?.split('@')[0] || '캐셔';
+    if (user.email?.startsWith('rbflrbgh') && displayName === 'rbflrbgh') {
+      displayName = '김규호';
+    }
 
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role, store_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error || !data) {
+        // Fallback for legacy admin
         const isAdmin = 
           user.user_metadata?.role === '관리자' || 
           user.email?.startsWith('admin') || 
           user.email?.startsWith('rbflrbgh') || 
           displayName === '김규호';
 
-        setCurrentCashier({
+        return {
+          id: user.id,
           email: user.email || '',
           name: displayName,
-          role: isAdmin ? '관리자' : '캐셔'
-        });
+          role: isAdmin ? 'Owner' : 'Staff',
+          store_id: '00000000-0000-0000-0000-000000000000'
+        };
+      }
+
+      return {
+        id: user.id,
+        email: user.email || '',
+        name: displayName,
+        role: data.role as 'Owner' | 'Staff',
+        store_id: data.store_id
+      };
+    } catch (err) {
+      console.error('Failed to load user role and store_id from db:', err);
+      return {
+        id: user.id,
+        email: user.email || '',
+        name: displayName,
+        role: 'Staff',
+        store_id: '00000000-0000-0000-0000-000000000000'
+      };
+    }
+  };
+
+  // Check auth session on startup
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session && session.user) {
+        const cashierObj = await fetchUserRoleAndStore(session.user);
+        setCurrentCashier(cashierObj);
         loadProducts(); // Load products using authenticated session headers
       }
       setIsSessionLoading(false);
@@ -110,25 +123,10 @@ const App: React.FC = () => {
       setIsSessionLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session && session.user) {
-        const user = session.user;
-        let displayName = user.user_metadata?.name || user.email?.split('@')[0] || '캐셔';
-        if (user.email?.startsWith('rbflrbgh') && displayName === 'rbflrbgh') {
-          displayName = '김규호';
-        }
-
-        const isAdmin = 
-          user.user_metadata?.role === '관리자' || 
-          user.email?.startsWith('admin') || 
-          user.email?.startsWith('rbflrbgh') || 
-          displayName === '김규호';
-
-        setCurrentCashier({
-          email: user.email || '',
-          name: displayName,
-          role: isAdmin ? '관리자' : '캐셔'
-        });
+        const cashierObj = await fetchUserRoleAndStore(session.user);
+        setCurrentCashier(cashierObj);
         loadProducts(); // Refresh products on login
       } else {
         setCurrentCashier(null);
@@ -225,8 +223,6 @@ const App: React.FC = () => {
           category: normalizeCategory(s.category, s.name),
           emoji: s.emoji,
           imageUrl: s.image_url,
-          stock: s.stock,
-          lowStockThreshold: s.low_stock_threshold,
           isActive: s.is_active
         })));
         showToast('📦 상품 데이터를 기본 목록으로 자동 초기화했습니다.', 'info');
@@ -238,8 +234,6 @@ const App: React.FC = () => {
           category: normalizeCategory(d.category, d.name),
           emoji: d.emoji,
           imageUrl: d.image_url,
-          stock: d.stock,
-          lowStockThreshold: d.low_stock_threshold,
           isActive: d.is_active,
           barcode: d.barcode
         }));
@@ -256,8 +250,6 @@ const App: React.FC = () => {
         category: p.category as any,
         emoji: p.emoji,
         imageUrl: p.imageUrl,
-        stock: 10,
-        lowStockThreshold: 3,
         isActive: true
       })));
     }
@@ -760,13 +752,35 @@ const App: React.FC = () => {
           >
             상품
           </button>
-          <button 
-            type="button" 
-            className={`gnb-tab ${activeTab === 'settings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('settings')}
-          >
-            설정
-          </button>
+
+          {currentCashier.role !== 'Staff' && (
+            <button 
+              type="button" 
+              className={`gnb-tab ${activeTab === 'customers' ? 'active' : ''}`}
+              onClick={() => setActiveTab('customers')}
+            >
+              고객
+            </button>
+          )}
+          {currentCashier.role === 'Owner' && (
+            <button 
+              type="button" 
+              className={`gnb-tab ${activeTab === 'employees' ? 'active' : ''}`}
+              onClick={() => setActiveTab('employees')}
+            >
+              직원
+            </button>
+          )}
+
+          {currentCashier.role !== 'Staff' && (
+            <button 
+              type="button" 
+              className={`gnb-tab ${activeTab === 'settings' ? 'active' : ''}`}
+              onClick={() => setActiveTab('settings')}
+            >
+              설정
+            </button>
+          )}
         </div>
 
         <div 
@@ -824,6 +838,7 @@ const App: React.FC = () => {
                 onApplyDiscount={handleApplyGlobalDiscount}
                 onApplyItemDiscount={handleApplyItemDiscount}
                 onSetQuantity={handleSetQty}
+                role={currentCashier.role}
               />
             </aside>
           </>
@@ -831,16 +846,31 @@ const App: React.FC = () => {
           <HistoryView 
             onSelectReceipt={(r) => setCurrentReceipt(r)}
             showToast={showToast}
+            role={currentCashier.role}
           />
         ) : activeTab === 'products' ? (
           <ProductsView 
             products={products}
             onRefresh={loadProducts}
             showToast={showToast}
+            role={currentCashier.role}
           />
+
+        ) : activeTab === 'customers' ? (
+          <CustomersView
+            role={currentCashier.role}
+            showToast={showToast}
+          />
+        ) : activeTab === 'employees' ? (
+          <EmployeesView
+            role={currentCashier.role}
+            storeId={currentCashier.store_id}
+            currentUserId={currentCashier.id}
+            showToast={showToast}
+          />
+
         ) : (
           <SettingsView 
-            products={products}
             currentCashier={currentCashier}
             onLogout={handleLogout}
             showToast={showToast}

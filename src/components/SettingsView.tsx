@@ -1,25 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Product } from '../types';
+import { CashierUser } from '../types';
 import { supabase } from '../supabase';
 import { FileSpreadsheet, Lock, RefreshCw, BarChart, ShieldCheck, Printer } from 'lucide-react';
 import { auditLog } from '../utils/auditLogger';
 import { withTimeout } from '../utils/asyncHelper';
 
 interface SettingsViewProps {
-  products: Product[];
-  currentCashier: { email: string; name: string; role: '관리자' | '캐셔' };
+  currentCashier: CashierUser;
   onLogout: () => void;
   showToast: (msg: string) => void;
   onRefreshProducts: () => void;
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({
-  products,
   currentCashier,
   onLogout,
   showToast,
   onRefreshProducts
 }) => {
+  if (currentCashier.role === 'Staff') {
+    return (
+      <div className="bo-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column' }}>
+        <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>⚠️ 접근 권한 없음</h2>
+        <p style={{ color: 'var(--text-muted)' }}>스태프 계정은 설정 페이지에 접근할 수 없습니다.</p>
+      </div>
+    );
+  }
+
   const [dbConnected, setDbConnected] = useState<boolean | null>(null);
   const [checkingDb, setCheckingDb] = useState(false);
   const [reports, setReports] = useState<any[]>([]);
@@ -30,6 +37,19 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [closingData, setClosingData] = useState<any>(null);
   const [savingClose, setSavingClose] = useState(false);
   const [activeCloseReport, setActiveCloseReport] = useState<any>(null);
+
+  // Printer settings states
+  const [printerName, setPrinterName] = useState(() => localStorage.getItem('ssnr_pos_printer_name') || '기본 프린터');
+  const [printerPort, setPrinterPort] = useState(() => localStorage.getItem('ssnr_pos_printer_port') || 'USB001');
+  const [paperWidth, setPaperWidth] = useState(() => localStorage.getItem('ssnr_pos_paper_width') || '80');
+
+  const handleSavePrinterSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    localStorage.setItem('ssnr_pos_printer_name', printerName);
+    localStorage.setItem('ssnr_pos_printer_port', printerPort);
+    localStorage.setItem('ssnr_pos_paper_width', paperWidth);
+    showToast('🖨️ 프린터 설정이 저장되었습니다.');
+  };
 
 
 
@@ -137,14 +157,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         }
       });
 
-      // Prepare snapshot of current stocks
+      // Prepare empty snapshot of current stocks (inventory functionality deprecated)
       const inventorySnapshot: Record<string, { stock: number; threshold: number }> = {};
-      products.forEach(p => {
-        inventorySnapshot[p.name] = {
-          stock: p.stock || 0,
-          threshold: p.lowStockThreshold || 5
-        };
-      });
 
       setClosingData({
         closed_at: new Date().toISOString(),
@@ -252,6 +266,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               <span className="bo-info-key">부여된 권한</span>
               <span className="bo-badge bo-badge--primary">{currentCashier.role}</span>
             </div>
+            {currentCashier.store_id && (
+              <div className="bo-info-row">
+                <span className="bo-info-key">매장 고유 코드</span>
+                <span className="bo-info-value" style={{ fontFamily: 'monospace', fontSize: '11px', userSelect: 'all', background: '#f1f5f9', padding: '2px 6px', borderRadius: '4px' }}>
+                  {currentCashier.store_id}
+                </span>
+              </div>
+            )}
           </div>
 
           <button type="button" className="btn--danger-outline" onClick={onLogout}>
@@ -259,110 +281,147 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           </button>
         </div>
 
-        {/* Database linkages */}
-        <div className="bo-card">
-          <div className="bo-card-header">
-            <FileSpreadsheet size={16} color="var(--success)" /> 데이터베이스 관리 연동
-          </div>
-          
-          <div className="bo-info-list">
-            <div className="bo-info-row">
-              <span className="bo-info-key">Supabase DB 상태</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {dbConnected === null ? (
-                  <span style={{ color: 'var(--text-muted)' }}>확인 중...</span>
-                ) : dbConnected ? (
-                  <span className="bo-badge bo-badge--success"><ShieldCheck size={12} /> 양호</span>
-                ) : (
-                  <span className="bo-badge bo-badge--danger">오류</span>
-                )}
-                <button type="button" onClick={checkSupabaseConnection} disabled={checkingDb} style={{ border: 'none', background: 'transparent', padding: '2px', cursor: 'pointer' }}>
-                  <RefreshCw size={12} className={checkingDb ? 'spin' : ''} />
-                </button>
+        {/* Database linkages - Owner only */}
+        {currentCashier.role === 'Owner' && (
+          <div className="bo-card">
+            <div className="bo-card-header">
+              <FileSpreadsheet size={16} color="var(--success)" /> 데이터베이스 관리 연동
+            </div>
+            
+            <div className="bo-info-list">
+              <div className="bo-info-row">
+                <span className="bo-info-key">Supabase DB 상태</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {dbConnected === null ? (
+                    <span style={{ color: 'var(--text-muted)' }}>확인 중...</span>
+                  ) : dbConnected ? (
+                    <span className="bo-badge bo-badge--success"><ShieldCheck size={12} /> 양호</span>
+                  ) : (
+                    <span className="bo-badge bo-badge--danger">오류</span>
+                  )}
+                  <button type="button" onClick={checkSupabaseConnection} disabled={checkingDb} style={{ border: 'none', background: 'transparent', padding: '2px', cursor: 'pointer' }}>
+                    <RefreshCw size={12} className={checkingDb ? 'spin' : ''} />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', background: 'var(--bg-primary)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', wordBreak: 'break-all', fontFamily: 'monospace' }}>
+                API: bhnlbfwajdrlxmjjqnio.supabase.co
               </div>
             </div>
 
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', background: 'var(--bg-primary)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-color)', wordBreak: 'break-all', fontFamily: 'monospace' }}>
-              API: bhnlbfwajdrlxmjjqnio.supabase.co
-            </div>
+            <a 
+              href={import.meta.env.VITE_SPREADSHEET_URL || "https://docs.google.com/spreadsheets"}
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="btn btn-secondary" 
+              style={{ width: '100%', height: '48px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', textDecoration: 'none', fontWeight: '600' }}
+            >
+              <FileSpreadsheet size={14} />
+              <span>구글 스프레드시트 이동</span>
+            </a>
           </div>
+        )}
 
-          <a 
-            href={import.meta.env.VITE_SPREADSHEET_URL || "https://docs.google.com/spreadsheets"}
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="btn btn-secondary" 
-            style={{ width: '100%', height: '48px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', textDecoration: 'none', fontWeight: '600' }}
-          >
-            <FileSpreadsheet size={14} />
-            <span>구글 스프레드시트 이동</span>
-          </a>
-        </div>
-
-        {/* Business close trigger */}
+        {/* Printer Settings Card - Owner & Manager */}
         <div className="bo-card">
           <div className="bo-card-header">
-            <BarChart size={16} color="var(--primary)" /> 영업 정산 및 마감
+            <Printer size={16} color="var(--primary)" /> 영수증 프린터 설정
           </div>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: '1.5' }}>
-            금일 발생한 매출 합산과 재고 상태를 마감 정산 보고서로 집계하고 데이터베이스에 영구적으로 보존합니다.
-          </p>
-
-          <button 
-            type="button" 
-            className="btn btn-primary" 
-            style={{ width: '100%', height: '48px', borderRadius: '10px', fontWeight: '600', fontSize: '15px' }}
-            onClick={handleCalculateClose}
-          >
-            📊 금일 영업 마감 정산 실행
-          </button>
+          <form onSubmit={handleSavePrinterSettings} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="bo-field">
+              <label className="bo-label">프린터 장치명</label>
+              <input type="text" className="bo-input" value={printerName} onChange={e => setPrinterName(e.target.value)} style={{ height: '36px' }} />
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <div className="bo-field" style={{ flex: 1 }}>
+                <label className="bo-label">포트</label>
+                <input type="text" className="bo-input" value={printerPort} onChange={e => setPrinterPort(e.target.value)} style={{ height: '36px' }} />
+              </div>
+              <div className="bo-field" style={{ flex: 1 }}>
+                <label className="bo-label">용지 폭 (mm)</label>
+                <select className="bo-select" value={paperWidth} onChange={e => setPaperWidth(e.target.value)} style={{ height: '36px' }}>
+                  <option value="80">80mm</option>
+                  <option value="58">58mm</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" className="btn btn-primary" style={{ width: '100%', height: '40px', borderRadius: '8px', fontSize: '13.5px', marginTop: '4px' }}>
+              프린터 설정 저장
+            </button>
+          </form>
         </div>
+
+        {/* Business close trigger - Owner only (Manager gets it in right column) */}
+        {currentCashier.role === 'Owner' && (
+          <div className="bo-card">
+            <div className="bo-card-header">
+              <BarChart size={16} color="var(--primary)" /> 영업 정산 및 마감
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: '1.5' }}>
+              금일 발생한 매출 합산과 재고 상태를 마감 정산 보고서로 집계하고 데이터베이스에 영구적으로 보존합니다.
+            </p>
+
+            <button 
+              type="button" 
+              className="btn btn-primary" 
+              style={{ width: '100%', height: '48px', borderRadius: '10px', fontWeight: '600', fontSize: '15px' }}
+              onClick={handleCalculateClose}
+            >
+              📊 금일 영업 마감 정산 실행
+            </button>
+          </div>
+        )}
 
       </div>
 
       {/* RIGHT COLUMN */}
       <div className="bo-page-col">
 
-        {/* History of close reports */}
-        <div className="bo-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div className="bo-card-header" style={{ flexShrink: 0 }}>
-            <BarChart size={16} color="var(--primary)" /> 최근 10건 마감 보고서 이력
-          </div>
-          
-          <div style={{ flex: 1, overflowY: 'auto' }}>
-            {loadingReports ? (
-              <div className="bo-empty" style={{ padding: '20px' }}>
-                <div className="bo-empty-text">이력을 가져오는 중...</div>
-              </div>
-            ) : reports.length === 0 ? (
-              <div className="bo-empty" style={{ padding: '20px' }}>
-                <div className="bo-empty-text">기록된 마감 보고서가 존재하지 않습니다.</div>
-              </div>
-            ) : (
-              reports.map(r => (
-                <div 
-                  key={r.id}
-                  className="bo-report-item"
-                  style={{ padding: '14px 4px', cursor: 'pointer' }}
-                  onClick={() => setActiveCloseReport(r)}
-                  title="자세히 보기"
-                >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    <span className="bo-report-date">
-                      {new Date(r.closed_at).toLocaleDateString('ko-KR')} 마감 보고
-                    </span>
-                    <span className="bo-report-meta">
-                      담당: {r.cashier_name} | 거래건수: {r.sales_count}건
-                    </span>
-                  </div>
-                  <strong style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-primary)' }}>
-                    {Number(r.total_sales).toLocaleString()}원
-                  </strong>
+
+
+        {/* History of close reports - Owner only */}
+        {currentCashier.role === 'Owner' && (
+          <div className="bo-card" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div className="bo-card-header" style={{ flexShrink: 0 }}>
+              <BarChart size={16} color="var(--primary)" /> 최근 10건 마감 보고서 이력
+            </div>
+            
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {loadingReports ? (
+                <div className="bo-empty" style={{ padding: '20px' }}>
+                  <div className="bo-empty-text">이력을 가져오는 중...</div>
                 </div>
-              ))
-            )}
+              ) : reports.length === 0 ? (
+                <div className="bo-empty" style={{ padding: '20px' }}>
+                  <div className="bo-empty-text">기록된 마감 보고서가 존재하지 않습니다.</div>
+                </div>
+              ) : (
+                reports.map(r => (
+                  <div 
+                    key={r.id}
+                    className="bo-report-item"
+                    style={{ padding: '14px 4px', cursor: 'pointer' }}
+                    onClick={() => setActiveCloseReport(r)}
+                    title="자세히 보기"
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span className="bo-report-date">
+                        {new Date(r.closed_at).toLocaleDateString('ko-KR')} 마감 보고
+                      </span>
+                      <span className="bo-report-meta">
+                        담당: {r.cashier_name} | 거래건수: {r.sales_count}건
+                      </span>
+                    </div>
+                    <strong style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-primary)' }}>
+                      {Number(r.total_sales).toLocaleString()}원
+                    </strong>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
       </div>
 

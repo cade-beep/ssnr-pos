@@ -10,6 +10,7 @@ export interface Product {
   lowStockThreshold?: number;
   barcode?: string;
   isActive?: boolean;
+  store_id?: string;
 }
 
 export interface ClosingReport {
@@ -38,10 +39,24 @@ export interface CartItem {
 }
 
 export interface CashierUser {
+  id?: string;
   email: string;
   name: string;
-  role: '관리자' | '캐셔';
+  role: 'Owner' | 'Staff';
+  store_id: string;
 }
+
+export interface Customer {
+  id: string;
+  store_id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  points: number;
+  notes?: string;
+  created_at?: string;
+}
+
 
 export type PaymentMethod = 'CARD' | 'TRANSFER';
 
@@ -77,3 +92,26 @@ declare global {
     };
   }
 }
+
+export const normalizeCategory = (cat: string, name?: string): 'bakery' | 'food' | 'etc' => {
+  if (!cat) return 'etc';
+  const c = cat.trim();
+  
+  if (name) {
+    const n = name.toLowerCase();
+    if (n.includes('쿠키') || n.includes('머핀') || n.includes('마들렌') || n.includes('브라우니')) {
+      return 'bakery';
+    }
+  }
+
+  if (c === '베이커리' || c === '쿠키/제과' || c === 'bakery') return 'bakery';
+  if (c === '간식및선물세트' || c === 'food') return 'food';
+  if (c === '기타' || c === 'etc') return 'etc';
+  return 'etc';
+};
+
+export const mapCategoryToDB = (cat: 'bakery' | 'food' | 'etc'): string => {
+  if (cat === 'bakery') return '베이커리';
+  if (cat === 'food') return '간식및선물세트';
+  return '기타';
+};

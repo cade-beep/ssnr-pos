@@ -20,6 +20,7 @@ interface CartProps {
   onApplyDiscount: (percent: number) => void;
   onApplyItemDiscount: (productId: string, amount: number, qty: number, isPercent?: boolean, percentVal?: number) => void;
   onSetQuantity: (productId: string, quantity: number) => void;
+  role: 'Owner' | 'Manager' | 'Staff';
 }
 
 const Cart: React.FC<CartProps> = ({
@@ -39,6 +40,7 @@ const Cart: React.FC<CartProps> = ({
   onApplyDiscount,
   onApplyItemDiscount,
   onSetQuantity,
+  role,
 }) => {
   // Modal Visibility States
   const [isCartDiscountOpen, setIsCartDiscountOpen] = useState(false);
@@ -272,14 +274,16 @@ const Cart: React.FC<CartProps> = ({
                     </div>
 
                     {/* Dedicated Per-Item Discount Button */}
-                    <button
-                      type="button"
-                      className={`item-discount-btn ${isDiscounted ? 'discounted' : ''}`}
-                      onClick={() => openItemDiscountModal(item)}
-                    >
-                      <span>🏷️</span>
-                      <span>{isDiscounted ? '할인 수정' : '할인'}</span>
-                    </button>
+                    {role !== 'Staff' && (
+                      <button
+                        type="button"
+                        className={`item-discount-btn ${isDiscounted ? 'discounted' : ''}`}
+                        onClick={() => openItemDiscountModal(item)}
+                      >
+                        <span>🏷️</span>
+                        <span>{isDiscounted ? '할인 수정' : '할인'}</span>
+                      </button>
+                    )}
                   </div>
 
                   {/* Remove button */}
@@ -332,14 +336,16 @@ const Cart: React.FC<CartProps> = ({
         </div>
 
         <div className="action-buttons">
-          <button
-            type="button"
-            className="btn-discount"
-            onClick={() => setIsCartDiscountOpen(true)}
-            disabled={items.length === 0}
-          >
-            🏷️ 할인 적용
-          </button>
+          {role !== 'Staff' && (
+            <button
+              type="button"
+              className="btn-discount"
+              onClick={() => setIsCartDiscountOpen(true)}
+              disabled={items.length === 0}
+            >
+              🏷️ 할인 적용
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-primary"

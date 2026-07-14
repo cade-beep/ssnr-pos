@@ -8,9 +8,10 @@ import { withTimeout } from '../utils/asyncHelper';
 interface HistoryViewProps {
   onSelectReceipt: (receipt: Receipt) => void;
   showToast: (msg: string) => void;
+  role: 'Owner' | 'Manager' | 'Staff';
 }
 
-const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast }) => {
+const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, role }) => {
   const [viewMode, setViewMode] = useState<'list' | 'dashboard'>('list');
   const [isLoading, setIsLoading] = useState(false);
   const [orders, setOrders] = useState<any[]>([]);
@@ -116,6 +117,44 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast })
     } finally {
       setIsLoading(false);
     }
+  };
+
+  useEffect(() => {
+    if (role === 'Staff' && dateRangeType !== 'today') {
+      setDateRangeType('today');
+    }
+  }, [role, dateRangeType]);
+
+  const handleExportCSV = () => {
+    if (filteredOrders.length === 0) {
+      alert('내보낼 데이터가 없습니다.');
+      return;
+    }
+
+    const headers = ['주문번호', '결제시간', '담당캐셔', '결제액', '결제수단', '환불여부', '판매내역'];
+    const rows = filteredOrders.map(o => {
+      const itemsStr = o.order_items?.map((i: any) => `${i.product_name} x ${i.quantity}`).join('; ') || '';
+      return [
+        o.order_number,
+        new Date(o.payment_date_time).toLocaleString('ko-KR'),
+        o.cashier_name,
+        o.total_amount,
+        o.payment_method === 'CARD' ? '신용카드' : '계좌이체',
+        o.is_refunded ? '환불' : '정상',
+        `"${itemsStr.replace(/"/g, '""')}"`
+      ];
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `매출내역_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('📥 CSV 파일로 매출 내역을 내보냈습니다.');
   };
 
   useEffect(() => {
@@ -368,7 +407,9 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast })
                 key={opt.value}
                 type="button"
                 onClick={() => setDateRangeType(opt.value as any)}
+                disabled={role === 'Staff' && opt.value !== 'today'}
                 className={`bo-filter-chip ${dateRangeType === opt.value ? 'active' : ''}`}
+                style={{ opacity: (role === 'Staff' && opt.value !== 'today') ? 0.4 : 1 }}
               >
                 {opt.label}
               </button>
@@ -386,7 +427,17 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast })
             </div>
           )}
 
-          <div style={{ marginLeft: 'auto' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+            {role !== 'Staff' && (
+              <button 
+                type="button" 
+                className="bo-filter-chip active"
+                onClick={handleExportCSV}
+                style={{ background: 'var(--success)', border: 'none', color: '#fff', display: 'flex', alignItems: 'center', gap: '4px', height: '32px' }}
+              >
+                📥 내보내기
+              </button>
+            )}
             <button type="button" className="bo-action-btn" onClick={fetchHistory} title="새로고침">
               <RefreshCw size={14} className={isLoading ? 'spin-icon' : ''} style={{ animation: isLoading ? 'spin 2s linear infinite' : 'none' }} />
             </button>
@@ -516,7 +567,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast })
                             <button type="button" className="bo-action-btn" onClick={() => handleSelectOrderForReceipt(o)} title="영수증 상세">
                               <Eye size={14} />
                             </button>
-                            {!o.is_refunded && (
+                            {!o.is_refunded && role !== 'Staff' && (
                               <button type="button" className="bo-action-btn bo-action-btn--danger" onClick={() => handleRefund(o)} title="환불 처리">
                                 <Undo size={14} />
                               </button>
