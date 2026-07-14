@@ -895,6 +895,39 @@ input:checked + .toggle-slider:before {
   transform: scale(0.97);
 }
 
+.btn-discount {
+  width: 100%;
+  height: 46px;
+  border-radius: var(--radius-md);
+  font-size: 14.5px;
+  font-weight: 700;
+  border: 1.5px solid var(--primary);
+  background: #ffffff;
+  color: var(--primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  outline: none;
+  margin-bottom: 8px;
+}
+.btn-discount:hover:not(:disabled) {
+  background: #f0f6ff;
+  border-color: #1557d0;
+  color: #1557d0;
+}
+.btn-discount:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.btn-discount:disabled {
+  border-color: var(--border-color);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 /* Modal layers */
 .modal-overlay {
   position: fixed;

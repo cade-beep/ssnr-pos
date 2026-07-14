@@ -303,13 +303,13 @@ const Cart: React.FC<CartProps> = ({
 
         <div 
           className="summary-row" 
-          onClick={() => items.length > 0 && setIsCartDiscountOpen(true)}
-          style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px', fontSize: '13.5px', color: cartDiscountAmount > 0 ? '#ef4444' : 'var(--text-secondary)', cursor: items.length > 0 ? 'pointer' : 'default', fontWeight: cartDiscountAmount > 0 ? '600' : 'normal' }}
-          title={items.length > 0 ? '클릭하여 전체 할인 설정' : ''}
+          style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px', fontSize: '13.5px', color: cartDiscountAmount > 0 ? '#ef4444' : 'var(--text-secondary)', fontWeight: cartDiscountAmount > 0 ? '600' : 'normal' }}
         >
-          <span>전체 할인 {cartDiscountPercent > 0 ? `(${cartDiscountPercent}%)` : ''}</span>
+          <span>전체 할인</span>
           <span>
-            {cartDiscountAmount > 0 ? `- ${cartDiscountAmount.toLocaleString()}원` : '할인 없음 🏷️'}
+            {cartDiscountAmount > 0 
+              ? `${cartDiscountPercent}% 할인 적용` 
+              : '할인 없음'}
           </span>
         </div>
 
@@ -321,6 +321,14 @@ const Cart: React.FC<CartProps> = ({
         </div>
 
         <div className="action-buttons">
+          <button
+            type="button"
+            className="btn-discount"
+            onClick={() => setIsCartDiscountOpen(true)}
+            disabled={items.length === 0}
+          >
+            🏷️ 할인 적용
+          </button>
           <button
             type="button"
             className="btn btn-primary"
