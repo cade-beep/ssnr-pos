@@ -204,83 +204,111 @@ const Cart: React.FC<CartProps> = ({
             const finalItemPrice = item.product.price - discInfo.unitDiscount;
 
             return (
-              <div key={item.product.id} className="cart-item" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border-color)' }}>
-                <div 
-                  className="cart-item-details" 
-                  onClick={() => openItemDiscountModal(item)}
-                  style={{ cursor: 'pointer', flex: 1, paddingRight: '8px' }}
-                  title="클릭하여 품목 할인 설정"
-                >
-                  <div className="cart-item-name" style={{ fontWeight: '600', fontSize: '14.5px', color: 'var(--text-primary)', marginBottom: '4px' }}>{item.product.name}</div>
-                  <div className="cart-item-price" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                    {isDiscounted ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ textDecoration: 'line-through', opacity: 0.5 }}>
-                            {item.product.price.toLocaleString()}원
-                          </span>
-                          <span style={{ color: '#ef4444', fontWeight: '800', fontSize: '11px' }}>
-                            {discInfo.percent > 0 ? `${discInfo.percent}% OFF` : '할인 적용'}
+              <div key={item.product.id} className="cart-item" style={{ display: 'flex', flexDirection: 'column', padding: '14px 0', borderBottom: '1px solid var(--border-color)', gap: '8px' }}>
+                {/* Top Row: Name and Delete button */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div className="cart-item-details" style={{ flex: 1, paddingRight: '8px' }}>
+                    <div className="cart-item-name" style={{ fontWeight: '600', fontSize: '14.5px', color: 'var(--text-primary)', marginBottom: '4px' }}>{item.product.name}</div>
+                    <div className="cart-item-price" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                      {isDiscounted ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ textDecoration: 'line-through', opacity: 0.5 }}>
+                              {item.product.price.toLocaleString()}원
+                            </span>
+                            <span className="bo-badge bo-badge--danger" style={{ fontSize: '10.5px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', background: '#fef2f2', color: '#ef4444' }}>
+                              {discInfo.percent > 0 ? `${discInfo.percent}% 할인` : `-${discInfo.unitDiscount.toLocaleString()}원 할인`}
+                            </span>
+                          </div>
+                          <span style={{ fontWeight: '700', color: 'var(--primary)', fontSize: '13.5px' }}>
+                            {finalItemPrice.toLocaleString()}원
                           </span>
                         </div>
-                        <span style={{ fontWeight: '700', color: 'var(--primary)', fontSize: '13.5px' }}>
-                          {finalItemPrice.toLocaleString()}원
-                        </span>
-                      </div>
-                    ) : (
-                      <span>{item.product.price.toLocaleString()}원</span>
-                    )}
+                      ) : (
+                        <span>{item.product.price.toLocaleString()}원</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <button
+                    type="button"
+                    className="delete-item-btn"
+                    onClick={() => onDelete(item.product.id)}
+                    title="상품 삭제"
+                    style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Bottom Row: Quantity controls, Discount button, and Total price */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* Quantity Controls */}
+                    <div className="cart-item-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        type="button"
+                        className="quantity-btn"
+                        onClick={() => onDecrease(item.product.id)}
+                        style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                      >
+                        <Minus size={12} />
+                      </button>
+                      <span 
+                        className="cart-item-quantity"
+                        onClick={() => {
+                          const newQtyInput = window.prompt(`[${item.product.name}] 구매 수량을 변경해 주세요 (직접 입력):`, String(item.quantity));
+                          if (newQtyInput !== null) {
+                            const parsed = parseInt(newQtyInput, 10);
+                            if (!isNaN(parsed) && parsed >= 0) {
+                              onSetQuantity(item.product.id, parsed);
+                            }
+                          }
+                        }}
+                        style={{ cursor: 'pointer', textDecoration: 'underline dotted', minWidth: '20px', textAlign: 'center', fontSize: '14px', fontWeight: '600' }}
+                        title="클릭하여 수량 직접 입력"
+                      >
+                        {item.quantity}
+                      </span>
+                      <button
+                        type="button"
+                        className="quantity-btn"
+                        onClick={() => onIncrease(item.product.id)}
+                        style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                      >
+                        <Plus size={12} />
+                      </button>
+                    </div>
+
+                    {/* Dedicated Per-Item Discount Button */}
+                    <button
+                      type="button"
+                      className="item-discount-btn"
+                      onClick={() => openItemDiscountModal(item)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        border: isDiscounted ? '1px solid #ef4444' : '1px solid var(--border-color)',
+                        background: isDiscounted ? '#fef2f2' : '#ffffff',
+                        color: isDiscounted ? '#ef4444' : 'var(--text-secondary)',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <span>🏷️</span>
+                      <span>{isDiscounted ? '할인 수정' : '할인'}</span>
+                    </button>
+                  </div>
+
+                  <div className="cart-item-total" style={{ fontWeight: '700', fontSize: '15px', color: 'var(--text-primary)' }}>
+                    {((isDiscounted ? finalItemPrice : item.product.price) * item.quantity).toLocaleString()}원
                   </div>
                 </div>
-                
-                <div className="cart-item-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button
-                    type="button"
-                    className="quantity-btn"
-                    onClick={() => onDecrease(item.product.id)}
-                    style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                  >
-                    <Minus size={12} />
-                  </button>
-                  <span 
-                    className="cart-item-quantity"
-                    onClick={() => {
-                      const newQtyInput = window.prompt(`[${item.product.name}] 구매 수량을 변경해 주세요 (직접 입력):`, String(item.quantity));
-                      if (newQtyInput !== null) {
-                        const parsed = parseInt(newQtyInput, 10);
-                        if (!isNaN(parsed) && parsed >= 0) {
-                          onSetQuantity(item.product.id, parsed);
-                        }
-                      }
-                    }}
-                    style={{ cursor: 'pointer', textDecoration: 'underline dotted', minWidth: '20px', textAlign: 'center', fontSize: '14px', fontWeight: '600' }}
-                    title="클릭하여 수량 직접 입력"
-                  >
-                    {item.quantity}
-                  </span>
-                  <button
-                    type="button"
-                    className="quantity-btn"
-                    onClick={() => onIncrease(item.product.id)}
-                    style={{ width: '28px', height: '28px', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-                  >
-                    <Plus size={12} />
-                  </button>
-                </div>
-
-                <div className="cart-item-total" style={{ fontWeight: '700', fontSize: '15px', minWidth: '70px', textAlign: 'right', color: 'var(--text-primary)' }}>
-                  {((isDiscounted ? finalItemPrice : item.product.price) * item.quantity).toLocaleString()}원
-                </div>
-
-                <button
-                  type="button"
-                  className="delete-item-btn"
-                  onClick={() => onDelete(item.product.id)}
-                  title="상품 삭제"
-                  style={{ marginLeft: '12px', border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}
-                >
-                  <X size={16} />
-                </button>
               </div>
             );
           })
