@@ -464,8 +464,8 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                         업로드 대기<br/>
                         <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{imageFile.name.slice(0, 12)}...</span>
                       </div>
-                    ) : getSafeImageUrl(imageUrl) ? (
-                      <img src={getSafeImageUrl(imageUrl)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : safeImageUrl ? (
+                      <img src={safeImageUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
                       <div style={{ fontSize: '48px' }}>{emoji || '🍞'}</div>
                     )}
