@@ -18,15 +18,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   showToast,
   onRefreshProducts
 }) => {
-  if (currentCashier.role === 'Staff') {
-    return (
-      <div className="bo-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column' }}>
-        <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>⚠️ 접근 권한 없음</h2>
-        <p style={{ color: 'var(--text-muted)' }}>스태프 계정은 설정 페이지에 접근할 수 없습니다.</p>
-      </div>
-    );
-  }
-
   const [dbConnected, setDbConnected] = useState<boolean | null>(null);
   const [checkingDb, setCheckingDb] = useState(false);
   const [reports, setReports] = useState<any[]>([]);
@@ -213,7 +204,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         action: 'BUSINESS_CLOSE',
         result: 'SUCCESS',
         context: {
-          salesAmount: closingData.sales_amount,
+          salesAmount: closingData.total_sales,
           refundAmount: closingData.refund_amount,
           salesCount: closingData.sales_count
         }
@@ -240,6 +231,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const handlePrintReport = () => {
     window.print();
   };
+
+  if (currentCashier.role === 'Staff') {
+    return (
+      <div className="bo-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column' }}>
+        <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>⚠️ 접근 권한 없음</h2>
+        <p style={{ color: 'var(--text-muted)' }}>스태프 계정은 설정 페이지에 접근할 수 없습니다.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bo-page-grid">

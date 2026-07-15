@@ -9,6 +9,7 @@ import HistoryView from './components/HistoryView';
 import SettingsView from './components/SettingsView';
 import CustomersView from './components/CustomersView';
 import EmployeesView from './components/EmployeesView';
+import Logo from './components/Logo';
 import { RefreshCw, LogOut } from 'lucide-react';
 import { supabase } from './supabase';
 import { STATIC_PRODUCTS } from './productsData';
@@ -94,7 +95,7 @@ const App: React.FC = () => {
         id: user.id,
         email: user.email || '',
         name: displayName,
-        role: data.role as 'Owner' | 'Staff',
+        role: data.role as 'Owner' | 'Manager' | 'Staff',
         store_id: data.store_id
       };
     } catch (err) {
@@ -723,7 +724,7 @@ const App: React.FC = () => {
       {/* Header GNB (Preserves existing layout style) */}
       <header className="app-header">
         <div className="header-logo" onClick={() => setActiveTab('sales')} style={{ cursor: 'pointer' }}>
-          <div className="header-logo-icon">P</div>
+          <div className="header-logo-icon"><Logo size={15} /></div>
           <h1>POS</h1>
         </div>
 

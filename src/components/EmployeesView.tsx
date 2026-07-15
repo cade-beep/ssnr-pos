@@ -19,15 +19,6 @@ interface Employee {
 }
 
 const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUserId, showToast }) => {
-  if (role !== 'Owner') {
-    return (
-      <div className="bo-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column' }}>
-        <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>⚠️ 접근 권한 없음</h2>
-        <p style={{ color: 'var(--text-muted)' }}>매장 소유자(Owner) 계정만 직원 정보 및 권한 관리가 가능합니다.</p>
-      </div>
-    );
-  }
-
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -64,7 +55,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
       return;
     }
 
-    if (password.length < 6) {
+    if (password.trim().length < 6) {
       alert('비밀번호는 최소 6자 이상이어야 합니다.');
       return;
     }
@@ -152,6 +143,15 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
       alert(`⚠️ 직원 삭제 실패: ${err.message}`);
     }
   };
+
+  if (role !== 'Owner') {
+    return (
+      <div className="bo-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column' }}>
+        <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>⚠️ 접근 권한 없음</h2>
+        <p style={{ color: 'var(--text-muted)' }}>매장 소유자(Owner) 계정만 직원 정보 및 권한 관리가 가능합니다.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bo-page">

@@ -42,7 +42,7 @@ export interface CashierUser {
   id?: string;
   email: string;
   name: string;
-  role: 'Owner' | 'Staff';
+  role: 'Owner' | 'Manager' | 'Staff';
   store_id: string;
 }
 

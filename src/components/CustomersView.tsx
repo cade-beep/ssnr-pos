@@ -9,15 +9,6 @@ interface CustomersViewProps {
 }
 
 const CustomersView: React.FC<CustomersViewProps> = ({ role, showToast }) => {
-  if (role === 'Staff') {
-    return (
-      <div className="bo-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column' }}>
-        <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>⚠️ 접근 권한 없음</h2>
-        <p style={{ color: 'var(--text-muted)' }}>스태프 계정은 고객 관리 메뉴에 접근할 수 없습니다.</p>
-      </div>
-    );
-  }
-
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,9 +40,18 @@ const CustomersView: React.FC<CustomersViewProps> = ({ role, showToast }) => {
     (c.email && c.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  if (role === 'Staff') {
+    return (
+      <div className="bo-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', flexDirection: 'column' }}>
+        <h2 style={{ color: 'var(--text-primary)', marginBottom: '8px' }}>⚠️ 접근 권한 없음</h2>
+        <p style={{ color: 'var(--text-muted)' }}>스태프 계정은 고객 관리 메뉴에 접근할 수 없습니다.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="bo-page">
-      
+
       {/* Top Toolbar */}
       <div className="bo-toolbar" style={{ flexShrink: 0, gap: '10px' }}>
         <div className="search-container" style={{ flex: 1 }}>

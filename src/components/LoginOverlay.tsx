@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { CashierUser } from '../types';
 import { supabase } from '../supabase';
 import { auditLog } from '../utils/auditLogger';
+import Logo from './Logo';
 
 interface LoginOverlayProps {
   onLoginSuccess: (user: CashierUser) => void;
@@ -134,7 +135,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
           console.log("Logged-in Session User ID (Dev Bypass):", session?.user.id);
           console.log("Logged-in Session User Email (Dev Bypass):", session?.user.email);
 
-          let devRole: 'Owner' | 'Staff' = 'Owner';
+          let devRole: 'Owner' | 'Manager' | 'Staff' = 'Owner';
           let devStoreId = 'ssnr-pos-9877';
 
           if (session?.user.id) {
@@ -144,7 +145,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
               .eq('user_id', session.user.id)
               .single();
             if (roleData) {
-              devRole = roleData.role as 'Owner' | 'Staff';
+              devRole = roleData.role as 'Owner' | 'Manager' | 'Staff';
               devStoreId = roleData.store_id;
             }
           }
@@ -204,7 +205,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
         console.log("Logged-in Session User Email:", session?.user.email);
 
         // Query user_roles table
-        let finalRole: 'Owner' | 'Staff' = 'Staff';
+        let finalRole: 'Owner' | 'Manager' | 'Staff' = 'Staff';
         let finalStoreId = 'ssnr-pos-9877';
 
         // 메타데이터 이름이 없으면 이메일 ID 앞자리를 이름으로 사용 (rbflrbgh -> rbflrbgh)
@@ -221,7 +222,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
             .single();
 
           if (roleData) {
-            finalRole = roleData.role as 'Owner' | 'Staff';
+            finalRole = roleData.role as 'Owner' | 'Manager' | 'Staff';
             finalStoreId = roleData.store_id;
           } else {
             // admin 이메일이거나 김규호 계정이면 자동으로 관리자로 설정
@@ -267,11 +268,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
         {/* Brand header */}
         <div className="login-header">
           <div className="login-brand-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <path d="M16 10a4 4 0 01-8 0" />
-            </svg>
+            <Logo size={28} />
           </div>
           <h1 className="login-title">서산나래 미니 POS</h1>
           <p className="login-subtitle">

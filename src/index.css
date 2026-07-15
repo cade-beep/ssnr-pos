@@ -411,6 +411,28 @@ body {
   transform: scale(0.95);
 }
 
+.sort-select {
+  height: 46px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: #f2f4f6;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+.sort-select:hover {
+  background: #e9ecef;
+  color: var(--text-primary);
+}
+.sort-select:focus {
+  box-shadow: 0 0 0 3px rgba(26, 100, 244, 0.08);
+}
+
 /* Category Chips Row */
 .category-chips {
   display: flex;

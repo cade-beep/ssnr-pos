@@ -95,9 +95,10 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose }) => {
                 ? receipt.totalDiscount
                 : (itemDiscountVal + cartDiscountVal);
 
+              const discountableSubtotal = subtotalVal - itemDiscountVal;
               const cartDiscountPct = receipt.cartDiscountPercent !== undefined && receipt.cartDiscountPercent !== null
                 ? receipt.cartDiscountPercent
-                : (globalDiscountItem && subtotalVal > 0 ? Math.round((cartDiscountVal / (subtotalVal - itemDiscountVal)) * 100) : 0);
+                : (globalDiscountItem && discountableSubtotal > 0 ? Math.round((cartDiscountVal / discountableSubtotal) * 100) : 0);
 
               return (
                 <>

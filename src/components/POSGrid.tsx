@@ -9,6 +9,7 @@ interface POSGridProps {
 }
 
 type CategoryFilter = 'all' | 'bakery' | 'cookies' | 'gift' | 'etc';
+type SortOption = 'default' | 'price_asc' | 'price_desc';
 
 const CATEGORIES: { value: CategoryFilter; label: string }[] = [
   { value: 'all', label: '전체' },
@@ -21,6 +22,7 @@ const CATEGORIES: { value: CategoryFilter; label: string }[] = [
 const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }) => {
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [sortOption, setSortOption] = useState<SortOption>('default');
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -57,6 +59,12 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
     }
     return false;
   });
+
+  if (sortOption === 'price_asc') {
+    filteredProducts.sort((a, b) => a.price - b.price);
+  } else if (sortOption === 'price_desc') {
+    filteredProducts.sort((a, b) => b.price - a.price);
+  }
 
   const isProductInCart = (productId: string) => {
     return cart.some(item => item.product.id === productId);
@@ -114,6 +122,16 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
           <Menu size={16} />
           <span>카테고리</span>
         </button>
+        <select
+          className="sort-select"
+          value={sortOption}
+          onChange={(e) => setSortOption(e.target.value as SortOption)}
+          title="정렬 기준"
+        >
+          <option value="default">기본순</option>
+          <option value="price_asc">가격 낮은순</option>
+          <option value="price_desc">가격 높은순</option>
+        </select>
       </div>
 
       {/* Category Tabs / Chips */}
