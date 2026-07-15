@@ -164,9 +164,9 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
   // Apply filters client-side for dynamic reactivity
   const filteredOrders = orders.filter(order => {
     // Search Cashier, ID, Order Number
-    const matchesSearch = 
-      order.order_number.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      order.cashier_name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch =
+      (order.order_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (order.cashier_name || '').toLowerCase().includes(searchQuery.toLowerCase());
       
     // Payment Method
     const matchesPayment = paymentFilter === 'all' || order.payment_method === paymentFilter;

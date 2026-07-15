@@ -27,8 +27,7 @@
 │   │   ├── Cart.tsx                # 장바구니 및 Staff 대상 할인 버튼 숨김 처리
 │   │   ├── ProductsView.tsx        # 상품 목록 테이블 및 점주 전용 CRUD 권한 처리
 │   │   ├── HistoryView.tsx         # 매출 기록 피드 및 Staff 당일 조회 격리 / CSV 익스포트
-│   │   ├── SettingsView.tsx        # 마감 정산 실행 및 영수증 프린터 로컬 설정
-│   │   ├── InventoryView.tsx       # [NEW] 재고 실시간 현황 및 수동 재고 조정 이력
+│   │   ├── SettingsView.tsx        # 마감 정산 실행 및 영수증 프린터 로컬 설정 (재고 관리 기능은 폐기됨)
 │   │   ├── CustomersView.tsx       # [NEW] 고객 마일리지 검색 및 포인트 목록 조회
 │   │   └── EmployeesView.tsx       # [NEW] 직원 등록 초대 메타데이터 및 직급 관리
 │   └── utils/

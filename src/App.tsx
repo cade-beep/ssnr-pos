@@ -281,7 +281,6 @@ const App: React.FC = () => {
 
       if (e.key === 'Enter') {
         if (buffer.length > 2) {
-          console.log('Barcode scanned:', buffer);
           const matched = products.find(p => p.barcode === buffer && p.isActive !== false);
           if (matched) {
             handleAddToCart(matched);
@@ -309,9 +308,8 @@ const App: React.FC = () => {
 
   // Add to cart
   const handleAddToCart = (product: Product) => {
-    const existing = cart.find((item) => item.product.id === product.id);
-
     setCart((prevCart) => {
+      const existing = prevCart.find((item) => item.product.id === product.id);
       if (existing) {
         return prevCart.map((item) =>
           item.product.id === product.id
@@ -495,7 +493,6 @@ const App: React.FC = () => {
   const handleCompletePayment = async (paymentMethod: PaymentMethod, receivedCashVal?: number, changeVal?: number) => {
     if (isCheckoutSubmitting) return;
     setIsCheckoutSubmitting(true);
-    console.log('[LOG] Initiating payment checkout flow with database RPC');
 
     // Fallback key if activeIdempotencyKey is somehow not set
     const finalIdempotencyKey = activeIdempotencyKey || (crypto.randomUUID ? crypto.randomUUID() : `SSNR-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
@@ -820,7 +817,6 @@ const App: React.FC = () => {
               <Cart
                 items={cart}
                 totalAmount={finalTotal}
-                discountAmount={totalDiscount}
                 cartDiscountPercent={cartDiscountPercent}
                 cartDiscountAmount={cartDiscountAmount}
                 itemDiscountAmount={totalItemDiscount}
@@ -833,8 +829,6 @@ const App: React.FC = () => {
                   setActiveIdempotencyKey(key);
                   setIsPaymentModalOpen(true);
                 }}
-                onViewHistory={() => setActiveTab('history')}
-                historyCount={0}
                 onApplyDiscount={handleApplyGlobalDiscount}
                 onApplyItemDiscount={handleApplyItemDiscount}
                 onSetQuantity={handleSetQty}
@@ -993,6 +987,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       setChange(0);
     }
   }, [receivedCash, totalAmount]);
+
+  // Discard any entered received-amount/change when switching payment methods,
+  // so a stale TRANSFER value can't be submitted under a CARD payment.
+  useEffect(() => {
+    setReceivedCash('');
+  }, [method]);
 
   useEffect(() => {
     const handleModalKeyDown = (e: KeyboardEvent) => {

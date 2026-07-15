@@ -6,7 +6,6 @@ import { Plus, Minus, RotateCcw, X } from 'lucide-react';
 interface CartProps {
   items: CartItem[];
   totalAmount: number;
-  discountAmount: number;
   cartDiscountPercent: number;
   cartDiscountAmount: number;
   itemDiscountAmount: number;
@@ -15,8 +14,6 @@ interface CartProps {
   onDelete: (productId: string) => void;
   onClear: () => void;
   onCheckout: () => void;
-  onViewHistory: () => void;
-  historyCount: number;
   onApplyDiscount: (percent: number) => void;
   onApplyItemDiscount: (productId: string, amount: number, qty: number, isPercent?: boolean, percentVal?: number) => void;
   onSetQuantity: (productId: string, quantity: number) => void;
@@ -26,7 +23,6 @@ interface CartProps {
 const Cart: React.FC<CartProps> = ({
   items,
   totalAmount,
-  discountAmount,
   cartDiscountPercent,
   cartDiscountAmount,
   itemDiscountAmount,
@@ -35,8 +31,6 @@ const Cart: React.FC<CartProps> = ({
   onDelete,
   onClear,
   onCheckout,
-  onViewHistory,
-  historyCount,
   onApplyDiscount,
   onApplyItemDiscount,
   onSetQuantity,
@@ -67,11 +61,6 @@ const Cart: React.FC<CartProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
-
-  // Bypass unused variable check for props not rendered in Toss UI
-  if (false as boolean) {
-    console.log(onViewHistory, historyCount, discountAmount);
-  }
 
   const originalSubtotal = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 

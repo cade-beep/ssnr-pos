@@ -23,16 +23,6 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortOption, setSortOption] = useState<'code' | 'name' | 'category' | 'price_asc' | 'price_desc'>('code');
 
-  const sanitizeImageUrl = (value: string): string => {
-    if (!value) return '';
-    try {
-      const parsed = new URL(value);
-      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? value : '';
-    } catch {
-      return '';
-    }
-  };
-  
   // CRUD Modals States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -609,7 +599,7 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                     position: 'relative'
                   }}>
                     {(() => {
-                      const safeImageUrl = sanitizeImageUrl(imageUrl);
+                      const safeImageUrl = getSafeImageUrl(imageUrl);
                       return imageFile ? (
                         <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'center', padding: '4px' }}>
                           업로드 대기<br/>
@@ -641,7 +631,7 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                   <div style={{ display: 'flex', gap: '12px' }}>
                     <div className="bo-field" style={{ flex: 1 }}>
                       <label className="bo-label">카테고리</label>
-                      <select className="bo-select" value={category} onChange={e => setCategory(e.target.value as any)} style={{ height: '40px' }}>
+                      <select className="bo-select" value={category} onChange={e => setCategory(e.target.value as any)} disabled={role === 'Manager'} style={{ height: '40px' }}>
                         <option value="bakery">베이커리</option>
                         <option value="food">선물세트</option>
                         <option value="etc">기타</option>
@@ -649,7 +639,7 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
                     </div>
                     <div className="bo-field" style={{ flex: 1 }}>
                       <label className="bo-label">가격 (원)</label>
-                      <input type="number" className="bo-input" value={price} onChange={e => setPrice(Math.max(0, Number(e.target.value)))} min="0" required style={{ height: '40px' }} />
+                      <input type="number" className="bo-input" value={price} onChange={e => setPrice(Math.max(0, Number(e.target.value)))} disabled={role === 'Manager'} min="0" required style={{ height: '40px' }} />
                     </div>
                   </div>
 
