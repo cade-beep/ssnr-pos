@@ -15,6 +15,7 @@ import { supabase } from './supabase';
 import { STATIC_PRODUCTS } from './productsData';
 import { auditLog } from './utils/auditLogger';
 import { withTimeout } from './utils/asyncHelper';
+import { archiveSale } from './services/archiveSaleService';
 
 const getFriendlyErrorMessage = (error: any): string => {
   if (!error) return '알 수 없는 오류가 발생했습니다.';
@@ -601,43 +602,8 @@ const App: React.FC = () => {
         finalTotal
       };
 
-      // Best-effort Sync to Google Sheets
-      const webappUrl = import.meta.env.VITE_GOOGLE_SHEETS_WEBAPP_URL || "";
-      if (webappUrl) {
-        let itemsSummary = cart.map((item: any) => {
-          const info = getItemDiscountInfo(item);
-          if (info.totalDiscount > 0) {
-            if (info.isPercent) {
-              return `${item.product.name} x ${item.quantity} (개별할인: ${item.quantity}개 대상 ${info.discountPercent}% 개당 -${info.unitDiscount.toLocaleString()}원, 총 -${info.totalDiscount.toLocaleString()}원)`;
-            }
-            return `${item.product.name} x ${item.quantity} (개별할인: ${item.discountQty}개 대상 개당 -${info.unitDiscount.toLocaleString()}원, 총 -${info.totalDiscount.toLocaleString()}원)`;
-          }
-          return `${item.product.name} x ${item.quantity}`;
-        }).join(', ');
-        
-        if (cartDiscountAmount > 0) {
-          itemsSummary += `, [전체 할인: ${cartDiscountPercent}% -${cartDiscountAmount.toLocaleString()}원]`;
-        }
-        
-        const payload = {
-          orderId: finalIdempotencyKey,
-          paymentDateTime: new Date().toLocaleString('ko-KR'),
-          paymentMethod: paymentMethod === 'CARD' ? '신용카드' : '계좌이체',
-          totalAmount: finalTotal,
-          items: itemsSummary,
-          totalQuantity: receipt.totalQuantity,
-          receivedAmount: receipt.receivedAmount,
-          change: receipt.change,
-          cashierName: receipt.cashierName
-        };
-
-        fetch(webappUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        }).catch(err => console.warn('Google Sheets sync fallback failed:', err));
-      }
+      // Archive-only: fire-and-forget log to Google Sheets, never affects checkout success
+      archiveSale(receipt);
 
       // Log audit transaction
       auditLog({
