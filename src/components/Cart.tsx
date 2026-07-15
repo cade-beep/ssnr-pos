@@ -198,7 +198,7 @@ const Cart: React.FC<CartProps> = ({
               <div key={item.product.id} className="cart-item">
                 {/* Top Row: Name on Left, Total Price on Right */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <div className="cart-item-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '170px' }}>
+                  <div className="cart-item-name">
                     {item.product.name}
                   </div>
                   <div className="cart-item-total" style={{ width: 'auto', textAlign: 'right' }}>
