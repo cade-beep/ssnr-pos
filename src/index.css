@@ -2437,6 +2437,19 @@ input:checked + .toggle-slider:before {
     max-width: 260px;
   }
 
+  /* Search input + category button + sort dropdown no longer fit on one
+     row once the panel is full-width — wrap so the search box stays usable. */
+  .search-row {
+    flex-wrap: wrap;
+  }
+  .search-container {
+    flex: 1 1 100%;
+  }
+  .btn-category,
+  .sort-select {
+    flex: 1;
+  }
+
   .bottom-control-bar {
     padding: 0 16px;
   }
