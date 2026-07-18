@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import { UserPlus, UserMinus, Shield, ShieldCheck, Mail, Key } from 'lucide-react';
 import { withTimeout } from '../utils/asyncHelper';
+import Button from './ui/Button';
+import Modal from './ui/Modal';
+import { Field, Input, Select } from './ui/Field';
+import { showAlert, showConfirm } from './ui/dialogs';
 
 interface EmployeesViewProps {
   role: 'Owner' | 'Manager' | 'Staff';
@@ -51,12 +55,12 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
   const handleInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !name.trim() || !password.trim()) {
-      alert('모든 필수 항목을 기입해 주세요.');
+      showAlert('모든 필수 항목을 기입해 주세요.', { title: '입력 확인' });
       return;
     }
 
     if (password.trim().length < 6) {
-      alert('비밀번호는 최소 6자 이상이어야 합니다.');
+      showAlert('비밀번호는 최소 6자 이상이어야 합니다.', { title: '입력 확인' });
       return;
     }
 
@@ -87,7 +91,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
       fetchEmployees();
     } catch (err: any) {
       console.error(err);
-      alert(`⚠️ 직원 초대 실패: ${err.message || err}`);
+      showAlert(`⚠️ 직원 초대 실패: ${err.message || err}`, { title: '직원 초대 실패' });
     } finally {
       setSubmitting(false);
     }
@@ -95,11 +99,15 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
 
   const handleRoleChange = async (userId: string, empName: string, newRole: 'Owner' | 'Manager' | 'Staff') => {
     if (userId === currentUserId) {
-      alert('본인의 직급 및 권한을 직접 수정할 수 없습니다.');
+      showAlert('본인의 직급 및 권한을 직접 수정할 수 없습니다.', { title: '변경 불가' });
       return;
     }
 
-    if (!window.confirm(`⚠️ [${empName}] 직원의 권한을 [${newRole}] (으)로 변경하시겠습니까?`)) {
+    const confirmed = await showConfirm(
+      `[${empName}] 직원의 권한을 [${newRole}] (으)로 변경하시겠습니까?`,
+      { title: '⚠️ 직원 권한 변경', confirmText: '권한 변경' }
+    );
+    if (!confirmed) {
       fetchEmployees(); // revert select UI
       return;
     }
@@ -115,18 +123,22 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
       fetchEmployees();
     } catch (err: any) {
       console.error(err);
-      alert(`⚠️ 직급 변경 실패: ${err.message}`);
+      showAlert(`⚠️ 직급 변경 실패: ${err.message}`, { title: '직급 변경 실패' });
       fetchEmployees();
     }
   };
 
   const handleRemoveEmployee = async (userId: string, empName: string) => {
     if (userId === currentUserId) {
-      alert('자기 자신은 직원 명단에서 해고하거나 삭제할 수 없습니다.');
+      showAlert('자기 자신은 직원 명단에서 해고하거나 삭제할 수 없습니다.', { title: '삭제 불가' });
       return;
     }
 
-    if (!window.confirm(`🚨 정말로 [${empName}] 직원을 매장 명단에서 해고/삭제하시겠습니까?\n이 직원의 로그인 계정이 삭제되며 더이상 시스템에 로그인할 수 없게 됩니다.`)) {
+    const confirmed = await showConfirm(
+      `정말로 [${empName}] 직원을 매장 명단에서 해고/삭제하시겠습니까?\n이 직원의 로그인 계정이 삭제되며 더이상 시스템에 로그인할 수 없게 됩니다.`,
+      { title: '🚨 직원 해고/삭제', danger: true, confirmText: '해고/삭제' }
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -140,7 +152,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
       fetchEmployees();
     } catch (err: any) {
       console.error(err);
-      alert(`⚠️ 직원 삭제 실패: ${err.message}`);
+      showAlert(`⚠️ 직원 삭제 실패: ${err.message}`, { title: '직원 삭제 실패' });
     }
   };
 
@@ -158,15 +170,10 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
       
       {/* Top Toolbar */}
       <div className="bo-toolbar" style={{ flexShrink: 0, justifyContent: 'flex-end' }}>
-        <button 
-          type="button" 
-          className="btn btn-primary" 
-          style={{ width: 'auto', padding: '0 20px', display: 'flex', alignItems: 'center', gap: '6px', borderRadius: '10px', height: '46px' }}
-          onClick={() => setIsInviteOpen(true)}
-        >
+        <Button variant="primary" size="md" style={{ height: '46px' }} onClick={() => setIsInviteOpen(true)}>
           <UserPlus size={16} />
           <span>신규 직원 등록 (초대)</span>
-        </button>
+        </Button>
       </div>
 
       {/* Employees Table */}
@@ -250,74 +257,67 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
 
       {/* INVITE MODAL */}
       {isInviteOpen && (
-        <div className="bo-modal-overlay">
-          <form className="bo-modal" onSubmit={handleInviteSubmit} style={{ maxWidth: '440px' }}>
-            <div className="bo-modal-header">
-              <div className="bo-modal-title">✉️ 신규 직원 초대 등록</div>
-              <div className="bo-modal-desc">초대할 직원의 이메일 계정과 첫 로그인 비밀번호를 생성합니다.</div>
-            </div>
-
-            <div className="bo-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div className="bo-field">
-                <label className="bo-label">직원 이름 *</label>
-                <input type="text" className="bo-input" value={name} onChange={e => setName(e.target.value)} placeholder="예: 김코딩 캐셔" required style={{ height: '38px' }} />
-              </div>
-
-              <div className="bo-field">
-                <label className="bo-label">이메일 계정 *</label>
-                <div style={{ position: 'relative' }}>
-                  <Mail size={16} style={{ position: 'absolute', left: '12px', top: '11px', color: 'var(--text-muted)' }} />
-                  <input 
-                    type="email" 
-                    className="bo-input" 
-                    value={email} 
-                    onChange={e => setEmail(e.target.value)} 
-                    placeholder="worker@company.com" 
-                    required 
-                    style={{ height: '38px', paddingLeft: '36px' }} 
-                  />
-                </div>
-              </div>
-
-              <div className="bo-field">
-                <label className="bo-label">초기 비밀번호 (최소 6자) *</label>
-                <div style={{ position: 'relative' }}>
-                  <Key size={16} style={{ position: 'absolute', left: '12px', top: '11px', color: 'var(--text-muted)' }} />
-                  <input 
-                    type="password" 
-                    className="bo-input" 
-                    value={password} 
-                    onChange={e => setPassword(e.target.value)} 
-                    placeholder="******" 
-                    required 
-                    style={{ height: '38px', paddingLeft: '36px' }} 
-                  />
-                </div>
-              </div>
-
-              <div className="bo-field">
-                <label className="bo-label">직원 권한 직급 *</label>
-                <select 
-                  className="bo-select" 
-                  value={employeeRole} 
-                  onChange={e => setEmployeeRole(e.target.value as any)} 
-                  style={{ height: '38px' }}
-                >
-                  <option value="Staff">Staff (할인/환불/설정 불가, 본인 오늘 실적만 조회 가능)</option>
-                  <option value="Manager">Manager (제품 CRUD/재고조정 가능하나 가격/이미지 변경 불가, 마감 가능)</option>
-                  <option value="Owner">Owner (매장 소유주 - 직원 초대 및 모든 권한 가능)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="bo-modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={() => setIsInviteOpen(false)} disabled={submitting}>취소</button>
-              <button type="submit" className="btn btn-primary" disabled={submitting}>
+        <Modal
+          as="form"
+          maxWidth={440}
+          title="✉️ 신규 직원 초대 등록"
+          description="초대할 직원의 이메일 계정과 첫 로그인 비밀번호를 생성합니다."
+          onClose={() => !submitting && setIsInviteOpen(false)}
+          onSubmit={handleInviteSubmit}
+          bodyStyle={{ display: 'flex', flexDirection: 'column', gap: '14px' }}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setIsInviteOpen(false)} disabled={submitting}>취소</Button>
+              <Button type="submit" variant="primary" disabled={submitting}>
                 {submitting ? '초대 등록 중...' : '등록 완료'}
-              </button>
+              </Button>
+            </>
+          }
+        >
+          <Field label="직원 이름 *">
+            <Input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="예: 김코딩 캐셔" required style={{ height: '38px' }} />
+          </Field>
+
+          <Field label="이메일 계정 *">
+            <div style={{ position: 'relative' }}>
+              <Mail size={16} style={{ position: 'absolute', left: '12px', top: '11px', color: 'var(--text-muted)' }} />
+              <Input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="worker@company.com"
+                required
+                style={{ height: '38px', paddingLeft: '36px' }}
+              />
             </div>
-          </form>
-        </div>
+          </Field>
+
+          <Field label="초기 비밀번호 (최소 6자) *">
+            <div style={{ position: 'relative' }}>
+              <Key size={16} style={{ position: 'absolute', left: '12px', top: '11px', color: 'var(--text-muted)' }} />
+              <Input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="******"
+                required
+                style={{ height: '38px', paddingLeft: '36px' }}
+              />
+            </div>
+          </Field>
+
+          <Field label="직원 권한 직급 *">
+            <Select
+              value={employeeRole}
+              onChange={e => setEmployeeRole(e.target.value as any)}
+              style={{ height: '38px' }}
+            >
+              <option value="Staff">Staff (할인/환불/설정 불가, 본인 오늘 실적만 조회 가능)</option>
+              <option value="Manager">Manager (제품 CRUD/재고조정 가능하나 가격/이미지 변경 불가, 마감 가능)</option>
+              <option value="Owner">Owner (매장 소유주 - 직원 초대 및 모든 권한 가능)</option>
+            </Select>
+          </Field>
+        </Modal>
       )}
 
     </div>

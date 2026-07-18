@@ -10,6 +10,9 @@ import SettingsView from './components/SettingsView';
 import CustomersView from './components/CustomersView';
 import EmployeesView from './components/EmployeesView';
 import Logo from './components/Logo';
+import Button from './components/ui/Button';
+import Modal from './components/ui/Modal';
+import { showAlert, showConfirm } from './components/ui/dialogs';
 import { RefreshCw, LogOut } from 'lucide-react';
 import { supabase } from './supabase';
 import { STATIC_PRODUCTS } from './productsData';
@@ -117,7 +120,7 @@ const App: React.FC = () => {
       if (session && session.user) {
         const cashierObj = await fetchUserRoleAndStore(session.user);
         setCurrentCashier(cashierObj);
-        loadProducts(); // Load products using authenticated session headers
+        loadProducts(cashierObj.role); // Load products using authenticated session headers
       }
       setIsSessionLoading(false);
     }).catch(err => {
@@ -129,7 +132,7 @@ const App: React.FC = () => {
       if (session && session.user) {
         const cashierObj = await fetchUserRoleAndStore(session.user);
         setCurrentCashier(cashierObj);
-        loadProducts(); // Refresh products on login
+        loadProducts(cashierObj.role); // Refresh products on login
       } else {
         setCurrentCashier(null);
       }
@@ -187,8 +190,11 @@ const App: React.FC = () => {
     }
   }, [activeTab, currentCashier]);
 
-  // Fetch products from Supabase and auto-seed if database is empty
-  async function loadProducts() {
+  // Fetch products from Supabase and auto-seed if database is empty.
+  // `role` must be passed explicitly by the caller (not read from `currentCashier`
+  // state) because callers invoke this in the same tick as `setCurrentCashier(...)`,
+  // and this closure would otherwise see the pre-update (stale) state value.
+  async function loadProducts(role?: 'Owner' | 'Manager' | 'Staff') {
     try {
       const { data, error } = await withTimeout(
         supabase
@@ -202,6 +208,16 @@ const App: React.FC = () => {
       }
 
       if (!data || (data as any[]).length === 0) {
+        // Only an Owner account can seed products — the DB trigger
+        // (trg_check_product_write) rejects INSERTs from Manager/Staff.
+        // Attempting it for non-Owner roles used to throw, land in the
+        // catch block below, and flash every price to a flat placeholder.
+        if (role !== 'Owner') {
+          setProducts([]);
+          showToast('📦 등록된 상품이 없습니다. 매장 관리자(Owner)에게 문의해 주세요.', 'info');
+          return;
+        }
+
         console.log('Database products empty. Auto-seeding initial products...');
         const seedData = STATIC_PRODUCTS.map((p, idx) => ({
           id: `P-${idx + 1}`,
@@ -244,11 +260,11 @@ const App: React.FC = () => {
     } catch (err: any) {
       console.error('Failed to load products dynamically:', err);
       showToast('⚠️ 상품 데이터를 가져오지 못했습니다. 오프라인 카탈로그로 대체합니다.', 'error');
-      // Fallback
+      // Fallback — use each product's real static price, not a flat placeholder.
       setProducts(STATIC_PRODUCTS.map((p, idx) => ({
         id: `P-STATIC-${idx}`,
         name: p.name,
-        price: 1500,
+        price: p.price || 1500,
         category: p.category as any,
         emoji: p.emoji,
         imageUrl: p.imageUrl,
@@ -378,9 +394,9 @@ const App: React.FC = () => {
   };
 
   // Clear cart
-  const handleClearCart = () => {
+  const handleClearCart = async () => {
     if (cart.length === 0) return;
-    if (window.confirm('장바구니에 담긴 모든 내역을 삭제하시겠습니까?')) {
+    if (await showConfirm('장바구니에 담긴 모든 내역을 삭제하시겠습니까?', { title: '장바구니 비우기', danger: true, confirmText: '전체 삭제' })) {
       setCart([]);
       showToast('장바구니가 초기화되었습니다.', 'info');
     }
@@ -625,7 +641,7 @@ const App: React.FC = () => {
       setCart([]);
       setCartDiscountPercent(0);
       setActiveIdempotencyKey(null);
-      loadProducts();
+      loadProducts(currentCashier?.role);
 
       // Auto-focus search input after checkout
       setTimeout(() => {
@@ -647,14 +663,14 @@ const App: React.FC = () => {
         }
       });
 
-      alert(getFriendlyErrorMessage(err));
+      showAlert(getFriendlyErrorMessage(err), { title: '결제 처리 실패' });
     } finally {
       setIsCheckoutSubmitting(false);
     }
   };
 
   const handleLogout = async () => {
-    if (window.confirm('근무를 종료하고 로그아웃 하시겠습니까?')) {
+    if (await showConfirm('근무를 종료하고 로그아웃 하시겠습니까?', { title: '로그아웃', confirmText: '로그아웃' })) {
       auditLog({ action: 'LOGOUT', result: 'SUCCESS' });
       await supabase.auth.signOut();
       setCurrentCashier(null);
@@ -855,9 +871,9 @@ const App: React.FC = () => {
                 <span className="toggle-slider"></span>
               </label>
             </div>
-            <button type="button" className="btn-draft" onClick={handleSaveDraft}>
+            <Button variant="secondary" size="sm" onClick={handleSaveDraft}>
               임시저장
-            </button>
+            </Button>
           </div>
 
           <div className="bottom-right-recent">
@@ -978,14 +994,23 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   }, [isSubmitting]);
 
   return (
-    <div className="bo-modal-overlay">
-      <form className="bo-modal" style={{ maxWidth: '440px' }} onSubmit={handleSubmit}>
-        <div className="bo-modal-header">
-          <div className="bo-modal-title">결제 처리</div>
-          <div className="bo-modal-desc">결제 수단을 선택하고 결제액을 확인합니다.</div>
-        </div>
-
-        <div className="bo-modal-body" style={{ paddingBottom: '10px' }}>
+    <Modal
+      as="form"
+      maxWidth={440}
+      title="결제 처리"
+      description="결제 수단을 선택하고 결제액을 확인합니다."
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      bodyStyle={{ paddingBottom: '10px' }}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>취소</Button>
+          <Button type="submit" variant="primary" disabled={isSubmitting}>
+            {isSubmitting ? '결제 처리 중...' : '결제 완료'}
+          </Button>
+        </>
+      }
+    >
           <div className="bo-payment-selector" style={{ pointerEvents: isSubmitting ? 'none' : 'auto' }}>
             <button 
               type="button"
@@ -1084,20 +1109,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
               </div>
             )}
           </div>
-        </div>
-
-        <div className="bo-modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSubmitting}>취소</button>
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? '결제 처리 중...' : '결제 완료'}
-          </button>
-        </div>
-      </form>
-    </div>
+    </Modal>
   );
 };
 

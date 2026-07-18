@@ -4,6 +4,10 @@ import { supabase } from '../supabase';
 import { FileSpreadsheet, Lock, RefreshCw, BarChart, ShieldCheck, Printer } from 'lucide-react';
 import { auditLog } from '../utils/auditLogger';
 import { withTimeout } from '../utils/asyncHelper';
+import Button from './ui/Button';
+import Modal from './ui/Modal';
+import { Field, Input, Select } from './ui/Field';
+import { showAlert, showConfirm } from './ui/dialogs';
 
 interface SettingsViewProps {
   currentCashier: CashierUser;
@@ -167,7 +171,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       });
     } catch (err: any) {
       console.error(err);
-      alert(`마감 정산 산출 실패: ${err.message || err}`);
+      showAlert(`마감 정산 산출 실패: ${err.message || err}`, { title: '마감 정산 실패' });
       setIsCloseModalOpen(false);
     }
   };
@@ -175,7 +179,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   // Save closing report to Supabase
   const handleSaveCloseReport = async () => {
     if (!closingData) return;
-    const confirmSave = window.confirm('오늘 마감 정산 보고서를 저장하시겠습니까?\n이 작업은 하루 영업 종료 시 한 번만 실행하는 것을 권장합니다.');
+    const confirmSave = await showConfirm(
+      '오늘 마감 정산 보고서를 저장하시겠습니까?\n이 작업은 하루 영업 종료 시 한 번만 실행하는 것을 권장합니다.',
+      { title: '마감 보고서 저장', confirmText: '저장' }
+    );
     if (!confirmSave) return;
 
     setSavingClose(true);
@@ -222,7 +229,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         context: { actionType: 'BUSINESS_CLOSE', error: err.message || String(err) }
       });
 
-      alert(`마감 보고서 저장 실패: ${err.message || err}`);
+      showAlert(`마감 보고서 저장 실패: ${err.message || err}`, { title: '저장 실패' });
     } finally {
       setSavingClose(false);
     }
@@ -276,9 +283,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             )}
           </div>
 
-          <button type="button" className="btn--danger-outline" onClick={onLogout}>
+          <Button variant="danger-outline" size="md" fullWidth onClick={onLogout}>
             👋 근무자 로그아웃
-          </button>
+          </Button>
         </div>
 
         {/* Database linkages - Owner only */}
@@ -314,8 +321,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               href={import.meta.env.VITE_SPREADSHEET_URL || "https://docs.google.com/spreadsheets"}
               target="_blank" 
               rel="noopener noreferrer"
-              className="btn btn-secondary" 
-              style={{ width: '100%', height: '48px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', textDecoration: 'none', fontWeight: '600' }}
+              className="btn btn--secondary btn--md btn--full"
+              style={{ textDecoration: 'none' }}
             >
               <FileSpreadsheet size={14} />
               <span>구글 스프레드시트 이동</span>
@@ -329,26 +336,23 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             <Printer size={16} color="var(--primary)" /> 영수증 프린터 설정
           </div>
           <form onSubmit={handleSavePrinterSettings} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div className="bo-field">
-              <label className="bo-label">프린터 장치명</label>
-              <input type="text" className="bo-input" value={printerName} onChange={e => setPrinterName(e.target.value)} style={{ height: '36px' }} />
-            </div>
+            <Field label="프린터 장치명">
+              <Input type="text" value={printerName} onChange={e => setPrinterName(e.target.value)} style={{ height: '36px' }} />
+            </Field>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <div className="bo-field" style={{ flex: 1 }}>
-                <label className="bo-label">포트</label>
-                <input type="text" className="bo-input" value={printerPort} onChange={e => setPrinterPort(e.target.value)} style={{ height: '36px' }} />
-              </div>
-              <div className="bo-field" style={{ flex: 1 }}>
-                <label className="bo-label">용지 폭 (mm)</label>
-                <select className="bo-select" value={paperWidth} onChange={e => setPaperWidth(e.target.value)} style={{ height: '36px' }}>
+              <Field label="포트" style={{ flex: 1 }}>
+                <Input type="text" value={printerPort} onChange={e => setPrinterPort(e.target.value)} style={{ height: '36px' }} />
+              </Field>
+              <Field label="용지 폭 (mm)" style={{ flex: 1 }}>
+                <Select value={paperWidth} onChange={e => setPaperWidth(e.target.value)} style={{ height: '36px' }}>
                   <option value="80">80mm</option>
                   <option value="58">58mm</option>
-                </select>
-              </div>
+                </Select>
+              </Field>
             </div>
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', height: '40px', borderRadius: '8px', fontSize: '13.5px', marginTop: '4px' }}>
+            <Button type="submit" variant="primary" size="sm" fullWidth style={{ marginTop: '4px' }}>
               프린터 설정 저장
-            </button>
+            </Button>
           </form>
         </div>
 
@@ -362,14 +366,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               금일 발생한 매출 합산과 재고 상태를 마감 정산 보고서로 집계하고 데이터베이스에 영구적으로 보존합니다.
             </p>
 
-            <button 
-              type="button" 
-              className="btn btn-primary" 
-              style={{ width: '100%', height: '48px', borderRadius: '10px', fontWeight: '600', fontSize: '15px' }}
-              onClick={handleCalculateClose}
-            >
+            <Button variant="primary" size="md" fullWidth onClick={handleCalculateClose}>
               📊 금일 영업 마감 정산 실행
-            </button>
+            </Button>
           </div>
         )}
 
@@ -427,14 +426,20 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
       {/* CLOSE REPORT BUILDER MODAL */}
       {isCloseModalOpen && (
-        <div className="bo-modal-overlay">
-          <div className="bo-modal" style={{ maxWidth: '460px' }}>
-            <div className="bo-modal-header">
-              <div className="bo-modal-title">영업 마감 정산 보고</div>
-              <div className="bo-modal-desc">마감 완료를 누르면 보고서가 저장되며 출력 가능 상태가 됩니다.</div>
-            </div>
-
-            <div className="bo-modal-body">
+        <Modal
+          maxWidth={460}
+          title="영업 마감 정산 보고"
+          description="마감 완료를 누르면 보고서가 저장되며 출력 가능 상태가 됩니다."
+          onClose={() => !savingClose && setIsCloseModalOpen(false)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setIsCloseModalOpen(false)} disabled={savingClose}>취소</Button>
+              <Button variant="primary" onClick={handleSaveCloseReport} disabled={savingClose || !closingData}>
+                {savingClose ? '저장 중...' : '마감 완료'}
+              </Button>
+            </>
+          }
+        >
               {closingData ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
                   <div className="bo-data-row">
@@ -500,23 +505,27 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   <div className="bo-empty-text">데이터를 준비하는 중...</div>
                 </div>
               )}
-            </div>
-
-            <div className="bo-modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={() => setIsCloseModalOpen(false)} disabled={savingClose}>취소</button>
-              <button type="button" className="btn btn-primary" onClick={handleSaveCloseReport} disabled={savingClose || !closingData}>
-                {savingClose ? '저장 중...' : '마감 완료'}
-              </button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* VIEW CLOSE REPORT PRINT-PREVIEW MODAL */}
       {activeCloseReport && (
-        <div className="bo-modal-overlay">
-          <div className="bo-modal" style={{ maxWidth: '420px' }}>
-            <div className="bo-modal-body" style={{ padding: '28px' }}>
+        <Modal
+          maxWidth={420}
+          bodyStyle={{ padding: '28px' }}
+          onClose={() => setActiveCloseReport(null)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={handlePrintReport}>
+                <Printer size={14} />
+                <span>정산서 출력</span>
+              </Button>
+              <Button variant="primary" onClick={() => setActiveCloseReport(null)}>
+                닫기
+              </Button>
+            </>
+          }
+        >
               <div className="receipt-paper">
                 <div style={{ textAlign: 'center', marginBottom: '16px' }}>
                   <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0 }}>일일 마감 정산서</h2>
@@ -568,19 +577,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   본 정산서는 Supabase 클라우드에 안전하게 보존되었습니다.
                 </div>
               </div>
-            </div>
-
-            <div className="bo-modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={handlePrintReport} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                <Printer size={14} />
-                <span>정산서 출력</span>
-              </button>
-              <button type="button" className="btn btn-primary" onClick={() => setActiveCloseReport(null)}>
-                닫기
-              </button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
     </div>

@@ -3,6 +3,8 @@ import { CashierUser } from '../types';
 import { supabase } from '../supabase';
 import { auditLog } from '../utils/auditLogger';
 import Logo from './Logo';
+import Button from './ui/Button';
+import { showAlert } from './ui/dialogs';
 
 interface LoginOverlayProps {
   onLoginSuccess: (user: CashierUser) => void;
@@ -66,7 +68,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
       if (error) throw error;
 
       auditLog({ action: 'SIGNUP', result: 'SUCCESS', context: { email: finalEmail, storeId: cleanStoreId } });
-      alert('🎉 직원 회원가입이 완료되었습니다!\n방금 가입하신 계정으로 로그인을 시도해 주세요.');
+      showAlert('🎉 직원 회원가입이 완료되었습니다!\n방금 가입하신 계정으로 로그인을 시도해 주세요.', { title: '회원가입 완료' });
       
       setEmail(signUpEmail);
       setIsSignUp(false);
@@ -359,22 +361,19 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
             )}
 
             {/* Submit button */}
-            <button
-              type="submit"
-              className="login-submit-btn"
-              disabled={isSigningUp}
-            >
+            <Button type="submit" variant="primary" size="lg" fullWidth disabled={isSigningUp}>
               {isSigningUp ? '직원 등록 중...' : '직원 회원가입'}
-            </button>
+            </Button>
 
-            <button
-              type="button"
-              className="login-submit-btn"
+            <Button
+              variant="secondary"
+              size="lg"
+              fullWidth
               onClick={() => { setIsSignUp(false); setSignUpError(''); }}
-              style={{ background: '#f1f5f9', color: '#475569', marginTop: '8px' }}
+              style={{ marginTop: '8px' }}
             >
               로그인 화면으로 돌아가기
-            </button>
+            </Button>
           </form>
         ) : (
           /* Login Form */
@@ -442,12 +441,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
             )}
 
             {/* Submit button */}
-            <button
-              type="submit"
-              className="login-submit-btn"
-              disabled={isLoggingIn}
-              tabIndex={3}
-            >
+            <Button type="submit" variant="primary" size="lg" fullWidth disabled={isLoggingIn} tabIndex={3}>
               {isLoggingIn ? (
                 <>
                   <div className="login-spinner" />
@@ -456,7 +450,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
               ) : (
                 <span>로그인</span>
               )}
-            </button>
+            </Button>
 
             {/* Link to Sign Up */}
             <div style={{ marginTop: '16px', textAlign: 'center' }}>

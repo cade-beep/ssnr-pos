@@ -1,6 +1,8 @@
 import React from 'react';
 import { Receipt } from '../types';
 import { Printer, CheckCircle } from 'lucide-react';
+import Button from './ui/Button';
+import Modal from './ui/Modal';
 
 interface ReceiptModalProps {
   receipt: Receipt;
@@ -14,9 +16,22 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose }) => {
   };
 
   return (
-    <div className="bo-modal-overlay">
-      <div className="bo-modal" style={{ maxWidth: '440px' }}>
-        <div className="bo-modal-body" style={{ padding: '24px 24px 4px 24px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <Modal
+      maxWidth={440}
+      onClose={onClose}
+      bodyStyle={{ padding: '24px 24px 4px 24px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+      footer={
+        <>
+          <Button variant="secondary" onClick={handlePrint}>
+            <Printer size={14} />
+            <span>영수증 출력</span>
+          </Button>
+          <Button variant="primary" onClick={onClose}>
+            닫기
+          </Button>
+        </>
+      }
+    >
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '16px', flexShrink: 0 }}>
             <CheckCircle size={40} color="var(--success)" style={{ marginBottom: '8px' }} />
             <h2 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>결제 완료</h2>
@@ -153,19 +168,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose }) => {
               방문해 주셔서 감사합니다.
             </div>
           </div>
-        </div>
-
-        <div className="bo-modal-footer">
-          <button type="button" className="btn btn-secondary" onClick={handlePrint}>
-            <Printer size={14} />
-            <span>영수증 출력</span>
-          </button>
-          <button type="button" className="btn btn-primary" onClick={onClose}>
-            닫기
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

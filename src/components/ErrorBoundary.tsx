@@ -1,5 +1,6 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { auditLog } from '../utils/auditLogger';
+import Button from './ui/Button';
 
 interface Props {
   children: ReactNode;
@@ -56,38 +57,18 @@ export class ErrorBoundary extends Component<Props, State> {
             화면을 그리는 도중 예상치 못한 오류가 발생했습니다. 아래 버튼을 눌러 화면을 새로고침 하거나, 현상이 지속될 경우 관리자에게 문의해 주세요.
           </p>
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button
-              onClick={() => window.location.reload()}
-              style={{
-                background: '#1a64f4',
-                color: '#ffffff',
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: '8px',
-                fontSize: '15px',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
-            >
+            <Button variant="primary" size="md" onClick={() => window.location.reload()}>
               새로고침
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
+              size="md"
               onClick={() => {
                 this.setState({ hasError: false, error: null });
               }}
-              style={{
-                background: '#f2f4f6',
-                color: '#4e5968',
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: '8px',
-                fontSize: '15px',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}
             >
               임시 복구 시도
-            </button>
+            </Button>
           </div>
           {this.state.error && (
             <details style={{ marginTop: '32px', textAlign: 'left', background: '#ffffff', border: '1px solid #e5e8eb', padding: '16px', borderRadius: '8px', maxWidth: '600px', width: '100%' }}>

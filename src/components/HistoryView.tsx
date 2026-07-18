@@ -4,6 +4,7 @@ import { supabase } from '../supabase';
 import { Search, Calendar, RefreshCw, Undo, Coins, TrendingUp, Award, ShoppingBag, Eye } from 'lucide-react';
 import { auditLog } from '../utils/auditLogger';
 import { withTimeout } from '../utils/asyncHelper';
+import { showAlert, showPrompt } from './ui/dialogs';
 
 interface HistoryViewProps {
   onSelectReceipt: (receipt: Receipt) => void;
@@ -127,7 +128,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
 
   const handleExportCSV = () => {
     if (filteredOrders.length === 0) {
-      alert('내보낼 데이터가 없습니다.');
+      showAlert('내보낼 데이터가 없습니다.', { title: '내보내기' });
       return;
     }
 
@@ -274,10 +275,13 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
   const handleRefund = async (order: any) => {
     if (isLoading || order.is_refunded) return;
     
-    const reason = window.prompt(`⚠️ 주문번호 [${order.order_number}] 결제건을 환불하시겠습니까?\n사유를 입력해 주세요 (필수):`, '고객 단순 변심');
+    const reason = await showPrompt(
+      `주문번호 [${order.order_number}] 결제건을 환불하시겠습니까?\n사유를 입력해 주세요 (필수):`,
+      { title: '⚠️ 환불 처리', defaultValue: '고객 단순 변심' }
+    );
     if (reason === null) return;
     if (!reason.trim()) {
-      alert('환불 사유를 작성해야 환불 처리가 가능합니다.');
+      showAlert('환불 사유를 작성해야 환불 처리가 가능합니다.', { title: '환불 처리' });
       return;
     }
 
@@ -317,11 +321,11 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
       });
 
       if (errMsg.includes('permission denied') || errMsg.includes('row-level security') || errMsg.includes('policy')) {
-        alert('⚠️ 환불 권한이 없습니다. 관리자(어드민) 계정만 결제 취소 및 환불 처리가 가능합니다.');
+        showAlert('⚠️ 환불 권한이 없습니다. 관리자(어드민) 계정만 결제 취소 및 환불 처리가 가능합니다.', { title: '환불 처리 실패' });
       } else if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) {
-        alert('🌐 인터넷 연결이 원활하지 않습니다. 네트워크 설정을 점검한 후 다시 시도해 주세요.');
+        showAlert('🌐 인터넷 연결이 원활하지 않습니다. 네트워크 설정을 점검한 후 다시 시도해 주세요.', { title: '환불 처리 실패' });
       } else {
-        alert(`⚠️ 환불 처리 실패: ${errMsg}`);
+        showAlert(`⚠️ 환불 처리 실패: ${errMsg}`, { title: '환불 처리 실패' });
       }
     } finally {
       setIsLoading(false);

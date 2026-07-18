@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState } from 'react';
 import { CartItem } from '../types';
 import { Plus, Minus, RotateCcw, X } from 'lucide-react';
+import Button from './ui/Button';
+import Modal from './ui/Modal';
+import { Input } from './ui/Field';
+import { showPrompt } from './ui/dialogs';
 
 interface CartProps {
   items: CartItem[];
@@ -48,19 +51,6 @@ const Cart: React.FC<CartProps> = ({
   // Input states
   const [customCartPercent, setCustomCartPercent] = useState('');
   const [customItemPercent, setCustomItemPercent] = useState('');
-
-  // ESC key listener to close active modals
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsCartDiscountOpen(false);
-        setIsItemDiscountOpen(false);
-        setIsStackingOpen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   const originalSubtotal = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 
@@ -168,6 +158,66 @@ const Cart: React.FC<CartProps> = ({
     setCustomItemPercent('');
   };
 
+  // Direct quantity input via unified prompt dialog
+  const handleQuantityClick = async (item: CartItem) => {
+    const newQtyInput = await showPrompt(`[${item.product.name}] 구매 수량을 직접 입력해 주세요.`, {
+      title: '수량 변경',
+      defaultValue: String(item.quantity),
+      inputType: 'number'
+    });
+    if (newQtyInput !== null) {
+      const parsed = parseInt(newQtyInput, 10);
+      if (!isNaN(parsed) && parsed >= 0) {
+        onSetQuantity(item.product.id, parsed);
+      }
+    }
+  };
+
+  // Shared content for the two percent-discount modals
+  const renderPercentPicker = (
+    onPick: (pct: number) => void,
+    formValue: string,
+    setFormValue: (v: string) => void,
+    onFormSubmit: (e: React.FormEvent) => void
+  ) => (
+    <>
+      {/* Quick Percentage Buttons */}
+      <div style={{ marginBottom: '20px' }}>
+        <div className="bo-label" style={{ marginBottom: '8px' }}>할인율 (%) 선택</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+          {[5, 10, 20, 30].map((pct) => (
+            <Button key={pct} variant="secondary" size="sm" onClick={() => onPick(pct)}>
+              {pct}%
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Custom Percentage Form */}
+      <form onSubmit={onFormSubmit} style={{ marginBottom: '20px' }}>
+        <div className="bo-label" style={{ marginBottom: '8px' }}>할인율 직접 입력 (%)</div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <Input
+            type="number"
+            placeholder="0~100"
+            value={formValue}
+            onChange={(e) => setFormValue(e.target.value)}
+            min="0"
+            max="100"
+            style={{ flex: 1 }}
+          />
+          <Button type="submit" variant="primary" size="md">적용</Button>
+        </div>
+      </form>
+
+      {/* Reset Button */}
+      <hr className="bo-divider" />
+      <Button variant="secondary" size="md" fullWidth onClick={() => onPick(0)}>
+        할인 적용 해제
+      </Button>
+    </>
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Cart Header */}
@@ -216,7 +266,7 @@ const Cart: React.FC<CartProps> = ({
                       <span style={{ fontWeight: '700', color: 'var(--primary)' }}>
                         {finalItemPrice.toLocaleString()}원
                       </span>
-                      <span className="bo-badge bo-badge--danger" style={{ fontSize: '10.5px', fontWeight: '700', padding: '1px 6px', borderRadius: '4px', background: '#fef2f2', color: '#ef4444' }}>
+                      <span className="bo-badge bo-badge--danger" style={{ fontSize: '10.5px', fontWeight: '700', padding: '1px 6px', borderRadius: '4px' }}>
                         {discInfo.percent > 0 ? `${discInfo.percent}% 할인` : `-${discInfo.unitDiscount.toLocaleString()}원 할인`}
                       </span>
                     </div>
@@ -237,17 +287,9 @@ const Cart: React.FC<CartProps> = ({
                       >
                         <Minus size={12} />
                       </button>
-                      <span 
+                      <span
                         className="cart-item-quantity"
-                        onClick={() => {
-                          const newQtyInput = window.prompt(`[${item.product.name}] 구매 수량을 변경해 주세요 (직접 입력):`, String(item.quantity));
-                          if (newQtyInput !== null) {
-                            const parsed = parseInt(newQtyInput, 10);
-                            if (!isNaN(parsed) && parsed >= 0) {
-                              onSetQuantity(item.product.id, parsed);
-                            }
-                          }
-                        }}
+                        onClick={() => handleQuantityClick(item)}
                         style={{ cursor: 'pointer', textDecoration: 'underline dotted' }}
                         title="클릭하여 수량 직접 입력"
                       >
@@ -297,7 +339,7 @@ const Cart: React.FC<CartProps> = ({
           <span>상품 금액</span>
           <span>{originalSubtotal.toLocaleString()}원</span>
         </div>
-        
+
         {itemDiscountAmount > 0 && (
           <div className="summary-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13.5px', color: '#ef4444', fontWeight: '500' }}>
             <span>품목 할인 합계</span>
@@ -305,14 +347,14 @@ const Cart: React.FC<CartProps> = ({
           </div>
         )}
 
-        <div 
-          className="summary-row" 
+        <div
+          className="summary-row"
           style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px', fontSize: '13.5px', color: cartDiscountAmount > 0 ? '#ef4444' : 'var(--text-secondary)', fontWeight: cartDiscountAmount > 0 ? '600' : 'normal' }}
         >
           <span>전체 할인</span>
           <span>
-            {cartDiscountAmount > 0 
-              ? `${cartDiscountPercent}% 할인 적용` 
+            {cartDiscountAmount > 0
+              ? `${cartDiscountPercent}% 할인 적용`
               : '할인 없음'}
           </span>
         </div>
@@ -326,239 +368,91 @@ const Cart: React.FC<CartProps> = ({
 
         <div className="action-buttons">
           {role !== 'Staff' && (
-            <button
-              type="button"
-              className="btn-discount"
+            <Button
+              variant="outline"
+              size="md"
+              fullWidth
               onClick={() => setIsCartDiscountOpen(true)}
               disabled={items.length === 0}
             >
               🏷️ 할인 적용
-            </button>
+            </Button>
           )}
-          <button
-            type="button"
-            className="btn btn-primary"
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
             onClick={onCheckout}
             disabled={items.length === 0}
-            style={{ width: '100%', height: '52px', borderRadius: '12px', fontSize: '16px', fontWeight: '700', border: 'none', background: 'var(--primary)', color: '#ffffff', cursor: items.length === 0 ? 'not-allowed' : 'pointer' }}
           >
             결제하기
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Cart Discount Modal */}
-      {isCartDiscountOpen && createPortal(
-        <div 
-          className="modal-overlay" 
-          onClick={() => setIsCartDiscountOpen(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200 }}
+      {isCartDiscountOpen && (
+        <Modal
+          title="🏷️ 전체 할인 설정"
+          maxWidth={380}
+          zIndex={1200}
+          onClose={() => setIsCartDiscountOpen(false)}
+          closeOnOverlay
         >
-          <div 
-            className="modal-content" 
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: '#ffffff', borderRadius: '20px', maxWidth: '380px', width: '90%', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}
-          >
-            <div className="modal-header" style={{ marginBottom: '18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '17px', fontWeight: '800', color: 'var(--text-primary)' }}>🏷️ 전체 할인 설정</h3>
-              <button type="button" onClick={() => setIsCartDiscountOpen(false)} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={18} />
-              </button>
-            </div>
-            
-            {/* Quick Percentage Buttons */}
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: '600' }}>할인율 (%) 선택</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-                {[5, 10, 20, 30].map((pct) => (
-                  <button
-                    key={pct}
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => requestCartDiscount(pct)}
-                    style={{ padding: '10px 0', fontSize: '13.5px', borderRadius: '10px', cursor: 'pointer', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', fontWeight: '600', color: 'var(--text-primary)' }}
-                  >
-                    {pct}%
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Custom Percentage Form */}
-            <form onSubmit={handleCustomCartDiscountSubmit} style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: '600' }}>할인율 직접 입력 (%)</div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="number"
-                  placeholder="0~100"
-                  value={customCartPercent}
-                  onChange={(e) => setCustomCartPercent(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: '12px',
-                    borderRadius: '10px',
-                    border: '1px solid var(--border-color)',
-                    background: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    fontSize: '14px',
-                    outline: 'none'
-                  }}
-                  min="0"
-                  max="100"
-                />
-                <button type="submit" className="btn btn-primary" style={{ padding: '0 20px', borderRadius: '10px', width: 'auto', background: 'var(--primary)', border: 'none', color: '#ffffff', fontWeight: '600', cursor: 'pointer' }}>
-                  적용
-                </button>
-              </div>
-            </form>
-
-            {/* Reset Button */}
-            <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => requestCartDiscount(0)}
-                style={{ flex: 1, borderRadius: '10px', padding: '12px', cursor: 'pointer', background: '#f1f5f9', border: 'none', fontWeight: '600', color: '#64748b' }}
-              >
-                할인 적용 해제
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
+          {renderPercentPicker(
+            requestCartDiscount,
+            customCartPercent,
+            setCustomCartPercent,
+            handleCustomCartDiscountSubmit
+          )}
+        </Modal>
       )}
 
       {/* Item Discount Modal */}
-      {isItemDiscountOpen && selectedItem && createPortal(
-        <div 
-          className="modal-overlay" 
-          onClick={() => setIsItemDiscountOpen(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200 }}
-        >
-          <div 
-            className="modal-content" 
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: '#ffffff', borderRadius: '20px', maxWidth: '380px', width: '90%', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}
-          >
-            <div className="modal-header" style={{ marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '17px', fontWeight: '800', color: 'var(--text-primary)' }}>🏷️ 품목 개별 할인 설정</h3>
-              <button type="button" onClick={() => setIsItemDiscountOpen(false)} style={{ border: 'none', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={18} />
-              </button>
-            </div>
-            
-            <div style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginBottom: '18px' }}>
+      {isItemDiscountOpen && selectedItem && (
+        <Modal
+          title="🏷️ 품목 개별 할인 설정"
+          description={
+            <>
               <strong>{selectedItem.product.name}</strong> (정가: {selectedItem.product.price.toLocaleString()}원)
-            </div>
-
-            {/* Quick Percentage Buttons */}
-            <div style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: '600' }}>할인율 (%) 선택</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-                {[5, 10, 20, 30].map((pct) => (
-                  <button
-                    key={pct}
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => applyItemDiscount(pct)}
-                    style={{ padding: '10px 0', fontSize: '13.5px', borderRadius: '10px', cursor: 'pointer', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', fontWeight: '600', color: 'var(--text-primary)' }}
-                  >
-                    {pct}%
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Custom Percentage Form */}
-            <form onSubmit={handleCustomItemDiscountSubmit} style={{ marginBottom: '20px' }}>
-              <div style={{ fontSize: '12.5px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: '600' }}>할인율 직접 입력 (%)</div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="number"
-                  placeholder="0~100"
-                  value={customItemPercent}
-                  onChange={(e) => setCustomItemPercent(e.target.value)}
-                  style={{
-                    flex: 1,
-                    padding: '12px',
-                    borderRadius: '10px',
-                    border: '1px solid var(--border-color)',
-                    background: 'var(--bg-primary)',
-                    color: 'var(--text-primary)',
-                    fontSize: '14px',
-                    outline: 'none'
-                  }}
-                  min="0"
-                  max="100"
-                />
-                <button type="submit" className="btn btn-primary" style={{ padding: '0 20px', borderRadius: '10px', width: 'auto', background: 'var(--primary)', border: 'none', color: '#ffffff', fontWeight: '600', cursor: 'pointer' }}>
-                  적용
-                </button>
-              </div>
-            </form>
-
-            {/* Reset Button */}
-            <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => applyItemDiscount(0)}
-                style={{ flex: 1, borderRadius: '10px', padding: '12px', cursor: 'pointer', background: '#f1f5f9', border: 'none', fontWeight: '600', color: '#64748b' }}
-              >
-                할인 적용 해제
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
+            </>
+          }
+          maxWidth={380}
+          zIndex={1200}
+          onClose={() => setIsItemDiscountOpen(false)}
+          closeOnOverlay
+        >
+          {renderPercentPicker(
+            applyItemDiscount,
+            customItemPercent,
+            setCustomItemPercent,
+            handleCustomItemDiscountSubmit
+          )}
+        </Modal>
       )}
 
       {/* Stacking Confirmation Modal */}
-      {isStackingOpen && createPortal(
-        <div 
-          className="modal-overlay" 
-          onClick={() => setIsStackingOpen(false)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300 }}
+      {isStackingOpen && (
+        <Modal
+          title="할인 중복 적용"
+          description="일부 상품에 개별 할인이 이미 적용되어 있습니다. 전체 할인을 어떻게 적용할까요?"
+          maxWidth={400}
+          zIndex={1300}
+          onClose={handleStackingCancel}
+          closeOnOverlay
         >
-          <div 
-            className="modal-content" 
-            onClick={(e) => e.stopPropagation()}
-            style={{ background: '#ffffff', borderRadius: '20px', maxWidth: '400px', width: '90%', padding: '24px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}
-          >
-            <div className="modal-header" style={{ marginBottom: '14px' }}>
-              <h3 style={{ fontSize: '17px', fontWeight: '800', color: 'var(--text-primary)' }}>Apply additional discount?</h3>
-            </div>
-            
-            <div style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '22px' }}>
-              Some products already have individual discounts. How would you like to apply the cart discount?
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={handleStackingApplyBoth}
-                style={{ width: '100%', height: '48px', borderRadius: '12px', fontSize: '14px', fontWeight: '700', border: 'none', background: 'var(--primary)', color: '#ffffff', cursor: 'pointer' }}
-              >
-                Apply Both
-              </button>
-              <button
-                type="button"
-                onClick={handleStackingReplace}
-                style={{ width: '100%', height: '48px', borderRadius: '12px', fontSize: '14px', fontWeight: '700', border: '1px solid #cbd5e1', background: '#ffffff', color: 'var(--text-primary)', cursor: 'pointer' }}
-              >
-                Replace Item Discounts
-              </button>
-              <button
-                type="button"
-                onClick={handleStackingCancel}
-                style={{ width: '100%', height: '48px', borderRadius: '12px', fontSize: '14px', fontWeight: '600', border: 'none', background: '#f1f5f9', color: '#64748b', cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-            </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <Button variant="primary" size="md" fullWidth onClick={handleStackingApplyBoth}>
+              개별 할인과 함께 적용
+            </Button>
+            <Button variant="outline" size="md" fullWidth onClick={handleStackingReplace}>
+              개별 할인 해제 후 전체 할인만 적용
+            </Button>
+            <Button variant="secondary" size="md" fullWidth onClick={handleStackingCancel}>
+              취소
+            </Button>
           </div>
-        </div>,
-        document.body
+        </Modal>
       )}
     </div>
   );
