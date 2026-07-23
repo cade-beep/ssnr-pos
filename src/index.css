@@ -548,6 +548,63 @@ body {
   color: #ffffff;
 }
 
+/* Smart nav chips (인기/최근/즐겨찾기/AI) — same pill, icon + label */
+.smart-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.smart-chip--reserved {
+  cursor: not-allowed;
+  opacity: 0.55;
+  border: 1px dashed var(--border-color);
+  background: transparent;
+}
+.smart-chip--reserved:hover {
+  background: transparent;
+  color: var(--text-secondary);
+}
+.chip-divider {
+  width: 1px;
+  flex-shrink: 0;
+  align-self: stretch;
+  background: var(--border-color);
+  margin: 4px 2px;
+}
+
+/* Favorite star toggle on the product image */
+.product-favorite-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+.product-favorite-btn:hover {
+  transform: scale(1.1);
+}
+.product-favorite-btn.active {
+  color: #f59e0b;
+}
+
+/* Keyboard focus ring for the product card (now a div[role=button]) */
+.product-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 /* Product list container & Grid */
 .products-grid-container {
   flex: 1;
