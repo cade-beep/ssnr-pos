@@ -246,6 +246,12 @@ const Cart: React.FC<CartProps> = ({
 
             return (
               <div key={item.product.id} className="cart-item">
+                {item.product.imageUrl ? (
+                  <img src={item.product.imageUrl} alt={item.product.name} className="cart-item-thumb" />
+                ) : (
+                  <div className="cart-item-thumb cart-item-thumb--emoji">{item.product.emoji || '🍞'}</div>
+                )}
+                <div className="cart-item-body">
                 {/* Top Row: Name on Left, Total Price on Right */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                   <div className="cart-item-name">
@@ -326,6 +332,7 @@ const Cart: React.FC<CartProps> = ({
                   >
                     <X size={16} />
                   </button>
+                </div>
                 </div>
               </div>
             );

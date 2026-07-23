@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Product, CartItem } from '../types';
-import { Search, Menu, X } from 'lucide-react';
+import { Search, Menu, X, Plus, Check } from 'lucide-react';
 
 interface POSGridProps {
   products: Product[];
@@ -165,36 +165,31 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
                 <button
                   key={product.id}
                   type="button"
-                  className="product-card"
+                  className={`product-card ${inCart ? 'in-cart' : ''}`}
                   onClick={() => onProductClick(product)}
-                  style={{
-                    borderColor: inCart ? 'var(--primary)' : 'var(--border-color)',
-                    boxShadow: inCart ? '0 0 0 2px rgba(26, 100, 244, 0.08)' : 'var(--shadow-sm)',
-                    position: 'relative',
-                    cursor: 'pointer'
-                  }}
                 >
                   {/* Product Photo */}
-                  <div className="product-image-container" style={{ position: 'relative' }}>
+                  <div className="product-image-container">
                     <img
                       src={product.imageUrl || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80'}
                       alt={product.name}
                       className="product-image"
                       loading="lazy"
                     />
+                    {product.emoji && <span className="product-emoji-tag">{product.emoji}</span>}
                   </div>
 
                   <div className="product-info">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', gap: '6px' }}>
-                      <span className="product-name" style={{ flex: 1, minWidth: 0 }} title={product.name}>
-                        {product.name}
-                      </span>
-                      {product.emoji && <span style={{ flexShrink: 0 }}>{product.emoji}</span>}
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                      <div className="product-price">{product.price.toLocaleString()}원</div>
-                    </div>
+                    <span className="product-name" title={product.name}>
+                      {product.name}
+                    </span>
+                    <div className="product-price">{product.price.toLocaleString()}원</div>
                   </div>
+
+                  {/* Add affordance — the whole card is the target; this is the recognition cue */}
+                  <span className="product-add-badge" aria-hidden="true">
+                    {inCart ? <Check size={20} /> : <Plus size={20} />}
+                  </span>
                 </button>
               );
             })}

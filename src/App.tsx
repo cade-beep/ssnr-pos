@@ -9,11 +9,11 @@ import HistoryView from './components/HistoryView';
 import SettingsView from './components/SettingsView';
 import CustomersView from './components/CustomersView';
 import EmployeesView from './components/EmployeesView';
-import Logo from './components/Logo';
+import Sidebar from './components/Sidebar';
 import Button from './components/ui/Button';
 import Modal from './components/ui/Modal';
 import { showAlert, showConfirm } from './components/ui/dialogs';
-import { RefreshCw, LogOut, X } from 'lucide-react';
+import { RefreshCw, X } from 'lucide-react';
 import { supabase } from './supabase';
 import { STATIC_PRODUCTS } from './productsData';
 import { auditLog } from './utils/auditLogger';
@@ -778,78 +778,15 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="app-container">
-      {/* Header GNB (Preserves existing layout style) */}
-      <header className="app-header">
-        <div className="header-logo" onClick={() => setActiveTab('sales')} style={{ cursor: 'pointer' }}>
-          <div className="header-logo-icon"><Logo size={15} /></div>
-          <h1>POS</h1>
-        </div>
+    <div className="app-shell">
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        currentCashier={currentCashier}
+        onLogout={handleLogout}
+      />
 
-        <div className="gnb-tabs">
-          <button 
-            type="button" 
-            className={`gnb-tab ${activeTab === 'sales' ? 'active' : ''}`}
-            onClick={() => setActiveTab('sales')}
-          >
-            판매
-          </button>
-          <button 
-            type="button" 
-            className={`gnb-tab ${activeTab === 'history' ? 'active' : ''}`}
-            onClick={() => setActiveTab('history')}
-          >
-            내역
-          </button>
-          <button 
-            type="button" 
-            className={`gnb-tab ${activeTab === 'products' ? 'active' : ''}`}
-            onClick={() => setActiveTab('products')}
-          >
-            상품
-          </button>
-
-          {currentCashier.role !== 'Staff' && (
-            <button 
-              type="button" 
-              className={`gnb-tab ${activeTab === 'customers' ? 'active' : ''}`}
-              onClick={() => setActiveTab('customers')}
-            >
-              고객
-            </button>
-          )}
-          {currentCashier.role === 'Owner' && (
-            <button 
-              type="button" 
-              className={`gnb-tab ${activeTab === 'employees' ? 'active' : ''}`}
-              onClick={() => setActiveTab('employees')}
-            >
-              직원
-            </button>
-          )}
-
-          {currentCashier.role !== 'Staff' && (
-            <button 
-              type="button" 
-              className={`gnb-tab ${activeTab === 'settings' ? 'active' : ''}`}
-              onClick={() => setActiveTab('settings')}
-            >
-              설정
-            </button>
-          )}
-        </div>
-
-        <div 
-          className="header-profile" 
-          onClick={handleLogout}
-          title="클릭하여 로그아웃"
-        >
-          <div className="profile-avatar">👤</div>
-          <span>{currentCashier.name} 님 ({currentCashier.role})</span>
-          <LogOut size={12} style={{ marginLeft: '6px', color: 'var(--text-muted)' }} />
-        </div>
-      </header>
-
+      <main className="app-main">
       {/* Main Content Area switched by tabs */}
       <div className="pos-dashboard" style={{ flex: 1, overflow: 'hidden' }}>
         {activeTab === 'sales' ? (
@@ -998,6 +935,7 @@ const App: React.FC = () => {
           </div>
         </footer>
       )}
+      </main>
 
       {/* Payment Selector Modal */}
       {isPaymentModalOpen && (
