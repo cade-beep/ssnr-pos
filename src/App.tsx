@@ -13,7 +13,7 @@ import Sidebar from './components/Sidebar';
 import Button from './components/ui/Button';
 import Modal from './components/ui/Modal';
 import { showAlert, showConfirm } from './components/ui/dialogs';
-import { RefreshCw, X } from 'lucide-react';
+import { RefreshCw, X, ChevronRight, ShoppingCart } from 'lucide-react';
 import { supabase } from './supabase';
 import { STATIC_PRODUCTS } from './productsData';
 import { auditLog } from './utils/auditLogger';
@@ -68,6 +68,8 @@ const App: React.FC = () => {
   const [isReceiptChecked, setIsReceiptChecked] = useState<boolean>(true);
   const [cartDiscountPercent, setCartDiscountPercent] = useState<number>(0);
   const [drafts, setDrafts] = useState<CartDraft[]>([]);
+  // Tablet: the cart becomes an overlay drawer. Start closed on tablet-width, open on desktop.
+  const [cartCollapsed, setCartCollapsed] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth <= 1200);
 
   // Cashier Authentication States
   const [currentCashier, setCurrentCashier] = useState<CashierUser | null>(null);
@@ -809,7 +811,15 @@ const App: React.FC = () => {
               )}
             </div>
             
-            <aside className="pos-side-panel">
+            <aside className={`pos-side-panel ${cartCollapsed ? 'is-collapsed' : 'is-open'}`}>
+              <button
+                type="button"
+                className="cart-drawer-close"
+                onClick={() => setCartCollapsed(true)}
+                title="장바구니 접기"
+              >
+                <ChevronRight size={20} />
+              </button>
               <Cart
                 items={cart}
                 totalAmount={finalTotal}
@@ -831,6 +841,23 @@ const App: React.FC = () => {
                 role={currentCashier.role}
               />
             </aside>
+
+            {/* Tablet drawer backdrop (only visible when the cart is open in drawer mode) */}
+            <div className="cart-backdrop" onClick={() => setCartCollapsed(true)} />
+
+            {/* Tablet floating cart button — opens the drawer, shows live count + total */}
+            <button
+              type="button"
+              className="cart-fab"
+              onClick={() => setCartCollapsed(false)}
+              title="장바구니 열기"
+            >
+              <span className="cart-fab-icon">
+                <ShoppingCart size={22} />
+                {cart.length > 0 && <span className="cart-fab-count">{cart.length}</span>}
+              </span>
+              <span className="cart-fab-total">{finalTotal.toLocaleString()}원</span>
+            </button>
           </>
         ) : activeTab === 'history' ? (
           <HistoryView 
