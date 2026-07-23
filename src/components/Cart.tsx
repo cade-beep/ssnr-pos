@@ -219,7 +219,8 @@ const Cart: React.FC<CartProps> = ({
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="cart-panel-root">
+      <div className="cart-items-column">
       {/* Cart Header */}
       <div className="cart-header">
         <h2>장바구니</h2>
@@ -338,6 +339,7 @@ const Cart: React.FC<CartProps> = ({
             );
           })
         )}
+      </div>
       </div>
 
       {/* Cart Summary & Footer Controls */}

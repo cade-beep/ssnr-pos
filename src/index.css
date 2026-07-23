@@ -818,6 +818,18 @@ input:checked + .toggle-slider:before {
 }
 
 /* Cart Panel (Toss visual layout) */
+.cart-panel-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.cart-items-column {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
 .cart-header {
   padding: 24px 24px 12px 24px;
   border-bottom: none;
@@ -2505,7 +2517,7 @@ input:checked + .toggle-slider:before {
   .product-image-container { height: 80px; }
 }
 
-/* Phone — keep usable (a dedicated phone layout is a later phase) */
+/* Phone — shared baseline for both orientations */
 @media (max-width: 560px) {
   :root { --sidebar-width: 68px; }
   .sidebar-nav-item { height: 54px; }
@@ -2532,6 +2544,184 @@ input:checked + .toggle-slider:before {
   .bo-modal-header { padding: 20px 20px 0; }
   .bo-modal-body { padding: 18px 20px 22px; }
   .bo-modal-footer { padding: 16px 20px 20px; }
+}
+
+/* =========================================================
+   MOBILE PORTRAIT — sidebar becomes a fixed bottom tab bar.
+   Not a scaled-down desktop: primary nav moves to the thumb
+   zone, everything else (cart drawer/FAB from the tablet
+   breakpoint) is reused as-is.
+   ========================================================= */
+@media (max-width: 560px) and (orientation: portrait) {
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: 100%;
+    height: 60px;
+    flex-direction: row;
+    align-items: center;
+    padding: 4px 6px;
+    gap: 2px;
+    border-right: none;
+    border-top: 1px solid var(--border-color);
+    z-index: 70;
+  }
+  .sidebar-brand {
+    display: none;
+  }
+  .sidebar-nav {
+    flex-direction: row;
+    flex: 1;
+    height: 100%;
+    overflow-x: auto;
+    gap: 2px;
+  }
+  .sidebar-nav-item {
+    flex: 1;
+    min-width: 56px;
+    height: 100%;
+  }
+  .sidebar-nav-label {
+    font-size: 9.5px;
+  }
+  .sidebar-footer {
+    flex-direction: row;
+    border-top: none;
+    padding-top: 0;
+    width: auto;
+  }
+  .sidebar-status {
+    display: none;
+  }
+  .sidebar-profile {
+    flex-direction: row;
+    padding: 6px;
+  }
+  .sidebar-profile-info,
+  .sidebar-profile-logout {
+    display: none;
+  }
+  .sidebar-profile-avatar {
+    font-size: 22px;
+  }
+
+  /* Reserve room for the fixed bottom tab bar */
+  .app-main {
+    padding-bottom: 60px;
+  }
+
+  .bottom-control-bar {
+    height: 50px;
+    padding: 0 12px;
+  }
+
+  /* Clear the fixed bottom tab bar */
+  .cart-fab {
+    bottom: 76px;
+  }
+  .pos-side-panel {
+    bottom: 60px;
+  }
+}
+
+/* =========================================================
+   MOBILE LANDSCAPE — short viewport, 3-panel workspace:
+   products | cart items | payment & checkout. The cart no
+   longer needs the tablet drawer/FAB since all three panels
+   fit side by side once the sidebar is collapsed to a rail.
+   ========================================================= */
+@media (max-height: 500px) and (orientation: landscape) {
+  :root { --sidebar-width: 52px; }
+
+  .sidebar-brand-text,
+  .sidebar-nav-label,
+  .sidebar-status,
+  .sidebar-profile-info,
+  .sidebar-profile-logout {
+    display: none;
+  }
+  .sidebar-nav-item {
+    height: 44px;
+  }
+
+  .pos-dashboard {
+    padding: 10px 10px 6px;
+    gap: 10px;
+  }
+  .products-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+  }
+  .product-image-container {
+    height: 56px;
+    margin-bottom: 6px;
+  }
+  .product-name {
+    font-size: 12.5px;
+    min-height: 2.2em;
+  }
+  .product-price {
+    font-size: 13.5px;
+  }
+  .product-add-badge {
+    width: 26px;
+    height: 26px;
+    right: 7px;
+    bottom: 7px;
+  }
+
+  /* Cart goes back to being an always-visible inline panel */
+  .cart-drawer-close,
+  .cart-backdrop,
+  .cart-fab {
+    display: none;
+  }
+  .pos-side-panel {
+    position: static;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    flex: 1.8;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-panel);
+    transform: none;
+  }
+
+  /* Split the cart itself into two panels: items, then payment */
+  .cart-panel-root {
+    flex-direction: row;
+    height: 100%;
+  }
+  .cart-items-column {
+    flex: 1.15;
+    min-width: 0;
+    border-right: 1px solid var(--border-color);
+  }
+  .cart-header {
+    padding: 12px 14px 8px;
+  }
+  .cart-items-list {
+    padding: 0 14px;
+  }
+  .cart-footer {
+    flex: 1;
+    min-width: 150px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 12px 14px !important;
+  }
+
+  .bottom-control-bar {
+    display: none;
+  }
 }
 
 /* =========================================================
