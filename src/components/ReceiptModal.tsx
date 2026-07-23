@@ -73,7 +73,7 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose }) => {
                       </div>
                     </div>
                     {hasDiscount && (
-                      <div style={{ fontSize: '11px', color: '#ef4444', paddingLeft: '8px', marginTop: '-2px', textAlign: 'left' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--danger)', paddingLeft: '8px', marginTop: '-2px', textAlign: 'left' }}>
                         └ 개별할인 적용: -{((item.discount || 0) * (item.discountQty || 0)).toLocaleString()}원
                       </div>
                     )}
@@ -122,19 +122,19 @@ const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose }) => {
                     <span>{subtotalVal.toLocaleString()}원</span>
                   </div>
                   {itemDiscountVal > 0 && (
-                    <div className="bo-receipt-row" style={{ color: '#ef4444' }}>
+                    <div className="bo-receipt-row" style={{ color: 'var(--danger)' }}>
                       <span>품목할인합계</span>
                       <span>-{itemDiscountVal.toLocaleString()}원</span>
                     </div>
                   )}
                   {cartDiscountVal > 0 && (
-                    <div className="bo-receipt-row" style={{ color: '#ef4444' }}>
+                    <div className="bo-receipt-row" style={{ color: 'var(--danger)' }}>
                       <span>전체할인{cartDiscountPct > 0 ? ` (${cartDiscountPct}%)` : ''}</span>
                       <span>-{cartDiscountVal.toLocaleString()}원</span>
                     </div>
                   )}
                   {totalDiscountVal > 0 && (
-                    <div className="bo-receipt-row" style={{ color: '#ef4444', fontWeight: 'bold', borderTop: '1px dotted #e2e8f0', paddingTop: '4px', marginTop: '2px' }}>
+                    <div className="bo-receipt-row" style={{ color: 'var(--danger)', fontWeight: 'bold', borderTop: '1px dotted #e2e8f0', paddingTop: '4px', marginTop: '2px' }}>
                       <span>할인합계</span>
                       <span>-{totalDiscountVal.toLocaleString()}원</span>
                     </div>

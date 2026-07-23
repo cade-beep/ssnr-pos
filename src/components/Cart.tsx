@@ -341,7 +341,7 @@ const Cart: React.FC<CartProps> = ({
         </div>
 
         {itemDiscountAmount > 0 && (
-          <div className="summary-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13.5px', color: '#ef4444', fontWeight: '500' }}>
+          <div className="summary-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13.5px', color: 'var(--danger)', fontWeight: '500' }}>
             <span>품목 할인 합계</span>
             <span>- {itemDiscountAmount.toLocaleString()}원</span>
           </div>
@@ -349,7 +349,7 @@ const Cart: React.FC<CartProps> = ({
 
         <div
           className="summary-row"
-          style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px', fontSize: '13.5px', color: cartDiscountAmount > 0 ? '#ef4444' : 'var(--text-secondary)', fontWeight: cartDiscountAmount > 0 ? '600' : 'normal' }}
+          style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px', fontSize: '13.5px', color: cartDiscountAmount > 0 ? 'var(--danger)' : 'var(--text-secondary)', fontWeight: cartDiscountAmount > 0 ? '600' : 'normal' }}
         >
           <span>전체 할인</span>
           <span>

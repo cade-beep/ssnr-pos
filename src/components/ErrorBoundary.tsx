@@ -73,7 +73,7 @@ export class ErrorBoundary extends Component<Props, State> {
           {this.state.error && (
             <details style={{ marginTop: '32px', textAlign: 'left', background: '#ffffff', border: '1px solid #e5e8eb', padding: '16px', borderRadius: '8px', maxWidth: '600px', width: '100%' }}>
               <summary style={{ fontSize: '13px', color: '#8b95a1', cursor: 'pointer', userSelect: 'none' }}>오류 상세 정보 (개발자 디버그용)</summary>
-              <pre style={{ fontSize: '12px', color: '#ef4444', overflowX: 'auto', marginTop: '12px', whiteSpace: 'pre-wrap' }}>
+              <pre style={{ fontSize: '12px', color: 'var(--danger)', overflowX: 'auto', marginTop: '12px', whiteSpace: 'pre-wrap' }}>
                 {this.state.error.toString()}
               </pre>
             </details>

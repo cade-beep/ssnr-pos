@@ -1164,19 +1164,19 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                 <span>{subtotal.toLocaleString()}원</span>
               </div>
               {itemDiscountAmount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--danger)' }}>
                   <span>품목 할인 합계</span>
                   <span>-{itemDiscountAmount.toLocaleString()}원</span>
                 </div>
               )}
               {cartDiscountAmount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--danger)' }}>
                   <span>전체 할인 ({cartDiscountPercent}%)</span>
                   <span>-{cartDiscountAmount.toLocaleString()}원</span>
                 </div>
               )}
               {discount > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ef4444', fontWeight: 'bold', borderTop: '1px dotted #e2e8f0', paddingTop: '6px', marginTop: '2px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--danger)', fontWeight: 'bold', borderTop: '1px dotted #e2e8f0', paddingTop: '6px', marginTop: '2px' }}>
                   <span>총 할인 금액</span>
                   <span>-{discount.toLocaleString()}원</span>
                 </div>
@@ -1208,7 +1208,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                 {Number(receivedCash) > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 'bold' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>거스름돈</span>
-                    <span style={{ color: '#ef4444', fontSize: '15px' }}>{change.toLocaleString()}원</span>
+                    <span style={{ color: 'var(--danger)', fontSize: '15px' }}>{change.toLocaleString()}원</span>
                   </div>
                 )}
               </div>

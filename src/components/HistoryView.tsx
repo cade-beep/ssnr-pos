@@ -600,14 +600,14 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
                 <div className="bo-stat-value">{stats.grossSales.toLocaleString()}원</div>
               </div>
               <div className="bo-stat-card">
-                <div className="bo-stat-label"><TrendingUp size={16} color="#ef4444" /> 할인 총액</div>
-                <div className="bo-stat-value" style={{ color: '#ef4444' }}>-{stats.totalDiscount.toLocaleString()}원</div>
+                <div className="bo-stat-label"><TrendingUp size={16} color="var(--danger)" /> 할인 총액</div>
+                <div className="bo-stat-value" style={{ color: 'var(--danger)' }}>-{stats.totalDiscount.toLocaleString()}원</div>
               </div>
               <div className="bo-stat-card">
                 <div className="bo-stat-label"><TrendingUp size={16} color="#d97706" /> 오늘 할인액 / 이번 달 할인액</div>
                 <div className="bo-stat-value" style={{ fontSize: '15px', display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}><span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>오늘:</span> <span style={{ color: '#ef4444', fontWeight: 'bold' }}>-{stats.todayDiscount.toLocaleString()}원</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}><span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>이번달:</span> <span style={{ color: '#ef4444', fontWeight: 'bold' }}>-{stats.monthlyDiscount.toLocaleString()}원</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}><span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>오늘:</span> <span style={{ color: 'var(--danger)', fontWeight: 'bold' }}>-{stats.todayDiscount.toLocaleString()}원</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}><span style={{ fontSize: '12px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>이번달:</span> <span style={{ color: 'var(--danger)', fontWeight: 'bold' }}>-{stats.monthlyDiscount.toLocaleString()}원</span></div>
                 </div>
               </div>
               <div className="bo-stat-card">

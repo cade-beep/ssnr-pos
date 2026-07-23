@@ -477,7 +477,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   </div>
                   <div className="bo-data-row">
                     <span className="bo-data-key">환불 처리 건수 / 금액</span>
-                    <span className="bo-data-value" style={{ color: '#ef4444' }}>
+                    <span className="bo-data-value" style={{ color: 'var(--danger)' }}>
                       {closingData.refund_count}건 (-{closingData.refund_amount.toLocaleString()}원)
                     </span>
                   </div>
