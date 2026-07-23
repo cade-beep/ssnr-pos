@@ -2455,8 +2455,8 @@ input:checked + .toggle-slider:before {
   .product-card { padding: 10px; }
   .product-image-container { aspect-ratio: auto; height: 92px; margin-bottom: 8px; }
   .product-info { padding-right: 38px; gap: 2px; }
-  .product-name { font-size: 13.5px; min-height: 2.4em; }
-  .product-price { font-size: 15px; }
+  .product-name { font-size: 15px; min-height: 2.4em; }
+  .product-price { font-size: 16.5px; }
   .product-add-badge { width: 32px; height: 32px; right: 9px; bottom: 9px; }
 
   /* Cart as a right-side overlay drawer */
@@ -2721,11 +2721,11 @@ input:checked + .toggle-slider:before {
     margin-bottom: 6px;
   }
   .product-name {
-    font-size: 12.5px;
+    font-size: 13.5px;
     min-height: 2.2em;
   }
   .product-price {
-    font-size: 13.5px;
+    font-size: 14.5px;
   }
   .product-add-badge {
     width: 26px;
