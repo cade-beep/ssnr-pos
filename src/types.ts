@@ -86,9 +86,6 @@ declare global {
   interface Window {
     electronAPI: {
       platform: string;
-      getProducts: () => Promise<Product[]>;
-      saveReceipt: (receipt: Receipt) => Promise<{ success: boolean; error?: string }>;
-      getSales: () => Promise<any[]>;
     };
   }
 }

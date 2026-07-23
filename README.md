@@ -75,8 +75,8 @@ npm install
 루트 경로에 `.env` 파일을 생성하고 아래 연동 변수 정보를 입력합니다.
 
 ```env
-# Google Apps Script Web App Deployment URL
-GOOGLE_SHEETS_WEBAPP_URL="https://script.google.com/macros/s/YOUR_DEPLOID_ID/exec"
+# Google Apps Script Web App Deployment URL (archive-only: sales are logged here
+# after a successful Supabase write; the app never reads products/settings from it)
 VITE_GOOGLE_SHEETS_WEBAPP_URL="https://script.google.com/macros/s/YOUR_DEPLOID_ID/exec"
 
 # Supabase Auth Configuration
