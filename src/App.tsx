@@ -353,6 +353,20 @@ const App: React.FC = () => {
     showToast(`${product.name}이(가) 추가되었습니다.`, 'success');
   };
 
+  // Product grid card tap — toggles cart membership (add if absent, remove if
+  // already there). Quantity can only be changed from the cart's own +/-
+  // controls afterward; this keeps repeat-tap-to-add (barcode scan, recent-
+  // sold quick chips) using handleAddToCart's increment behavior untouched.
+  const handleToggleCartItem = (product: Product) => {
+    const existing = cart.find((item) => item.product.id === product.id);
+    if (existing) {
+      handleRemoveFromCart(product.id);
+      return;
+    }
+    setCart((prevCart) => [...prevCart, { product, quantity: 1 }]);
+    showToast(`${product.name}이(가) 추가되었습니다.`, 'success');
+  };
+
   // Increase qty
   const handleIncreaseQty = (productId: string) => {
     const product = products.find(p => p.id === productId);
@@ -807,7 +821,7 @@ const App: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <POSGrid products={products.filter(p => p.isActive !== false)} onProductClick={handleAddToCart} cart={cart} />
+                <POSGrid products={products.filter(p => p.isActive !== false)} onProductClick={handleToggleCartItem} onQuickAdd={handleAddToCart} cart={cart} />
               )}
             </div>
             

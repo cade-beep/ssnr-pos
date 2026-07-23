@@ -5,7 +5,11 @@ import { Search, Menu, X, Plus, Check, TrendingUp, Clock, Star, Sparkles } from 
 
 interface POSGridProps {
   products: Product[];
+  // Card tap — toggles cart membership (add if absent, remove if already in cart).
   onProductClick: (product: Product) => void;
+  // Enter-to-add from the search box — always adds/increments, mirroring
+  // barcode-scan behavior; never removes on a repeat trigger.
+  onQuickAdd: (product: Product) => void;
   cart?: CartItem[];
 }
 
@@ -24,7 +28,7 @@ const FAVORITES_STORAGE_KEY = 'ssnr_pos_favorite_products';
 const SALES_INSIGHT_LOOKBACK_DAYS = 30;
 const SALES_INSIGHT_ROW_LIMIT = 1000;
 
-const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }) => {
+const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd, cart = [] }) => {
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('all');
   const [smartFilter, setSmartFilter] = useState<SmartFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -120,7 +124,7 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
     if (e.key === 'Enter') {
       e.preventDefault();
       if (filteredProducts.length > 0) {
-        onProductClick(filteredProducts[0]);
+        onQuickAdd(filteredProducts[0]);
         setSearchTerm('');
       }
     }
@@ -321,6 +325,7 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, cart = [] }
                   className={`product-card ${inCart ? 'in-cart' : ''}`}
                   onClick={() => onProductClick(product)}
                   onKeyDown={(e) => handleCardKeyDown(e, product)}
+                  title={inCart ? '탭하여 장바구니에서 빼기' : '탭하여 장바구니에 담기'}
                 >
                   {/* Product Photo */}
                   <div className="product-image-container">
