@@ -13,7 +13,7 @@ import Logo from './components/Logo';
 import Button from './components/ui/Button';
 import Modal from './components/ui/Modal';
 import { showAlert, showConfirm } from './components/ui/dialogs';
-import { RefreshCw, LogOut } from 'lucide-react';
+import { RefreshCw, LogOut, X } from 'lucide-react';
 import { supabase } from './supabase';
 import { STATIC_PRODUCTS } from './productsData';
 import { auditLog } from './utils/auditLogger';
@@ -45,6 +45,16 @@ const getFriendlyErrorMessage = (error: any): string => {
   return `데이터베이스 처리 중 오류가 발생했습니다.\n(${msg})`;
 };
 
+// A held-aside cart snapshot — local-only, never synced to the server.
+interface CartDraft {
+  id: string;
+  items: CartItem[];
+  discountPercent: number;
+  savedAt: number;
+}
+
+const DRAFTS_STORAGE_KEY = 'ssnr_pos_cart_drafts';
+const MAX_DRAFTS = 3;
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'sales' | 'history' | 'products' | 'customers' | 'employees' | 'settings'>('sales');
@@ -57,6 +67,7 @@ const App: React.FC = () => {
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'error' } | null>(null);
   const [isReceiptChecked, setIsReceiptChecked] = useState<boolean>(true);
   const [cartDiscountPercent, setCartDiscountPercent] = useState<number>(0);
+  const [drafts, setDrafts] = useState<CartDraft[]>([]);
 
   // Cashier Authentication States
   const [currentCashier, setCurrentCashier] = useState<CashierUser | null>(null);
@@ -402,32 +413,97 @@ const App: React.FC = () => {
     }
   };
 
-  // Draft Save/Load
-  const handleSaveDraft = () => {
+  // Draft Save/Load — up to MAX_DRAFTS carts held aside locally (no server sync)
+  const persistDrafts = (next: CartDraft[]) => {
+    setDrafts(next);
+    localStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(next));
+  };
+
+  // Load saved drafts on mount. Also migrates the old single-slot draft key
+  // (`ssnr_pos_cart_draft`) from before multi-slot support existed, so an
+  // in-flight draft from a previous version isn't silently lost.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRAFTS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setDrafts(parsed.slice(0, MAX_DRAFTS));
+        }
+        return;
+      }
+
+      const legacy = localStorage.getItem('ssnr_pos_cart_draft');
+      if (legacy) {
+        const parsedLegacy = JSON.parse(legacy);
+        if (Array.isArray(parsedLegacy) && parsedLegacy.length > 0) {
+          const migrated: CartDraft[] = [{
+            id: `draft-${Date.now()}`,
+            items: parsedLegacy,
+            discountPercent: 0,
+            savedAt: Date.now()
+          }];
+          persistDrafts(migrated);
+        }
+        localStorage.removeItem('ssnr_pos_cart_draft');
+      }
+    } catch (e) {
+      console.error('Failed to load saved drafts', e);
+    }
+  }, []);
+
+  const handleSaveDraft = async () => {
     if (cart.length === 0) {
       showToast('장바구니가 비어있어 임시저장할 수 없습니다.', 'error');
       return;
     }
-    localStorage.setItem('ssnr_pos_cart_draft', JSON.stringify(cart));
-    showToast('🛒 장바구니가 임시저장되었습니다.', 'success');
+
+    let baseDrafts = drafts;
+    if (drafts.length >= MAX_DRAFTS) {
+      const confirmOverwrite = await showConfirm(
+        `임시저장은 최대 ${MAX_DRAFTS}개까지 보관할 수 있습니다.\n가장 오래된 임시저장 내역을 지우고 새로 저장하시겠습니까?`,
+        { title: '임시저장 공간 부족', confirmText: '지우고 저장' }
+      );
+      if (!confirmOverwrite) return;
+      baseDrafts = drafts.slice(1);
+    }
+
+    const newDraft: CartDraft = {
+      id: crypto.randomUUID ? crypto.randomUUID() : `draft-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      items: cart,
+      discountPercent: cartDiscountPercent,
+      savedAt: Date.now()
+    };
+
+    persistDrafts([...baseDrafts, newDraft]);
+    setCart([]);
+    setCartDiscountPercent(0);
+    showToast('🛒 장바구니를 임시저장하고 새 판매를 시작합니다.', 'success');
   };
 
-  // Load draft on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('ssnr_pos_cart_draft');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setCart(parsed);
-          showToast('💾 임시저장된 장바구니를 불러왔습니다.', 'info');
-          localStorage.removeItem('ssnr_pos_cart_draft');
-        }
-      } catch (e) {
-        console.error('Failed to parse draft cart', e);
-      }
+  const handleLoadDraft = async (draftId: string) => {
+    const target = drafts.find(d => d.id === draftId);
+    if (!target) return;
+
+    if (cart.length > 0) {
+      const confirmLoad = await showConfirm(
+        '현재 장바구니에 담긴 상품이 있습니다. 임시저장 내역을 불러오면 현재 장바구니가 대체됩니다.\n계속하시겠습니까?',
+        { title: '임시저장 불러오기', confirmText: '불러오기' }
+      );
+      if (!confirmLoad) return;
     }
-  }, []);
+
+    setCart(target.items);
+    setCartDiscountPercent(target.discountPercent || 0);
+    persistDrafts(drafts.filter(d => d.id !== draftId));
+    showToast('💾 임시저장된 장바구니를 불러왔습니다.', 'info');
+  };
+
+  const handleRemoveDraft = async (draftId: string) => {
+    const confirmed = await showConfirm('이 임시저장 내역을 삭제하시겠습니까?', { title: '임시저장 삭제', danger: true, confirmText: '삭제' });
+    if (!confirmed) return;
+    persistDrafts(drafts.filter(d => d.id !== draftId));
+  };
 
   // Dynamic Recent Products
   const getRecentProducts = (): string[] => {
@@ -871,9 +947,38 @@ const App: React.FC = () => {
                 <span className="toggle-slider"></span>
               </label>
             </div>
-            <Button variant="secondary" size="sm" onClick={handleSaveDraft}>
-              임시저장
-            </Button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Button variant="secondary" size="sm" onClick={handleSaveDraft}>
+                임시저장{drafts.length > 0 ? ` (${drafts.length}/${MAX_DRAFTS})` : ''}
+              </Button>
+              {drafts.length > 0 && (
+                <div className="draft-chips">
+                  {drafts.map((d, idx) => {
+                    const draftTotal = d.items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+                    return (
+                      <div key={d.id} className="draft-chip">
+                        <button
+                          type="button"
+                          className="draft-chip-load"
+                          onClick={() => handleLoadDraft(d.id)}
+                          title={`품목 ${d.items.length}개 · ${draftTotal.toLocaleString()}원 · 클릭하여 불러오기`}
+                        >
+                          임시{idx + 1} ({d.items.length})
+                        </button>
+                        <button
+                          type="button"
+                          className="draft-chip-remove"
+                          onClick={() => handleRemoveDraft(d.id)}
+                          title="임시저장 삭제"
+                        >
+                          <X size={11} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="bottom-right-recent">

@@ -179,6 +179,17 @@
   .recent-chip:hover {
     background: #202026;
   }
+  .draft-chip {
+    background: #2a1f14;
+    border-color: #7c4a12;
+  }
+  .draft-chip-load,
+  .draft-chip-remove {
+    color: #fdba74;
+  }
+  .draft-chip-remove:hover {
+    background: #3a2a18;
+  }
 }
 
 * {
@@ -628,6 +639,55 @@ input:checked + .toggle-slider:before {
   border: 1px solid var(--border-color);
   color: var(--text-secondary);
   cursor: pointer;
+}
+
+/* Held-aside draft chips (local-only "hold sale" slots, max 3) */
+.draft-chips {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.draft-chips::-webkit-scrollbar {
+  display: none;
+}
+.draft-chip {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 20px;
+  padding: 2px 2px 2px 4px;
+}
+.draft-chip-load {
+  border: none;
+  background: transparent;
+  color: #c2410c;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 4px 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.draft-chip-remove {
+  border: none;
+  background: transparent;
+  color: #c2410c;
+  opacity: 0.6;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.draft-chip-remove:hover {
+  background: #ffedd5;
+  opacity: 1;
 }
 
 /* Cart Panel (Toss visual layout) */
