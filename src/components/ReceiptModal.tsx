@@ -1,6 +1,6 @@
 import React from 'react';
 import { Receipt } from '../types';
-import { Printer, CheckCircle } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 import Button from './ui/Button';
 import Modal from './ui/Modal';
 
@@ -10,26 +10,15 @@ interface ReceiptModalProps {
 }
 
 const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose }) => {
-  const handlePrint = () => {
-    // Opens print settings window for active frame/window
-    window.print();
-  };
-
   return (
     <Modal
       maxWidth={440}
       onClose={onClose}
       bodyStyle={{ padding: '24px 24px 4px 24px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
       footer={
-        <>
-          <Button variant="secondary" onClick={handlePrint}>
-            <Printer size={14} />
-            <span>영수증 출력</span>
-          </Button>
-          <Button variant="primary" onClick={onClose}>
-            닫기
-          </Button>
-        </>
+        <Button variant="primary" onClick={onClose}>
+          닫기
+        </Button>
       }
     >
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '16px', flexShrink: 0 }}>
