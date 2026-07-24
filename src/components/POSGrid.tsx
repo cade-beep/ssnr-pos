@@ -170,6 +170,9 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
     filteredProducts.sort((a, b) => (bestSellerRank.get(a.id) ?? 0) - (bestSellerRank.get(b.id) ?? 0));
   } else if (smartFilter === 'recent') {
     filteredProducts.sort((a, b) => (recentSoldRank.get(a.id) ?? 0) - (recentSoldRank.get(b.id) ?? 0));
+  } else {
+    // Default browsing order: product code ascending (P-1, P-2, ... P-10), not DB insertion order.
+    filteredProducts.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
   }
 
   const isProductInCart = (productId: string) => {
@@ -257,37 +260,6 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
         >
           전체
         </button>
-        <button
-          type="button"
-          className={`category-chip smart-chip ${smartFilter === 'bestsellers' ? 'active' : ''}`}
-          onClick={() => setSmartFilter('bestsellers')}
-        >
-          <TrendingUp size={13} /> 인기
-        </button>
-        <button
-          type="button"
-          className={`category-chip smart-chip ${smartFilter === 'recent' ? 'active' : ''}`}
-          onClick={() => setSmartFilter('recent')}
-        >
-          <Clock size={13} /> 최근
-        </button>
-        <button
-          type="button"
-          className={`category-chip smart-chip ${smartFilter === 'favorites' ? 'active' : ''}`}
-          onClick={() => setSmartFilter('favorites')}
-        >
-          <Star size={13} /> 즐겨찾기
-        </button>
-        <button
-          type="button"
-          className="category-chip smart-chip smart-chip--reserved"
-          disabled
-          title="AI 추천 기능은 준비 중입니다"
-        >
-          <Sparkles size={13} /> AI 추천
-        </button>
-
-        <span className="chip-divider" aria-hidden="true" />
 
         {CATEGORIES.map((cat) => (
           <button
@@ -299,6 +271,38 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
             {cat.label}
           </button>
         ))}
+
+        <span className="chip-divider" aria-hidden="true" />
+
+        <button
+          type="button"
+          className={`category-chip smart-chip ${smartFilter === 'favorites' ? 'active' : ''}`}
+          onClick={() => setSmartFilter('favorites')}
+        >
+          <Star size={13} /> 즐겨찾기
+        </button>
+        <button
+          type="button"
+          className={`category-chip smart-chip ${smartFilter === 'recent' ? 'active' : ''}`}
+          onClick={() => setSmartFilter('recent')}
+        >
+          <Clock size={13} /> 최근
+        </button>
+        <button
+          type="button"
+          className={`category-chip smart-chip ${smartFilter === 'bestsellers' ? 'active' : ''}`}
+          onClick={() => setSmartFilter('bestsellers')}
+        >
+          <TrendingUp size={13} /> 인기
+        </button>
+        <button
+          type="button"
+          className="category-chip smart-chip smart-chip--reserved"
+          disabled
+          title="AI 추천 기능은 준비 중입니다"
+        >
+          <Sparkles size={13} /> AI 추천
+        </button>
       </div>
 
       {/* Products Grid */}
@@ -335,7 +339,6 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
                       className="product-image"
                       loading="lazy"
                     />
-                    {product.emoji && <span className="product-emoji-tag">{product.emoji}</span>}
                     <button
                       type="button"
                       className={`product-favorite-btn ${isFavorite ? 'active' : ''}`}

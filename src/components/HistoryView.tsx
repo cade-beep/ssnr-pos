@@ -5,6 +5,7 @@ import { Search, Calendar, RefreshCw, Undo, Coins, TrendingUp, Award, ShoppingBa
 import { auditLog } from '../utils/auditLogger';
 import { withTimeout } from '../utils/asyncHelper';
 import { showAlert, showPrompt } from './ui/dialogs';
+import SalesTrendChart, { TrendBucket } from './SalesTrendChart';
 
 interface HistoryViewProps {
   onSelectReceipt: (receipt: Receipt) => void;
@@ -270,6 +271,48 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
   const topProducts = (Object.entries(stats.itemsSold) as [string, number][])
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
+
+  // Sales trend buckets — hourly for a single day (today/yesterday), daily otherwise.
+  const isHourlyTrend = dateRangeType === 'today' || dateRangeType === 'yesterday';
+  const trendData: TrendBucket[] = (() => {
+    if (isHourlyTrend) {
+      const amountByHour = new Map<number, number>();
+      filteredOrders.forEach(o => {
+        if (o.is_refunded) return;
+        const hour = new Date(o.payment_date_time).getHours();
+        const amt = Number(o.final_total) || Number(o.total_amount) || 0;
+        amountByHour.set(hour, (amountByHour.get(hour) || 0) + amt);
+      });
+      const hoursWithData = [...amountByHour.keys()];
+      const minH = Math.max(0, (hoursWithData.length ? Math.min(...hoursWithData) : 9) - 1);
+      const maxH = Math.min(23, (hoursWithData.length ? Math.max(...hoursWithData) : 20) + 1);
+      const buckets: TrendBucket[] = [];
+      for (let h = minH; h <= maxH; h++) {
+        buckets.push({ key: String(h), label: `${h}시`, value: amountByHour.get(h) || 0 });
+      }
+      return buckets;
+    }
+
+    const amountByDay = new Map<string, number>();
+    filteredOrders.forEach(o => {
+      if (o.is_refunded) return;
+      const dayKey = new Date(o.payment_date_time).toISOString().split('T')[0];
+      const amt = Number(o.final_total) || Number(o.total_amount) || 0;
+      amountByDay.set(dayKey, (amountByDay.get(dayKey) || 0) + amt);
+    });
+    const { start, end } = resolveDates();
+    const cursor = new Date(start);
+    cursor.setHours(0, 0, 0, 0);
+    const endDay = new Date(end);
+    endDay.setHours(0, 0, 0, 0);
+    const buckets: TrendBucket[] = [];
+    while (cursor <= endDay) {
+      const dayKey = cursor.toISOString().split('T')[0];
+      buckets.push({ key: dayKey, label: `${cursor.getMonth() + 1}/${cursor.getDate()}`, value: amountByDay.get(dayKey) || 0 });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return buckets;
+  })();
 
   // Refund Order & restore inventory (atomic database transaction)
   const handleRefund = async (order: any) => {
@@ -625,8 +668,16 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
               </div>
             </div>
 
+            {/* Sales Trend Chart */}
+            <div className="bo-card">
+              <div className="bo-card-header">
+                <TrendingUp size={16} color="var(--primary)" /> 매출 추이
+              </div>
+              <SalesTrendChart data={trendData} isHourly={isHourlyTrend} />
+            </div>
+
             {/* Bottom Breakdown Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="bo-breakdown-grid">
               
               {/* Payment Methods Ratio */}
               <div className="bo-card">

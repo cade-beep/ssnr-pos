@@ -871,6 +871,7 @@ const App: React.FC = () => {
                 {cart.length > 0 && <span className="cart-fab-count">{cart.length}</span>}
               </span>
               <span className="cart-fab-total">{finalTotal.toLocaleString()}원</span>
+              <ChevronRight size={18} className="cart-fab-arrow" />
             </button>
           </>
         ) : activeTab === 'history' ? (
