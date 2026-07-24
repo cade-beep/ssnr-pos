@@ -4,7 +4,7 @@ import { supabase } from '../supabase';
 import { auditLog } from '../utils/auditLogger';
 import Logo from './Logo';
 import Button from './ui/Button';
-import { showAlert } from './ui/dialogs';
+import { showAlert, showPrompt } from './ui/dialogs';
 
 interface LoginOverlayProps {
   onLoginSuccess: (user: CashierUser) => void;
@@ -82,6 +82,27 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
       setSignUpError(err.message || '회원가입 처리 중 오류가 발생했습니다.');
     } finally {
       setIsSigningUp(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const inputEmail = await showPrompt(
+      '가입하신 아이디(이메일)를 입력해 주세요. 비밀번호 재설정 메일을 보내드립니다.',
+      { title: '비밀번호 찾기', defaultValue: email }
+    );
+    if (!inputEmail || !inputEmail.trim()) return;
+
+    let targetEmail = inputEmail.trim();
+    if (!targetEmail.includes('@')) {
+      targetEmail = `${targetEmail}@ssnr-pos.com`;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(targetEmail);
+      if (error) throw error;
+      showAlert('📧 비밀번호 재설정 메일을 보냈습니다. 메일함(스팸함 포함)을 확인해 주세요.', { title: '비밀번호 찾기' });
+    } catch (err: any) {
+      showAlert(`⚠️ 비밀번호 재설정 요청에 실패했습니다: ${err.message || err}`, { title: '비밀번호 찾기 실패' });
     }
   };
 
@@ -451,6 +472,17 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
                 <span>로그인</span>
               )}
             </Button>
+
+            {/* Forgot password */}
+            <div style={{ marginTop: '12px', textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                style={{ fontSize: '13px', color: 'var(--text-secondary)', border: 'none', background: 'transparent', cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                비밀번호를 잊으셨나요?
+              </button>
+            </div>
 
             {/* Link to Sign Up */}
             <div style={{ marginTop: '16px', textAlign: 'center' }}>

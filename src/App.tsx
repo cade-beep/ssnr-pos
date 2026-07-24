@@ -12,7 +12,7 @@ import EmployeesView from './components/EmployeesView';
 import Sidebar from './components/Sidebar';
 import Button from './components/ui/Button';
 import Modal from './components/ui/Modal';
-import { showAlert, showConfirm } from './components/ui/dialogs';
+import { showAlert, showConfirm, showPrompt } from './components/ui/dialogs';
 import { RefreshCw, X, ChevronRight, ShoppingCart } from 'lucide-react';
 import { supabase } from './supabase';
 import { STATIC_PRODUCTS } from './productsData';
@@ -141,7 +141,26 @@ const App: React.FC = () => {
       setIsSessionLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        // The recovery link established a temporary session — ask for a new
+        // password instead of treating this as a normal login.
+        const newPassword = await showPrompt('새 비밀번호를 입력해 주세요 (최소 6자).', {
+          title: '비밀번호 재설정',
+          inputType: 'password'
+        });
+        if (newPassword && newPassword.length >= 6) {
+          const { error } = await supabase.auth.updateUser({ password: newPassword });
+          if (error) {
+            showAlert(`⚠️ 비밀번호 변경에 실패했습니다: ${error.message}`, { title: '비밀번호 재설정 실패' });
+          } else {
+            await showAlert('✅ 비밀번호가 변경되었습니다. 새 비밀번호로 다시 로그인해 주세요.', { title: '비밀번호 재설정 완료' });
+          }
+        }
+        await supabase.auth.signOut();
+        return;
+      }
+
       if (session && session.user) {
         const cashierObj = await fetchUserRoleAndStore(session.user);
         setCurrentCashier(cashierObj);

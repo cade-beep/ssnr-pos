@@ -18,7 +18,7 @@ export interface PromptOptions {
   title?: string;
   defaultValue?: string;
   placeholder?: string;
-  inputType?: 'text' | 'number';
+  inputType?: 'text' | 'number' | 'password';
 }
 
 type DialogRequest =
