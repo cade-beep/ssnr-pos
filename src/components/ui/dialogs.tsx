@@ -125,7 +125,7 @@ export const DialogHost: React.FC = () => {
     <Modal
       title={title}
       maxWidth={400}
-      zIndex={3000}
+      zIndex={100000}
       onClose={handleCancel}
       closeOnOverlay={current.kind === 'alert'}
       as={current.kind === 'prompt' ? 'form' : 'div'}
