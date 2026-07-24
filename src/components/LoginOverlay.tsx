@@ -104,7 +104,9 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
       if (error) throw error;
       showAlert('📧 비밀번호 재설정 메일을 보냈습니다. 메일함(스팸함 포함)을 확인해 주세요.', { title: '비밀번호 찾기' });
     } catch (err: any) {
-      showAlert(`⚠️ 비밀번호 재설정 요청에 실패했습니다: ${err.message || err}`, { title: '비밀번호 찾기 실패' });
+      console.error('비밀번호 재설정 요청 실패:', err);
+      const detail = err?.message || err?.error_description || err?.msg || (err?.status ? `서버 응답 코드 ${err.status}` : '알 수 없는 오류');
+      showAlert(`⚠️ 비밀번호 재설정 요청에 실패했습니다: ${detail}`, { title: '비밀번호 찾기 실패' });
     }
   };
 
