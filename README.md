@@ -5,25 +5,24 @@
   <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
   <img src="https://img.shields.io/badge/Electron-47848F?style=for-the-badge&logo=electron&logoColor=white" alt="Electron" />
   <img src="https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" alt="Supabase" />
-  <img src="https://img.shields.io/badge/Google_Sheets-34A853?style=for-the-badge&logo=googlesheets&logoColor=white" alt="Google Sheets" />
   <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
 </p>
 
 <p align="center">
-  <strong>소규모 카페, 베이커리, 동네 상점을 위한 초간편 데스크톱 포스기(POS) 시스템</strong><br />
-  근무자 세션 관리는 <b>Supabase Auth</b>로 안전하게 수행하고, 매출/상품 목록은 <b>구글 스프레드시트</b>를 데이터베이스로 결합하여 투명하게 관리합니다.
+  <strong>소규모 카페, 베이커리, 동네 상점을 위한 데스크톱 포스기(POS) 시스템</strong><br />
+  Supabase(Postgres + Auth)를 메인 DB로 쓰고, 결제 성공 후 구글 스프레드시트에 보조 기록을 남깁니다.
 </p>
 
 ---
 
 ## ✨ Key Features (주요 기능)
 
-- **🔒 Secure Login**: Supabase Auth 기반의 이메일/비밀번호 암호화 근무자 로그인 및 지속 세션 제어
-- **⚡ Fast Checkout**: 직관적이고 반응성 빠른 상품 그리드와 실시간 장바구니 시스템
-- **📊 Real-time Sheet Sync**: 결제 완료 즉시 구글 스프레드시트(Google Spreadsheet)에 결제 내역을 1행 단위로 안전하게 추가 (담당자 자동 기입)
-- **📂 Sales History**: 데스크톱 앱 내에서 실시간 매출 내역을 간편하게 스크롤 및 조회 가능
-- **🎨 Modern Premium UI**: 다크 모드 기반의 글래스모피즘(Glassmorphism) 스타일과 고급스러운 인터랙션
-- **☁️ Zero-Server DB**: 별도의 DB 서버를 직접 구축할 필요 없이 구글 스프레드시트의 편리함과 클라우드 인프라를 그대로 연계
+- **🔒 Secure Login & RBAC**: Supabase Auth 기반 로그인, Owner/Manager/Staff 역할별 권한 분리, 매장(store) 단위 격리
+- **⚡ Fast Checkout**: 반응성 빠른 상품 그리드와 장바구니, 품목별/전체 할인(할인 제외 품목 지정 가능)
+- **📂 Sales History & Refunds**: 매출 내역 조회, 통계 대시보드, 매출 추이 차트, 주문 전체/품목별 부분 환불
+- **🧾 Closing Report**: 마감 정산서 생성, 프린터 드라이버와 무관하게 항상 정확한 폭으로 PDF 저장
+- **👥 Employee & Customer Management**: 직원 초대/권한 관리, 고객 마일리지 조회
+- **📊 Secondary Sheet Log**: 결제 완료 후 구글 스프레드시트에 1행씩 보조 기록 (조회는 앱 내 매출내역이 기준)
 
 ---
 
@@ -33,24 +32,22 @@
 - **UI Framework**: React (v18)
 - **Programming Language**: TypeScript
 - **Bundler & Dev Server**: Vite
-- **Desktop Runtime**: Electron (v29)
-- **Styling**: Vanilla CSS (Premium Glassmorphic Design)
+- **Desktop Runtime**: Electron
+- **Styling**: Vanilla CSS
 
-### Backend & Database (Hybrid)
-- **User Authentication**: Supabase Auth (PostgreSQL DB)
-- **POS Data Storage**: Google Spreadsheet (via Google Apps Script Web API)
+### Backend & Database
+- **Primary DB & Auth**: Supabase (PostgreSQL + Auth)
+- **Secondary Log**: Google Spreadsheet (Google Apps Script Web API, archive-only)
 
 ---
 
 ## 📐 Architecture (시스템 아키텍처)
 
-이 프로젝트는 보안 중심의 로그인 처리와 경량 스프레드시트 결제 아키텍처가 공존합니다:
-
 ```mermaid
 graph TD
-    A[React Client / Electron] -->|1. 로그인/세션 검증| B[Supabase Auth Cloud]
-    A -->|2. 상품 로드 & 결제 기록 저장| C(Google Apps Script Web App)
-    C -->|행 추가 및 갱신| D[Google Spreadsheet DB]
+    A[React Client / Electron] -->|로그인/세션 검증, 상품/주문 CRUD, RPC| B[Supabase Cloud]
+    A -->|결제 성공 후 보조 기록| C(Google Apps Script Web App)
+    C -->|행 추가| D[Google Spreadsheet]
 ```
 
 ---
@@ -75,13 +72,13 @@ npm install
 루트 경로에 `.env` 파일을 생성하고 아래 연동 변수 정보를 입력합니다.
 
 ```env
+# Supabase Configuration (primary DB + Auth)
+VITE_SUPABASE_URL="https://your-supabase-project.supabase.co"
+VITE_SUPABASE_ANON_KEY="your-anon-key-here"
+
 # Google Apps Script Web App Deployment URL (archive-only: sales are logged here
 # after a successful Supabase write; the app never reads products/settings from it)
 VITE_GOOGLE_SHEETS_WEBAPP_URL="https://script.google.com/macros/s/YOUR_DEPLOID_ID/exec"
-
-# Supabase Auth Configuration
-VITE_SUPABASE_URL="https://your-supabase-project.supabase.co"
-VITE_SUPABASE_ANON_KEY="your-anon-key-here"
 ```
 
 ### 3. Run Development (개발 서버 실행)
@@ -92,13 +89,11 @@ npm run dev
 
 ---
 
-## 🚫 Scope Limits (MVP 프로젝트 범위 제한)
+## 🚫 Scope Limits (범위 제한)
 
-이 프로젝트는 심플하고 신뢰도 높은 MVP(최소 기능 제품)를 지향합니다. **다음 기능들은 기본 범위 외(Out of Scope)에 해당합니다:**
-- ❌ 바코드 리더기 및 영수증 프린터 하드웨어 연동
-- ❌ 회원가입 양식 노출 (관리자가 Supabase 대시보드에서 직원 계정 일괄 등록 후 지급)
-- ❌ 다중 매장 및 직원 관리 시스템
-- ❌ 별도의 로컬/서버용 관계형 DB 구축 (구글 스프레드시트 단독 사용)
+- ❌ 바코드 리더기 하드웨어 직접 연동 (바코드 값 매칭 로직은 있음, 리더기 자체 드라이버 연동은 없음)
+- ❌ 감열 영수증 프린터 ESC/POS 직접 연동 (정산서 PDF 저장으로 대체)
+- ❌ 재고 관리 (도입했다가 폐기됨 — 소규모 매장 특성상 실익이 없다고 판단)
 
 ---
 

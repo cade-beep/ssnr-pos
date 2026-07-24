@@ -6,8 +6,6 @@ export interface Product {
   emoji: string;
   color?: string; // Card accent color
   imageUrl?: string;
-  stock?: number;
-  lowStockThreshold?: number;
   barcode?: string;
   isActive?: boolean;
   store_id?: string;

@@ -6,7 +6,7 @@ import { auditLog } from '../utils/auditLogger';
 import { withTimeout } from '../utils/asyncHelper';
 import Button from './ui/Button';
 import Modal from './ui/Modal';
-import { Field, Input, Select } from './ui/Field';
+import { Field, Select } from './ui/Field';
 import { showAlert, showConfirm } from './ui/dialogs';
 import { downloadElementAsPdf } from '../utils/pdfExport';
 
@@ -37,14 +37,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const reportRef = useRef<HTMLDivElement>(null);
 
   // Printer settings states
-  const [printerName, setPrinterName] = useState(() => localStorage.getItem('ssnr_pos_printer_name') || '기본 프린터');
-  const [printerPort, setPrinterPort] = useState(() => localStorage.getItem('ssnr_pos_printer_port') || 'USB001');
   const [paperWidth, setPaperWidth] = useState(() => localStorage.getItem('ssnr_pos_paper_width') || '80');
 
   const handleSavePrinterSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('ssnr_pos_printer_name', printerName);
-    localStorage.setItem('ssnr_pos_printer_port', printerPort);
     localStorage.setItem('ssnr_pos_paper_width', paperWidth);
     showToast('🖨️ 프린터 설정이 저장되었습니다.');
   };
@@ -354,20 +350,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             <Printer size={16} color="var(--primary)" /> 영수증 프린터 설정
           </div>
           <form onSubmit={handleSavePrinterSettings} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <Field label="프린터 장치명">
-              <Input type="text" value={printerName} onChange={e => setPrinterName(e.target.value)} style={{ height: '36px' }} />
+            <Field label="용지 폭 (mm)">
+              <Select value={paperWidth} onChange={e => setPaperWidth(e.target.value)} style={{ height: '36px' }}>
+                <option value="80">80mm</option>
+                <option value="58">58mm</option>
+              </Select>
             </Field>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <Field label="포트" style={{ flex: 1 }}>
-                <Input type="text" value={printerPort} onChange={e => setPrinterPort(e.target.value)} style={{ height: '36px' }} />
-              </Field>
-              <Field label="용지 폭 (mm)" style={{ flex: 1 }}>
-                <Select value={paperWidth} onChange={e => setPaperWidth(e.target.value)} style={{ height: '36px' }}>
-                  <option value="80">80mm</option>
-                  <option value="58">58mm</option>
-                </Select>
-              </Field>
-            </div>
             <Button type="submit" variant="primary" size="sm" fullWidth style={{ marginTop: '4px' }}>
               프린터 설정 저장
             </Button>
