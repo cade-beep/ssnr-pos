@@ -98,7 +98,9 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
     }
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(targetEmail);
+      const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+        redirectTo: window.location.origin
+      });
       if (error) throw error;
       showAlert('📧 비밀번호 재설정 메일을 보냈습니다. 메일함(스팸함 포함)을 확인해 주세요.', { title: '비밀번호 찾기' });
     } catch (err: any) {
