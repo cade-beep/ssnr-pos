@@ -40,6 +40,13 @@ DROP POLICY IF EXISTS "Allow admin all user_roles" ON public.user_roles;
 DROP POLICY IF EXISTS "Allow auth read inventory_movements" ON public.inventory_movements;
 DROP POLICY IF EXISTS "Allow admin read product_audit_logs" ON public.product_audit_logs;
 
+-- Compat policies from 20260723000000_restore_english_schema_compatibility.sql also
+-- depend on store_id and must be dropped before the type ALTERs below can run.
+DROP POLICY IF EXISTS products_compat_select ON public.products;
+DROP POLICY IF EXISTS products_compat_owner_write ON public.products;
+DROP POLICY IF EXISTS orders_compat_select ON public.orders;
+DROP POLICY IF EXISTS user_roles_compat_select ON public.user_roles;
+
 -- Drop check triggers temporarily so updates do not block during migration run
 DROP TRIGGER IF EXISTS trg_check_product_write ON public.products;
 DROP TRIGGER IF EXISTS trg_check_customer_write ON public.customers;
@@ -131,9 +138,6 @@ ALTER TABLE public.inventory_movements ALTER COLUMN store_id SET DEFAULT public.
 ALTER TABLE public.product_audit_logs ALTER COLUMN store_id SET DEFAULT public.get_user_store_id();
 
 -- 6. Create customers table
-ALTER TABLE public.customers ALTER COLUMN store_id DROP DEFAULT;
-ALTER TABLE public.subscriptions ALTER COLUMN store_id DROP DEFAULT;
-
 CREATE TABLE IF NOT EXISTS public.customers (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   store_id VARCHAR(255) NOT NULL DEFAULT 'ssnr-pos-9877',
@@ -153,6 +157,9 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
   expires_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+ALTER TABLE public.customers ALTER COLUMN store_id DROP DEFAULT;
+ALTER TABLE public.subscriptions ALTER COLUMN store_id DROP DEFAULT;
 
 -- Alter types for them just in case they were previously created as UUID
 ALTER TABLE public.customers ALTER COLUMN store_id TYPE VARCHAR(255) USING store_id::VARCHAR;
@@ -1027,8 +1034,8 @@ DECLARE
   v_caller_store VARCHAR(255);
   v_caller_role VARCHAR(50);
 BEGIN
-  SELECT store_id, role INTO v_caller_store, v_caller_role FROM public.user_roles WHERE user_id = v_caller_id;
-  
+  SELECT ur.store_id, ur.role INTO v_caller_store, v_caller_role FROM public.user_roles ur WHERE ur.user_id = v_caller_id;
+
   IF v_caller_role IS DISTINCT FROM 'Owner' THEN
     RAISE EXCEPTION '직원 목록 조회 권한이 없습니다. 소유자만 조회할 수 있습니다.';
   END IF;
