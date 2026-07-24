@@ -19,6 +19,7 @@ interface CartProps {
   onCheckout: () => void;
   onApplyDiscount: (percent: number) => void;
   onApplyItemDiscount: (productId: string, amount: number, qty: number, isPercent?: boolean, percentVal?: number) => void;
+  onToggleDiscountExclusion: (productId: string) => void;
   onSetQuantity: (productId: string, quantity: number) => void;
   role: 'Owner' | 'Manager' | 'Staff';
 }
@@ -36,6 +37,7 @@ const Cart: React.FC<CartProps> = ({
   onCheckout,
   onApplyDiscount,
   onApplyItemDiscount,
+  onToggleDiscountExclusion,
   onSetQuantity,
   role,
 }) => {
@@ -257,6 +259,14 @@ const Cart: React.FC<CartProps> = ({
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                   <div className="cart-item-name">
                     {item.product.name}
+                    {item.excludeFromCartDiscount && (
+                      <span
+                        className="bo-badge"
+                        style={{ marginLeft: '6px', fontSize: '10px', fontWeight: '700', padding: '1px 6px', borderRadius: '4px', background: '#f1f5f9', color: 'var(--text-secondary)' }}
+                      >
+                        할인 제외
+                      </span>
+                    )}
                   </div>
                   <div className="cart-item-total" style={{ width: 'auto', textAlign: 'right' }}>
                     {((isDiscounted ? finalItemPrice : item.product.price) * item.quantity).toLocaleString()}원
@@ -313,14 +323,25 @@ const Cart: React.FC<CartProps> = ({
 
                     {/* Dedicated Per-Item Discount Button */}
                     {role !== 'Staff' && (
-                      <button
-                        type="button"
-                        className={`item-discount-btn ${isDiscounted ? 'discounted' : ''}`}
-                        onClick={() => openItemDiscountModal(item)}
-                      >
-                        <span>🏷️</span>
-                        <span>{isDiscounted ? '할인 수정' : '할인'}</span>
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className={`item-discount-btn ${isDiscounted ? 'discounted' : ''}`}
+                          onClick={() => openItemDiscountModal(item)}
+                        >
+                          <span>🏷️</span>
+                          <span>{isDiscounted ? '할인 수정' : '할인'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className={`item-exclude-btn ${item.excludeFromCartDiscount ? 'active' : ''}`}
+                          onClick={() => onToggleDiscountExclusion(item.product.id)}
+                          title="전체 할인 적용 시 이 상품을 제외합니다"
+                        >
+                          <span>{item.excludeFromCartDiscount ? '✅' : '⬜'}</span>
+                          <span>할인 제외</span>
+                        </button>
+                      </>
                     )}
                   </div>
 

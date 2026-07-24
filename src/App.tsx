@@ -570,13 +570,24 @@ const App: React.FC = () => {
     setCart((prevCart) =>
       prevCart.map((item) =>
         item.product.id === productId
-          ? { 
-              ...item, 
-              discount: Math.max(0, amount), 
+          ? {
+              ...item,
+              discount: Math.max(0, amount),
               discountQty: Math.max(0, qty),
               isPercent: !!isPercent,
               discountPercent: percentVal || 0
             }
+          : item
+      )
+    );
+  };
+
+  // Toggle whether a cart item is excluded from the cart-wide percentage discount
+  const handleToggleItemDiscountExclusion = (productId: string) => {
+    setCart((prevCart) =>
+      prevCart.map((item) =>
+        item.product.id === productId
+          ? { ...item, excludeFromCartDiscount: !item.excludeFromCartDiscount }
           : item
       )
     );
@@ -595,7 +606,12 @@ const App: React.FC = () => {
   const originalSubtotal = safeNumber(cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0));
   const totalItemDiscount = safeNumber(cart.reduce((sum, item) => sum + getItemDiscountInfo(item).totalDiscount, 0));
   const subtotalAfterItemDiscounts = Math.max(0, originalSubtotal - totalItemDiscount);
-  const cartDiscountAmount = safeNumber(Math.round(subtotalAfterItemDiscounts * (Math.min(100, Math.max(0, cartDiscountPercent)) / 100)));
+  const discountableSubtotalAfterItemDiscounts = safeNumber(
+    cart
+      .filter((item) => !item.excludeFromCartDiscount)
+      .reduce((sum, item) => sum + (item.product.price * item.quantity - getItemDiscountInfo(item).totalDiscount), 0)
+  );
+  const cartDiscountAmount = safeNumber(Math.round(discountableSubtotalAfterItemDiscounts * (Math.min(100, Math.max(0, cartDiscountPercent)) / 100)));
   const totalDiscount = safeNumber(totalItemDiscount + cartDiscountAmount);
   const finalTotal = Math.max(0, subtotalAfterItemDiscounts - cartDiscountAmount);
 
@@ -851,6 +867,7 @@ const App: React.FC = () => {
                 }}
                 onApplyDiscount={handleApplyGlobalDiscount}
                 onApplyItemDiscount={handleApplyItemDiscount}
+                onToggleDiscountExclusion={handleToggleItemDiscountExclusion}
                 onSetQuantity={handleSetQty}
                 role={currentCashier.role}
               />

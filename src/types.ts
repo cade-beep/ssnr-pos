@@ -36,6 +36,7 @@ export interface CartItem {
   discountQty?: number; // 할인을 적용할 수량 (개수)
   isPercent?: boolean; // 퍼센트 할인 여부
   discountPercent?: number; // 할인 퍼센트 수치 (예: 10)
+  excludeFromCartDiscount?: boolean; // 전체 할인 계산에서 이 품목을 제외할지 여부
 }
 
 export interface CashierUser {
