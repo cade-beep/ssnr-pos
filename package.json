@@ -21,6 +21,8 @@
   "license": "ISC",
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
