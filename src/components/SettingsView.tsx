@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CashierUser } from '../types';
 import { supabase } from '../supabase';
-import { FileSpreadsheet, Lock, RefreshCw, BarChart, ShieldCheck, Printer } from 'lucide-react';
+import { FileSpreadsheet, Lock, RefreshCw, BarChart, ShieldCheck, Printer, Download } from 'lucide-react';
 import { auditLog } from '../utils/auditLogger';
 import { withTimeout } from '../utils/asyncHelper';
 import Button from './ui/Button';
 import Modal from './ui/Modal';
 import { Field, Input, Select } from './ui/Field';
 import { showAlert, showConfirm } from './ui/dialogs';
+import { downloadElementAsPdf } from '../utils/pdfExport';
 
 interface SettingsViewProps {
   currentCashier: CashierUser;
@@ -32,6 +33,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [closingData, setClosingData] = useState<any>(null);
   const [savingClose, setSavingClose] = useState(false);
   const [activeCloseReport, setActiveCloseReport] = useState<any>(null);
+  const [isExportingReportPdf, setIsExportingReportPdf] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   // Printer settings states
   const [printerName, setPrinterName] = useState(() => localStorage.getItem('ssnr_pos_printer_name') || '기본 프린터');
@@ -237,6 +240,21 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handlePrintReport = () => {
     window.print();
+  };
+
+  const handleDownloadReportPdf = async () => {
+    if (!reportRef.current || isExportingReportPdf) return;
+    setIsExportingReportPdf(true);
+    try {
+      const widthMm = Number(localStorage.getItem('ssnr_pos_paper_width')) || 58;
+      const dateStr = activeCloseReport ? new Date(activeCloseReport.closed_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+      await downloadElementAsPdf(reportRef.current, `정산서_${dateStr}.pdf`, widthMm);
+    } catch (err: any) {
+      console.error(err);
+      showAlert(`⚠️ PDF 저장에 실패했습니다: ${err.message || String(err)}`, { title: 'PDF 저장 실패' });
+    } finally {
+      setIsExportingReportPdf(false);
+    }
   };
 
   if (currentCashier.role === 'Staff') {
@@ -520,13 +538,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                 <Printer size={14} />
                 <span>정산서 출력</span>
               </Button>
+              <Button variant="secondary" onClick={handleDownloadReportPdf} disabled={isExportingReportPdf}>
+                <Download size={14} />
+                <span>{isExportingReportPdf ? '저장 중...' : 'PDF로 저장'}</span>
+              </Button>
               <Button variant="primary" onClick={() => setActiveCloseReport(null)}>
                 닫기
               </Button>
             </>
           }
         >
-              <div className="receipt-paper">
+              <div className="bo-receipt-paper" ref={reportRef}>
                 <div style={{ textAlign: 'center', marginBottom: '16px' }}>
                   <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0 }}>일일 마감 정산서</h2>
                   <p style={{ color: 'var(--text-muted)', fontSize: '12px', margin: '4px 0 0 0' }}>서산나래 미니 포스</p>

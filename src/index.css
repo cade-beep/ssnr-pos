@@ -2393,12 +2393,10 @@ input:checked + .toggle-slider:before {
   body * {
     visibility: hidden;
   }
-  .bo-receipt-paper, .bo-receipt-paper *,
-  .receipt-paper, .receipt-paper * {
+  .bo-receipt-paper, .bo-receipt-paper * {
     visibility: visible;
   }
-  .bo-receipt-paper,
-  .receipt-paper {
+  .bo-receipt-paper {
     position: absolute;
     left: 0;
     top: 0;
