@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Receipt, PaymentMethod, CartItem } from '../types';
 import { supabase } from '../supabase';
-import { Search, Calendar, RefreshCw, Undo, Coins, TrendingUp, Award, ShoppingBag, Eye } from 'lucide-react';
+import { Search, Calendar, RefreshCw, Undo, Coins, TrendingUp, Award, ShoppingBag, Eye, ListChecks } from 'lucide-react';
 import { auditLog } from '../utils/auditLogger';
 import { withTimeout } from '../utils/asyncHelper';
 import { showAlert, showPrompt } from './ui/dialogs';
 import SalesTrendChart, { TrendBucket } from './SalesTrendChart';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
 
 interface HistoryViewProps {
   onSelectReceipt: (receipt: Receipt) => void;
@@ -26,6 +28,10 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'CARD' | 'TRANSFER'>('all');
   const [refundFilter, setRefundFilter] = useState<'all' | 'active' | 'refunded'>('all');
   const [selectedProduct, setSelectedProduct] = useState('all');
+
+  // Item-level refund modal state
+  const [itemRefundOrder, setItemRefundOrder] = useState<any | null>(null);
+  const [selectedRefundItemIds, setSelectedRefundItemIds] = useState<number[]>([]);
 
   // List of distinct product names for drop-down filter
   const [availableProducts, setAvailableProducts] = useState<string[]>([]);
@@ -79,6 +85,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
           is_refunded,
           refunded_at,
           refunded_by,
+          refunded_amount,
           subtotal,
           item_discount_amount,
           cart_discount_percent,
@@ -86,6 +93,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
           total_discount,
           final_total,
           order_items (
+            id,
             product_id,
             product_name,
             product_price,
@@ -93,7 +101,9 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
             discount,
             discount_qty,
             is_percent,
-            discount_percent
+            discount_percent,
+            is_refunded,
+            refunded_amount
           )
         `)
         .gte('payment_date_time', start.toISOString())
@@ -210,14 +220,19 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
       : (itemDiscountVal + cartDiscountVal);
 
     const netSalesVal = Number(curr.final_total) || Number(curr.total_amount) || 0;
+    const refundedAmountVal = Number(curr.refunded_amount) || 0;
 
     if (curr.is_refunded) {
       acc.refundCount += 1;
       acc.refundAmount += netSalesVal;
     } else {
+      // Partially-refunded orders (some order_items refunded, order itself
+      // still active) contribute only their remaining, non-refunded amount.
+      const effectiveNetSalesVal = Math.max(0, netSalesVal - refundedAmountVal);
       acc.grossSales += subtotalVal;
       acc.totalDiscount += totalDiscountVal;
-      acc.netSales += netSalesVal;
+      acc.netSales += effectiveNetSalesVal;
+      acc.refundAmount += refundedAmountVal;
       acc.salesCount += 1;
       acc.totalQty += Number(curr.total_quantity) || 0;
 
@@ -232,12 +247,12 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
       if (orderDate.getMonth() === today.getMonth() && orderDate.getFullYear() === today.getFullYear()) {
         acc.monthlyDiscount += totalDiscountVal;
       }
-      
+
       if (curr.payment_method === 'CARD') {
-        acc.cardAmount += netSalesVal;
+        acc.cardAmount += effectiveNetSalesVal;
         acc.cardCount += 1;
       } else {
-        acc.transferAmount += netSalesVal;
+        acc.transferAmount += effectiveNetSalesVal;
         acc.transferCount += 1;
       }
 
@@ -280,7 +295,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
       filteredOrders.forEach(o => {
         if (o.is_refunded) return;
         const hour = new Date(o.payment_date_time).getHours();
-        const amt = Number(o.final_total) || Number(o.total_amount) || 0;
+        const amt = Math.max(0, (Number(o.final_total) || Number(o.total_amount) || 0) - (Number(o.refunded_amount) || 0));
         amountByHour.set(hour, (amountByHour.get(hour) || 0) + amt);
       });
       const hoursWithData = [...amountByHour.keys()];
@@ -297,7 +312,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
     filteredOrders.forEach(o => {
       if (o.is_refunded) return;
       const dayKey = new Date(o.payment_date_time).toISOString().split('T')[0];
-      const amt = Number(o.final_total) || Number(o.total_amount) || 0;
+      const amt = Math.max(0, (Number(o.final_total) || Number(o.total_amount) || 0) - (Number(o.refunded_amount) || 0));
       amountByDay.set(dayKey, (amountByDay.get(dayKey) || 0) + amt);
     });
     const { start, end } = resolveDates();
@@ -351,7 +366,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
         context: { orderNumber: order.order_number, reason: reason.trim() }
       });
 
-      showToast(`↩️ 주문번호 [${order.order_number}] 환불 완료 및 재고가 복원되었습니다.`);
+      showToast(`↩️ 주문번호 [${order.order_number}] 환불이 완료되었습니다.`);
       fetchHistory();
     } catch (err: any) {
       console.error(err);
@@ -369,6 +384,79 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
         showAlert('🌐 인터넷 연결이 원활하지 않습니다. 네트워크 설정을 점검한 후 다시 시도해 주세요.', { title: '환불 처리 실패' });
       } else {
         showAlert(`⚠️ 환불 처리 실패: ${errMsg}`, { title: '환불 처리 실패' });
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Open the item-level refund modal for a given order
+  const openItemRefundModal = (order: any) => {
+    setItemRefundOrder(order);
+    setSelectedRefundItemIds([]);
+  };
+
+  const toggleRefundItemSelection = (itemId: number) => {
+    setSelectedRefundItemIds((prev) =>
+      prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [...prev, itemId]
+    );
+  };
+
+  const handleRefundSelectedItems = async () => {
+    if (!itemRefundOrder || selectedRefundItemIds.length === 0 || isLoading) return;
+
+    const reason = await showPrompt(
+      `선택한 ${selectedRefundItemIds.length}개 품목을 환불하시겠습니까?\n사유를 입력해 주세요 (필수):`,
+      { title: '⚠️ 품목별 환불 처리', defaultValue: '고객 단순 변심' }
+    );
+    if (reason === null) return;
+    if (!reason.trim()) {
+      showAlert('환불 사유를 작성해야 환불 처리가 가능합니다.', { title: '품목별 환불 처리' });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data: rpcData, error: rpcError } = await withTimeout(
+        supabase.rpc('refund_order_items', {
+          p_order_number: itemRefundOrder.order_number,
+          p_item_ids: selectedRefundItemIds,
+          p_reason: reason.trim()
+        }),
+        10000
+      );
+
+      if (rpcError) throw rpcError;
+      if (!rpcData || !rpcData.success) {
+        throw new Error(rpcData?.message || '서버 품목별 환불 처리에 실패했습니다.');
+      }
+
+      auditLog({
+        action: 'REFUND',
+        result: 'SUCCESS',
+        context: { orderNumber: itemRefundOrder.order_number, reason: reason.trim(), itemIds: selectedRefundItemIds }
+      });
+
+      showToast(`↩️ 선택한 품목 환불이 완료되었습니다 (-${Number(rpcData.refunded_amount).toLocaleString()}원).`);
+      setItemRefundOrder(null);
+      setSelectedRefundItemIds([]);
+      fetchHistory();
+    } catch (err: any) {
+      console.error(err);
+      const errMsg = err.message || String(err);
+
+      auditLog({
+        action: 'API_FAILURE',
+        result: 'FAIL',
+        context: { actionType: 'REFUND_ITEMS', orderNumber: itemRefundOrder.order_number, error: errMsg }
+      });
+
+      if (errMsg.includes('permission denied') || errMsg.includes('row-level security') || errMsg.includes('policy')) {
+        showAlert('⚠️ 환불 권한이 없습니다. 관리자(어드민) 계정만 결제 취소 및 환불 처리가 가능합니다.', { title: '품목별 환불 처리 실패' });
+      } else if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) {
+        showAlert('🌐 인터넷 연결이 원활하지 않습니다. 네트워크 설정을 점검한 후 다시 시도해 주세요.', { title: '품목별 환불 처리 실패' });
+      } else {
+        showAlert(`⚠️ 품목별 환불 처리 실패: ${errMsg}`, { title: '품목별 환불 처리 실패' });
       }
     } finally {
       setIsLoading(false);
@@ -605,6 +693,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
                         <td className="text-center">
                           {o.is_refunded ? (
                             <span className="bo-badge bo-badge--danger bo-badge--pill">환불완료</span>
+                          ) : Number(o.refunded_amount) > 0 ? (
+                            <span className="bo-badge bo-badge--danger bo-badge--pill">부분환불</span>
                           ) : (
                             <span className="bo-badge bo-badge--success bo-badge--pill">정상판매</span>
                           )}
@@ -615,9 +705,14 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
                               <Eye size={14} />
                             </button>
                             {!o.is_refunded && role !== 'Staff' && (
-                              <button type="button" className="bo-action-btn bo-action-btn--danger" onClick={() => handleRefund(o)} title="환불 처리">
-                                <Undo size={14} />
-                              </button>
+                              <>
+                                <button type="button" className="bo-action-btn bo-action-btn--danger" onClick={() => handleRefund(o)} title="전체 환불 처리">
+                                  <Undo size={14} />
+                                </button>
+                                <button type="button" className="bo-action-btn" onClick={() => openItemRefundModal(o)} title="품목별 환불">
+                                  <ListChecks size={14} />
+                                </button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -738,7 +833,62 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
           </div>
         )}
       </div>
-      
+
+      {/* Item-level Refund Modal */}
+      {itemRefundOrder && (
+        <Modal
+          title="🧾 품목별 환불"
+          description={`주문번호 [${itemRefundOrder.order_number}] — 환불할 품목을 선택하세요.`}
+          maxWidth={440}
+          onClose={() => !isLoading && setItemRefundOrder(null)}
+          closeOnOverlay
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+            {itemRefundOrder.order_items
+              ?.filter((item: any) => item.product_id !== 'DISCOUNT')
+              .map((item: any) => (
+                <label
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '10px 12px',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '10px',
+                    opacity: item.is_refunded ? 0.5 : 1,
+                    cursor: item.is_refunded ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    disabled={item.is_refunded}
+                    checked={selectedRefundItemIds.includes(item.id)}
+                    onChange={() => toggleRefundItemSelection(item.id)}
+                  />
+                  <span style={{ flex: 1 }}>
+                    {item.product_name} x {item.quantity}
+                    {item.is_refunded && (
+                      <span style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--danger)' }}>(환불됨)</span>
+                    )}
+                  </span>
+                  <span style={{ fontWeight: '700' }}>
+                    {(Number(item.product_price) * Number(item.quantity) - Number(item.discount || 0) * Number(item.discount_qty || 0)).toLocaleString()}원
+                  </span>
+                </label>
+              ))}
+          </div>
+          <Button
+            variant="primary"
+            size="md"
+            fullWidth
+            disabled={selectedRefundItemIds.length === 0 || isLoading}
+            onClick={handleRefundSelectedItems}
+          >
+            선택한 {selectedRefundItemIds.length}개 품목 환불하기
+          </Button>
+        </Modal>
+      )}
     </div>
   );
 };
