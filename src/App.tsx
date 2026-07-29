@@ -643,9 +643,30 @@ const App: React.FC = () => {
     const finalIdempotencyKey = activeIdempotencyKey || (crypto.randomUUID ? crypto.randomUUID() : `SSNR-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
 
     try {
-      // Prepare cart payload for RPC
+      // Prepare cart payload for RPC. Each item's line_total is the exact amount actually
+      // charged for that line: its post-item-discount value minus its share of the cart-wide
+      // discount (0 if the item is excluded from the cart discount). The last discountable item
+      // absorbs the rounding remainder so the shares always sum to exactly cartDiscountAmount.
+      const discountableItemIds = cart
+        .filter(item => !item.excludeFromCartDiscount)
+        .map(item => item.product.id);
+      const lastDiscountableItemId = discountableItemIds[discountableItemIds.length - 1];
+      let remainingCartDiscount = cartDiscountAmount;
+
       const cartPayload = cart.map(item => {
         const info = getItemDiscountInfo(item);
+        const postItemDiscountValue = item.product.price * item.quantity - info.totalDiscount;
+
+        let cartDiscountShare = 0;
+        if (!item.excludeFromCartDiscount && discountableSubtotalAfterItemDiscounts > 0) {
+          if (item.product.id === lastDiscountableItemId) {
+            cartDiscountShare = remainingCartDiscount;
+          } else {
+            cartDiscountShare = Math.round(cartDiscountAmount * (postItemDiscountValue / discountableSubtotalAfterItemDiscounts));
+            remainingCartDiscount -= cartDiscountShare;
+          }
+        }
+
         return {
           product_id: item.product.id,
           product_name: item.product.name,
@@ -654,7 +675,8 @@ const App: React.FC = () => {
           discount: info.unitDiscount,
           discount_qty: info.isPercent ? item.quantity : (item.discountQty || 0),
           is_percent: info.isPercent,
-          discount_percent: info.discountPercent
+          discount_percent: info.discountPercent,
+          line_total: postItemDiscountValue - cartDiscountShare
         };
       });
 
@@ -667,7 +689,8 @@ const App: React.FC = () => {
           discount: 0,
           discount_qty: 0,
           is_percent: false,
-          discount_percent: 0
+          discount_percent: 0,
+          line_total: -cartDiscountAmount
         });
       }
 
