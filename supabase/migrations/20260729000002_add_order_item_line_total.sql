@@ -25,14 +25,14 @@ WITH order_totals AS (
   GROUP BY oi.order_id
 )
 UPDATE public.order_items oi
-SET line_total = GREATEST(0,
+SET line_total = GREATEST(0, ROUND(
   (oi.product_price * oi.quantity - COALESCE(oi.discount, 0) * COALESCE(oi.discount_qty, 0))
   - CASE
       WHEN ot.discountable_subtotal > 0
       THEN COALESCE(o.cart_discount_amount, 0) * (oi.product_price * oi.quantity - COALESCE(oi.discount, 0) * COALESCE(oi.discount_qty, 0)) / ot.discountable_subtotal
       ELSE 0
     END
-)
+))
 FROM public.orders o, order_totals ot
 WHERE oi.order_id = o.id AND oi.order_id = ot.order_id AND oi.product_id <> 'DISCOUNT';
 
