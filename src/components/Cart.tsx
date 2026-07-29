@@ -21,7 +21,7 @@ interface CartProps {
   onApplyItemDiscount: (productId: string, amount: number, qty: number, isPercent?: boolean, percentVal?: number) => void;
   onToggleDiscountExclusion: (productId: string) => void;
   onSetQuantity: (productId: string, quantity: number) => void;
-  role: 'Owner' | 'Manager' | 'Staff';
+  role: 'Owner' | 'Staff';
 }
 
 const Cart: React.FC<CartProps> = ({

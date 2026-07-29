@@ -4,7 +4,7 @@ import Logo from './Logo';
 import { ShoppingBag, Receipt, Package, Users, UserCog, Settings, LogOut, LucideIcon } from 'lucide-react';
 
 type TabKey = 'sales' | 'history' | 'products' | 'customers' | 'employees' | 'settings';
-type Role = 'Owner' | 'Manager' | 'Staff';
+type Role = 'Owner' | 'Staff';
 
 interface SidebarProps {
   activeTab: TabKey;
@@ -14,12 +14,12 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS: { key: TabKey; label: string; icon: LucideIcon; roles: Role[] }[] = [
-  { key: 'sales', label: '판매', icon: ShoppingBag, roles: ['Owner', 'Manager', 'Staff'] },
-  { key: 'history', label: '판매내역', icon: Receipt, roles: ['Owner', 'Manager', 'Staff'] },
-  { key: 'products', label: '상품관리', icon: Package, roles: ['Owner', 'Manager', 'Staff'] },
-  { key: 'customers', label: '고객', icon: Users, roles: ['Owner', 'Manager'] },
+  { key: 'sales', label: '판매', icon: ShoppingBag, roles: ['Owner', 'Staff'] },
+  { key: 'history', label: '판매내역', icon: Receipt, roles: ['Owner', 'Staff'] },
+  { key: 'products', label: '상품관리', icon: Package, roles: ['Owner', 'Staff'] },
+  { key: 'customers', label: '고객', icon: Users, roles: ['Owner'] },
   { key: 'employees', label: '직원', icon: UserCog, roles: ['Owner'] },
-  { key: 'settings', label: '설정', icon: Settings, roles: ['Owner', 'Manager'] },
+  { key: 'settings', label: '설정', icon: Settings, roles: ['Owner'] },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, currentCashier, onLogout }) => {

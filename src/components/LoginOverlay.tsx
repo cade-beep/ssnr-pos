@@ -162,7 +162,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
           console.log("Logged-in Session User ID (Dev Bypass):", session?.user.id);
           console.log("Logged-in Session User Email (Dev Bypass):", session?.user.email);
 
-          let devRole: 'Owner' | 'Manager' | 'Staff' = 'Owner';
+          let devRole: 'Owner' | 'Staff' = 'Owner';
           let devStoreId = 'ssnr-pos-9877';
 
           if (session?.user.id) {
@@ -172,7 +172,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
               .eq('user_id', session.user.id)
               .single();
             if (roleData) {
-              devRole = roleData.role as 'Owner' | 'Manager' | 'Staff';
+              devRole = roleData.role as 'Owner' | 'Staff';
               devStoreId = roleData.store_id;
             }
           }
@@ -232,7 +232,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
         console.log("Logged-in Session User Email:", session?.user.email);
 
         // Query user_roles table
-        let finalRole: 'Owner' | 'Manager' | 'Staff' = 'Staff';
+        let finalRole: 'Owner' | 'Staff' = 'Staff';
         let finalStoreId = 'ssnr-pos-9877';
 
         // 메타데이터 이름이 없으면 이메일 ID 앞자리를 이름으로 사용 (rbflrbgh -> rbflrbgh)
@@ -249,7 +249,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
             .single();
 
           if (roleData) {
-            finalRole = roleData.role as 'Owner' | 'Manager' | 'Staff';
+            finalRole = roleData.role as 'Owner' | 'Staff';
             finalStoreId = roleData.store_id;
           } else {
             // admin 이메일이거나 김규호 계정이면 자동으로 관리자로 설정

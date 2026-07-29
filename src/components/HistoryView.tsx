@@ -12,7 +12,7 @@ import Button from './ui/Button';
 interface HistoryViewProps {
   onSelectReceipt: (receipt: Receipt) => void;
   showToast: (msg: string) => void;
-  role: 'Owner' | 'Manager' | 'Staff';
+  role: 'Owner' | 'Staff';
 }
 
 const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, role }) => {

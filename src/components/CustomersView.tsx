@@ -4,7 +4,7 @@ import { supabase } from '../supabase';
 import { Search } from 'lucide-react';
 
 interface CustomersViewProps {
-  role: 'Owner' | 'Manager' | 'Staff';
+  role: 'Owner' | 'Staff';
   showToast: (msg: string) => void;
 }
 

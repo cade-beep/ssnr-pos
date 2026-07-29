@@ -112,7 +112,7 @@ const App: React.FC = () => {
         id: user.id,
         email: user.email || '',
         name: displayName,
-        role: data.role as 'Owner' | 'Manager' | 'Staff',
+        role: data.role as 'Owner' | 'Staff',
         store_id: data.store_id
       };
     } catch (err) {
@@ -226,7 +226,7 @@ const App: React.FC = () => {
   // `role` must be passed explicitly by the caller (not read from `currentCashier`
   // state) because callers invoke this in the same tick as `setCurrentCashier(...)`,
   // and this closure would otherwise see the pre-update (stale) state value.
-  async function loadProducts(role?: 'Owner' | 'Manager' | 'Staff') {
+  async function loadProducts(role?: 'Owner' | 'Staff') {
     try {
       const { data, error } = await withTimeout(
         supabase
@@ -241,7 +241,7 @@ const App: React.FC = () => {
 
       if (!data || (data as any[]).length === 0) {
         // Only an Owner account can seed products — the DB trigger
-        // (trg_check_product_write) rejects INSERTs from Manager/Staff.
+        // (trg_check_product_write) rejects INSERTs from Staff.
         // Attempting it for non-Owner roles used to throw, land in the
         // catch block below, and flash every price to a flat placeholder.
         if (role !== 'Owner') {

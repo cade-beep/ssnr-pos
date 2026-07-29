@@ -12,7 +12,7 @@ interface ProductsViewProps {
   products: Product[];
   onRefresh: () => void;
   showToast: (msg: string) => void;
-  role: 'Owner' | 'Manager' | 'Staff';
+  role: 'Owner' | 'Staff';
 }
 
 const CATEGORIES = [
@@ -298,7 +298,7 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
 
   // Shared form body for the Add/Edit modals (identical fields, small per-mode differences)
   const renderProductFormBody = (mode: 'add' | 'edit') => {
-    const canUpload = mode === 'add' ? role === 'Owner' : role !== 'Manager';
+    const canUpload = mode !== 'add' || role === 'Owner';
     const checkboxId = mode === 'add' ? 'isActive' : 'editIsActive';
     const safeImageUrl = getSafeImageUrl(imageUrl);
 
@@ -349,14 +349,14 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
 
             <div style={{ display: 'flex', gap: '12px' }}>
               <Field label="카테고리" style={{ flex: 1 }}>
-                <Select value={category} onChange={e => setCategory(e.target.value as any)} disabled={role === 'Manager'} style={{ height: '40px' }}>
+                <Select value={category} onChange={e => setCategory(e.target.value as any)} style={{ height: '40px' }}>
                   <option value="bakery">베이커리</option>
                   <option value="food">선물세트</option>
                   <option value="etc">기타</option>
                 </Select>
               </Field>
               <Field label="가격 (원)" style={{ flex: 1 }}>
-                <Input type="number" value={price} onChange={e => setPrice(Math.max(0, Number(e.target.value)))} disabled={role === 'Manager'} min="0" required style={{ height: '40px' }} />
+                <Input type="number" value={price} onChange={e => setPrice(Math.max(0, Number(e.target.value)))} min="0" required style={{ height: '40px' }} />
               </Field>
             </div>
 
@@ -411,10 +411,10 @@ const ProductsView: React.FC<ProductsViewProps> = ({ products, onRefresh, showTo
               {/* Second row: Emoji & Image URL */}
               <div style={{ display: 'flex', gap: '12px' }}>
                 <Field label="이모지" style={{ width: '80px', flexShrink: 0 }}>
-                  <Input type="text" className="bo-input--center" value={emoji} onChange={e => setEmoji(e.target.value)} disabled={role === 'Manager'} placeholder="🍞" style={{ height: '36px', fontSize: '13px' }} />
+                  <Input type="text" className="bo-input--center" value={emoji} onChange={e => setEmoji(e.target.value)} placeholder="🍞" style={{ height: '36px', fontSize: '13px' }} />
                 </Field>
                 <Field label="이미지 URL" style={{ flex: 1 }}>
-                  <Input type="text" value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImageFile(null); }} disabled={role === 'Manager'} placeholder="https://..." style={{ height: '36px', fontSize: '13px' }} />
+                  <Input type="text" value={imageUrl} onChange={e => { setImageUrl(e.target.value); setImageFile(null); }} placeholder="https://..." style={{ height: '36px', fontSize: '13px' }} />
                 </Field>
               </div>
             </div>

@@ -41,7 +41,7 @@ export interface CashierUser {
   id?: string;
   email: string;
   name: string;
-  role: 'Owner' | 'Manager' | 'Staff';
+  role: 'Owner' | 'Staff';
   store_id: string;
 }
 

@@ -8,7 +8,7 @@ import { Field, Input, Select } from './ui/Field';
 import { showAlert, showConfirm } from './ui/dialogs';
 
 interface EmployeesViewProps {
-  role: 'Owner' | 'Manager' | 'Staff';
+  role: 'Owner' | 'Staff';
   storeId: string;
   currentUserId: string | undefined; // to prevent self-deletion or self-demotion
   showToast: (msg: string) => void;
@@ -18,7 +18,7 @@ interface Employee {
   user_id: string;
   email: string;
   name: string;
-  role: 'Owner' | 'Manager' | 'Staff';
+  role: 'Owner' | 'Staff';
   store_id: string;
 }
 
@@ -31,7 +31,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
-  const [employeeRole, setEmployeeRole] = useState<'Owner' | 'Manager' | 'Staff'>('Staff');
+  const [employeeRole, setEmployeeRole] = useState<'Owner' | 'Staff'>('Staff');
   const [submitting, setSubmitting] = useState(false);
 
   const fetchEmployees = async () => {
@@ -97,7 +97,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
     }
   };
 
-  const handleRoleChange = async (userId: string, empName: string, newRole: 'Owner' | 'Manager' | 'Staff') => {
+  const handleRoleChange = async (userId: string, empName: string, newRole: 'Owner' | 'Staff') => {
     if (userId === currentUserId) {
       showAlert('본인의 직급 및 권한을 직접 수정할 수 없습니다.', { title: '변경 불가' });
       return;
@@ -206,8 +206,6 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {emp.role === 'Owner' ? (
                           <ShieldCheck size={18} color="var(--primary)" />
-                        ) : emp.role === 'Manager' ? (
-                          <Shield size={18} color="var(--success)" />
                         ) : (
                           <Shield size={18} color="var(--text-muted)" />
                         )}
@@ -218,7 +216,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
                     </td>
                     <td style={{ color: 'var(--text-secondary)' }}>{emp.email}</td>
                     <td>
-                      <span className={`bo-badge ${emp.role === 'Owner' ? 'bo-badge--primary' : emp.role === 'Manager' ? 'bo-badge--success' : 'bo-badge--neutral'}`}>
+                      <span className={`bo-badge ${emp.role === 'Owner' ? 'bo-badge--primary' : 'bo-badge--neutral'}`}>
                         {emp.role}
                       </span>
                     </td>
@@ -231,7 +229,6 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
                         style={{ height: '32px', width: '120px', margin: '0 auto', opacity: isSelf ? 0.6 : 1 }}
                       >
                         <option value="Owner">Owner</option>
-                        <option value="Manager">Manager</option>
                         <option value="Staff">Staff</option>
                       </select>
                     </td>
@@ -313,7 +310,6 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
               style={{ height: '38px' }}
             >
               <option value="Staff">Staff (할인/환불/설정 불가, 본인 오늘 실적만 조회 가능)</option>
-              <option value="Manager">Manager (제품 CRUD/재고조정 가능하나 가격/이미지 변경 불가, 마감 가능)</option>
               <option value="Owner">Owner (매장 소유주 - 직원 초대 및 모든 권한 가능)</option>
             </Select>
           </Field>

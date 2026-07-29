@@ -344,7 +344,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         )}
 
-        {/* Printer Settings Card - Owner & Manager */}
+        {/* Printer Settings Card */}
         <div className="bo-card">
           <div className="bo-card-header">
             <Printer size={16} color="var(--primary)" /> 영수증 프린터 설정
@@ -362,7 +362,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           </form>
         </div>
 
-        {/* Business close trigger - Owner only (Manager gets it in right column) */}
+        {/* Business close trigger - Owner only */}
         {currentCashier.role === 'Owner' && (
           <div className="bo-card">
             <div className="bo-card-header">
