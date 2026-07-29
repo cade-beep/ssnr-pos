@@ -37,8 +37,10 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    // Validate store code format
-    const cleanStoreId = signUpStoreId.trim();
+    // Validate store code format. Lowercased because store_id is compared
+    // case-sensitively everywhere (RLS policies, get_employees_rpc) — a stray
+    // capital silently files the employee under a store that doesn't exist.
+    const cleanStoreId = signUpStoreId.trim().toLowerCase();
     if (cleanStoreId.length < 3) {
       setSignUpError('매장 코드는 최소 3자 이상이어야 합니다.');
       return;
