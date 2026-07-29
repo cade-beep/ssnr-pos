@@ -379,7 +379,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
       });
 
       if (errMsg.includes('permission denied') || errMsg.includes('row-level security') || errMsg.includes('policy')) {
-        showAlert('⚠️ 환불 권한이 없습니다. 관리자(어드민) 계정만 결제 취소 및 환불 처리가 가능합니다.', { title: '환불 처리 실패' });
+        showAlert('⚠️ 환불 권한이 없습니다. 매장 직원(Staff/Owner) 계정으로 로그인해 주십시오.', { title: '환불 처리 실패' });
       } else if (errMsg.includes('Failed to fetch') || errMsg.includes('NetworkError')) {
         showAlert('🌐 인터넷 연결이 원활하지 않습니다. 네트워크 설정을 점검한 후 다시 시도해 주세요.', { title: '환불 처리 실패' });
       } else {
