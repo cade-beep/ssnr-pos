@@ -70,7 +70,7 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
       if (error) throw error;
 
       auditLog({ action: 'SIGNUP', result: 'SUCCESS', context: { email: finalEmail, storeId: cleanStoreId } });
-      showAlert('🎉 직원 회원가입이 완료되었습니다!\n방금 가입하신 계정으로 로그인을 시도해 주세요.', { title: '회원가입 완료' });
+      showAlert('🎉 직원 회원가입 신청이 완료되었습니다!\n매장 관리자(Owner)의 승인 후 로그인이 가능합니다.', { title: '가입 신청 완료' });
       
       setEmail(signUpEmail);
       setIsSignUp(false);
@@ -246,11 +246,18 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
         if (session?.user.id) {
           const { data: roleData } = await supabase
             .from('user_roles')
-            .select('role, store_id')
+            .select('role, store_id, is_approved')
             .eq('user_id', session.user.id)
             .single();
 
           if (roleData) {
+            if (!roleData.is_approved) {
+              await supabase.auth.signOut();
+              auditLog({ action: 'AUTH_FAILURE', result: 'FAIL', context: { email: user.email, reason: 'pending_approval' } });
+              setLoginError('가입 승인 대기 중입니다. 매장 관리자에게 문의해 주세요.');
+              setIsLoggingIn(false);
+              return;
+            }
             finalRole = roleData.role as 'Owner' | 'Staff';
             finalStoreId = roleData.store_id;
           } else {

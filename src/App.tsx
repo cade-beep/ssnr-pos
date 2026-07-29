@@ -723,6 +723,10 @@ const App: React.FC = () => {
         throw new Error(rpcData?.message || '결제 등록에 실패했습니다.');
       }
 
+      if (rpcData.is_duplicate) {
+        showToast('⚠️ 이미 처리 완료된 중복 결제건입니다.', 'info');
+      }
+
       const receiptItems = cart.map(item => {
         const info = getItemDiscountInfo(item);
         return {

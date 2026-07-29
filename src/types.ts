@@ -43,6 +43,7 @@ export interface CashierUser {
   name: string;
   role: 'Owner' | 'Staff';
   store_id: string;
+  is_approved?: boolean;
 }
 
 export interface Customer {

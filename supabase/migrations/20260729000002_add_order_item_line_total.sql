@@ -25,21 +25,20 @@ WITH order_totals AS (
   GROUP BY oi.order_id
 )
 UPDATE public.order_items oi
-SET line_total = GREATEST(0, ROUND(
+SET line_total = GREATEST(0,
   (oi.product_price * oi.quantity - COALESCE(oi.discount, 0) * COALESCE(oi.discount_qty, 0))
   - CASE
       WHEN ot.discountable_subtotal > 0
       THEN COALESCE(o.cart_discount_amount, 0) * (oi.product_price * oi.quantity - COALESCE(oi.discount, 0) * COALESCE(oi.discount_qty, 0)) / ot.discountable_subtotal
       ELSE 0
     END
-))
+)
 FROM public.orders o, order_totals ot
 WHERE oi.order_id = o.id AND oi.order_id = ot.order_id AND oi.product_id <> 'DISCOUNT';
 
 UPDATE public.order_items SET line_total = product_price WHERE product_id = 'DISCOUNT';
 
--- Store line_total on new sales (complete_sale). Only the insert loop changes from the
--- 20260729000001_harden_complete_sale.sql definition — everything else is identical.
+-- Store line_total on new sales (complete_sale).
 CREATE OR REPLACE FUNCTION public.complete_sale(
   p_idempotency_key VARCHAR,
   p_payment_method VARCHAR,
@@ -174,7 +173,6 @@ BEGIN
     END IF;
   END;
 
-  -- Changed: now also stores line_total, the exact amount charged for this line.
   FOR v_item IN SELECT * FROM JSONB_ARRAY_ELEMENTS(p_items)
   LOOP
     INSERT INTO public.order_items (
@@ -200,9 +198,7 @@ $$ LANGUAGE plpgsql;
 
 GRANT EXECUTE ON FUNCTION public.complete_sale(VARCHAR, VARCHAR, NUMERIC, INTEGER, NUMERIC, NUMERIC, JSONB, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC, NUMERIC) TO authenticated;
 
--- Fix refund_order_items: use the stored line_total instead of recomputing an incomplete
--- formula, and add a server-side product_id <> 'DISCOUNT' guard (previously only enforced
--- client-side in HistoryView.tsx).
+-- Fix refund_order_items: use the stored line_total instead of recomputing an incomplete formula
 CREATE OR REPLACE FUNCTION public.refund_order_items(
   p_order_number VARCHAR,
   p_item_ids BIGINT[],
@@ -294,7 +290,7 @@ BEGIN
     'success', true,
     'order_id', v_order_id,
     'refunded_amount', v_newly_refunded_amount,
-    'fully_refunded', v_remaining_unrefunded = 0
+    'is_fully_refunded', (v_remaining_unrefunded = 0)
   );
 END;
 $$ LANGUAGE plpgsql;

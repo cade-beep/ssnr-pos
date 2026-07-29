@@ -20,6 +20,7 @@ interface Employee {
   name: string;
   role: 'Owner' | 'Staff';
   store_id: string;
+  is_approved: boolean;
 }
 
 const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUserId, showToast }) => {
@@ -51,6 +52,18 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
   useEffect(() => {
     fetchEmployees();
   }, []);
+
+  const handleApproveEmployee = async (userId: string, empName: string) => {
+    try {
+      const { error } = await supabase.rpc('approve_employee_rpc', { p_user_id: userId });
+      if (error) throw error;
+      showToast(`✅ [${empName}] 직원 가입을 승인했습니다.`);
+      fetchEmployees();
+    } catch (err: any) {
+      console.error(err);
+      showAlert(`⚠️ 승인 실패: ${err.message || err}`, { title: '승인 실패' });
+    }
+  };
 
   const handleInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,6 +189,33 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
         </Button>
       </div>
 
+      {/* Pending Approval Requests */}
+      {employees.some(emp => emp.is_approved === false) && (
+        <div className="bo-card" style={{ marginBottom: '16px', borderColor: 'var(--danger)', padding: '16px' }}>
+          <div className="bo-card-header" style={{ color: 'var(--danger)', fontWeight: 'bold', marginBottom: '12px', fontSize: '15px' }}>
+            ⏳ 승인 대기 중인 직원 가입 요청
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {employees.filter(emp => emp.is_approved === false).map(emp => (
+              <div key={emp.user_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-secondary)' }}>
+                <div>
+                  <div className="cell-bold" style={{ fontSize: '14px' }}>{emp.name}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '12.5px' }}>{emp.email}</div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <Button variant="primary" size="sm" onClick={() => handleApproveEmployee(emp.user_id, emp.name)}>
+                    승인
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => handleRemoveEmployee(emp.user_id, emp.name)}>
+                    거절
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Employees Table */}
       <div className="bo-table-wrap" style={{ flex: 1 }}>
         <table className="bo-table">
@@ -193,12 +233,12 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
               <tr>
                 <td colSpan={5} className="cell-empty">불러오는 중...</td>
               </tr>
-            ) : employees.length === 0 ? (
+            ) : employees.filter(emp => emp.is_approved !== false).length === 0 ? (
               <tr>
-                <td colSpan={5} className="cell-empty">등록된 직원이 없습니다.</td>
+                <td colSpan={5} className="cell-empty">등록된 승인 직원이 없습니다.</td>
               </tr>
             ) : (
-              employees.map((emp) => {
+              employees.filter(emp => emp.is_approved !== false).map((emp) => {
                 const isSelf = emp.user_id === currentUserId;
                 return (
                   <tr key={emp.user_id}>

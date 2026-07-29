@@ -114,7 +114,6 @@ BEGIN
     v_calculated_total_amount := v_calculated_total_amount + v_item_expected_total;
   END LOOP;
 
-  -- New: reject an over-sized cart discount instead of silently flooring it to 0.
   IF COALESCE(p_global_discount, 0) > v_calculated_total_amount THEN
     RAISE EXCEPTION '전체 할인 금액(%)이 상품 합계(%)를 초과할 수 없습니다.', p_global_discount, v_calculated_total_amount;
   END IF;
@@ -125,8 +124,6 @@ BEGIN
       v_calculated_total_amount, p_total_amount;
   END IF;
 
-  -- New: catch a racing duplicate insert (two near-simultaneous submits past the check above)
-  -- and normalize it to the same friendly is_duplicate response instead of a raw constraint error.
   BEGIN
     INSERT INTO public.orders (
       order_number, payment_date_time, payment_method, total_amount,
@@ -156,7 +153,7 @@ BEGIN
   LOOP
     INSERT INTO public.order_items (
       order_id, product_id, product_name, product_price, quantity,
-      discount, discount_qty, is_percent, discount_percent
+      discount, discount_qty, is_percent, discount_percent, line_total
     ) VALUES (
       v_order_uuid,
       v_item->>'product_id',
@@ -166,7 +163,8 @@ BEGIN
       COALESCE((v_item->>'discount')::NUMERIC, 0),
       COALESCE((v_item->>'discount_qty')::INTEGER, 0),
       COALESCE((v_item->>'is_percent')::BOOLEAN, false),
-      COALESCE((v_item->>'discount_percent')::NUMERIC, 0)
+      COALESCE((v_item->>'discount_percent')::NUMERIC, 0),
+      COALESCE((v_item->>'line_total')::NUMERIC, 0)
     );
   END LOOP;
 
