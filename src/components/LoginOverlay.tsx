@@ -27,47 +27,91 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!signUpEmail.trim() || !signUpName.trim() || !signUpPassword.trim() || !signUpStoreId.trim()) {
+    const rawEmail = signUpEmail.trim();
+    const rawName = signUpName.trim();
+    const rawPassword = signUpPassword.trim();
+    const cleanStoreId = signUpStoreId.trim().toLowerCase();
+
+    if (!rawEmail || !rawName || !rawPassword || !cleanStoreId) {
       setSignUpError('모든 필드를 올바르게 입력해 주세요.');
       return;
     }
 
-    if (signUpPassword.length < 6) {
+    if (rawPassword.length < 6) {
       setSignUpError('비밀번호는 최소 6자 이상이어야 합니다.');
       return;
     }
 
-    // Validate store code format. Lowercased because store_id is compared
-    // case-sensitively everywhere (RLS policies, get_employees_rpc) — a stray
-    // capital silently files the employee under a store that doesn't exist.
-    const cleanStoreId = signUpStoreId.trim().toLowerCase();
     if (cleanStoreId.length < 3) {
-      setSignUpError('매장 코드는 최소 3자 이상이어야 합니다.');
+      setSignUpError('매장 고유 코드는 최소 3자 이상이어야 합니다.');
       return;
     }
 
     setIsSigningUp(true);
     setSignUpError('');
 
-    let finalEmail = signUpEmail.trim();
+    let finalEmail = rawEmail;
     if (!finalEmail.includes('@')) {
       finalEmail = `${finalEmail}@ssnr-pos.com`;
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email: finalEmail,
-        password: signUpPassword,
-        options: {
-          data: {
-            name: signUpName.trim(),
-            role: 'Staff', // Default to Staff role for employees signing up
-            store_id: cleanStoreId
-          }
-        }
-      });
+      // Step 1: Pre-validate Store ID existence against user_roles / default store
+      const { data: existingStores, error: storeCheckError } = await supabase
+        .from('user_roles')
+        .select('store_id')
+        .eq('store_id', cleanStoreId)
+        .limit(1);
 
-      if (error) throw error;
+      if (storeCheckError) {
+        console.warn('Store check warning:', storeCheckError);
+      }
+
+      if ((!existingStores || existingStores.length === 0) && cleanStoreId !== 'ssnr-pos-9877') {
+        setSignUpError('존재하지 않는 매장 고유 코드(Store ID)입니다. 매장 소유자(Owner)에게 올바른 코드를 확인받아 입력해 주세요.');
+        setIsSigningUp(false);
+        return;
+      }
+
+      // Step 2: Attempt signup via RPC fallback or Auth API
+      let signupSuccess = false;
+
+      // Try self-service signup RPC if available
+      try {
+        const { data: rpcUserId, error: rpcErr } = await supabase.rpc('signup_staff_rpc', {
+          p_email: finalEmail,
+          p_password: rawPassword,
+          p_name: rawName,
+          p_store_id: cleanStoreId
+        });
+
+        if (!rpcErr && rpcUserId) {
+          signupSuccess = true;
+        } else if (rpcErr && !rpcErr.message?.includes('Could not find the function')) {
+          throw rpcErr;
+        }
+      } catch (rpcCatchErr: any) {
+        if (rpcCatchErr?.message && !rpcCatchErr.message.includes('Could not find the function')) {
+          throw rpcCatchErr;
+        }
+      }
+
+      // Fallback to standard Supabase Auth signUp
+      if (!signupSuccess) {
+        const { error: authError } = await supabase.auth.signUp({
+          email: finalEmail,
+          password: rawPassword,
+          options: {
+            data: {
+              name: rawName,
+              role: 'Staff',
+              store_id: cleanStoreId
+            }
+          }
+        });
+
+        if (authError) throw authError;
+      }
 
       auditLog({ action: 'SIGNUP', result: 'SUCCESS', context: { email: finalEmail, storeId: cleanStoreId } });
       showAlert('🎉 직원 회원가입 신청이 완료되었습니다!\n매장 관리자(Owner)의 승인 후 로그인이 가능합니다.', { title: '가입 신청 완료' });
@@ -80,8 +124,48 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
       setSignUpPassword('');
       setSignUpStoreId('');
     } catch (err: any) {
-      console.error('Signup error:', err);
-      setSignUpError(err.message || '회원가입 처리 중 오류가 발생했습니다.');
+      // Requirement 3: Raw original error output to console.error
+      console.error("Signup Error:", err);
+
+      let extractedMsg = "";
+
+      if (typeof err === "string") {
+        extractedMsg = err;
+      } else if (err?.message && typeof err.message === "string" && err.message !== "{}" && err.message !== "[]") {
+        extractedMsg = err.message;
+      } else if (err?.error_description && typeof err.error_description === "string") {
+        extractedMsg = err.error_description;
+      } else if (err?.details && typeof err.details === "string") {
+        extractedMsg = err.details;
+      } else if (err?.name && typeof err.name === "string" && err.name !== "AuthRetryableFetchError" && err.name !== "Error") {
+        extractedMsg = err.name;
+      }
+
+      let userMsg = "";
+
+      // Requirement 1: User-readable Korean error messages
+      if (extractedMsg.includes("User already registered") || extractedMsg.includes("already exists") || extractedMsg.includes("email_already_exists") || extractedMsg.includes("이미")) {
+        userMsg = "이미 가입되어 있는 이메일/아이디입니다. 다른 아이디를 사용하거나 기존 계정으로 로그인해 주세요.";
+      } else if (extractedMsg.includes("Password should be at least") || extractedMsg.includes("password")) {
+        userMsg = "비밀번호는 최소 6자 이상이어야 합니다.";
+      } else if (extractedMsg.includes("invalid email") || extractedMsg.includes("Unable to validate email address")) {
+        userMsg = "올바른 이메일 형식이 아닙니다.";
+      } else if (extractedMsg.includes("Store ID") || extractedMsg.includes("매장")) {
+        userMsg = extractedMsg;
+      } else if (extractedMsg.includes("AuthRetryableFetchError") || err?.status === 500) {
+        userMsg = "인증 서버 가입 처리 오류 (500)가 발생했습니다. 매장 관리자(Owner)에게 [직원] 탭에서 직접 초대해 주시기를 요청해 주세요.";
+      } else if (extractedMsg.includes("Failed to fetch") || extractedMsg.includes("NetworkError") || extractedMsg.includes("fetch failed")) {
+        userMsg = "네트워크 연결 상태가 불안정합니다. 인터넷 연결을 확인해 주십시오.";
+      } else if (extractedMsg) {
+        userMsg = `회원가입 실패: ${extractedMsg}`;
+      }
+
+      // Requirement 2: Never allow empty string or "{}"
+      if (!userMsg || userMsg.trim() === "" || userMsg === "{}" || userMsg.includes("{}")) {
+        userMsg = "회원가입 중 오류가 발생했습니다.";
+      }
+
+      setSignUpError(userMsg);
     } finally {
       setIsSigningUp(false);
     }

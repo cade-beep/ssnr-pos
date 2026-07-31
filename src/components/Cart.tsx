@@ -39,7 +39,6 @@ const Cart: React.FC<CartProps> = ({
   onApplyItemDiscount,
   onToggleDiscountExclusion,
   onSetQuantity,
-  role,
 }) => {
   // Modal Visibility States
   const [isCartDiscountOpen, setIsCartDiscountOpen] = useState(false);
@@ -322,27 +321,23 @@ const Cart: React.FC<CartProps> = ({
                     </div>
 
                     {/* Dedicated Per-Item Discount Button */}
-                    {role !== 'Staff' && (
-                      <>
-                        <button
-                          type="button"
-                          className={`item-discount-btn ${isDiscounted ? 'discounted' : ''}`}
-                          onClick={() => openItemDiscountModal(item)}
-                        >
-                          <span>🏷️</span>
-                          <span>{isDiscounted ? '할인 수정' : '할인'}</span>
-                        </button>
-                        <button
-                          type="button"
-                          className={`item-exclude-btn ${item.excludeFromCartDiscount ? 'active' : ''}`}
-                          onClick={() => onToggleDiscountExclusion(item.product.id)}
-                          title="전체 할인 적용 시 이 상품을 제외합니다"
-                        >
-                          <span>{item.excludeFromCartDiscount ? '✅' : '⬜'}</span>
-                          <span>할인 제외</span>
-                        </button>
-                      </>
-                    )}
+                    <button
+                      type="button"
+                      className={`item-discount-btn ${isDiscounted ? 'discounted' : ''}`}
+                      onClick={() => openItemDiscountModal(item)}
+                    >
+                      <span>🏷️</span>
+                      <span>{isDiscounted ? '할인 수정' : '할인'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`item-exclude-btn ${item.excludeFromCartDiscount ? 'active' : ''}`}
+                      onClick={() => onToggleDiscountExclusion(item.product.id)}
+                      title="전체 할인 적용 시 이 상품을 제외합니다"
+                    >
+                      <span>{item.excludeFromCartDiscount ? '✅' : '⬜'}</span>
+                      <span>할인 제외</span>
+                    </button>
                   </div>
 
                   {/* Remove button */}
@@ -397,17 +392,15 @@ const Cart: React.FC<CartProps> = ({
         </div>
 
         <div className="action-buttons">
-          {role !== 'Staff' && (
-            <Button
-              variant="outline"
-              size="md"
-              fullWidth
-              onClick={() => setIsCartDiscountOpen(true)}
-              disabled={items.length === 0}
-            >
-              🏷️ 할인 적용
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="md"
+            fullWidth
+            onClick={() => setIsCartDiscountOpen(true)}
+            disabled={items.length === 0}
+          >
+            🏷️ 할인 적용
+          </Button>
           <Button
             variant="primary"
             size="lg"

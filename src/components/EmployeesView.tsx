@@ -349,7 +349,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
               onChange={e => setEmployeeRole(e.target.value as any)}
               style={{ height: '38px' }}
             >
-              <option value="Staff">Staff (할인/환불/설정 불가, 본인 오늘 실적만 조회 가능)</option>
+              <option value="Staff">Staff (환불/설정 불가, 본인 오늘 실적만 조회 가능)</option>
               <option value="Owner">Owner (매장 소유주 - 직원 초대 및 모든 권한 가능)</option>
             </Select>
           </Field>
