@@ -19,6 +19,7 @@ import { STATIC_PRODUCTS } from './productsData';
 import { auditLog } from './utils/auditLogger';
 import { withTimeout } from './utils/asyncHelper';
 import { archiveSale } from './services/archiveSaleService';
+import { saveOfflineSale, initOfflineQueueSync } from './lib/offlineQueue';
 
 const getFriendlyErrorMessage = (error: any): string => {
   if (!error) return '알 수 없는 오류가 발생했습니다.';
@@ -247,6 +248,32 @@ const App: React.FC = () => {
       return () => clearInterval(interval);
     }
   }, [currentCashier, activeTab]);
+
+  useEffect(() => {
+    const cleanup = initOfflineQueueSync(async (offlineSale) => {
+      const { error } = await supabase.rpc('complete_sale', {
+        p_idempotency_key: offlineSale.id,
+        p_payment_method: offlineSale.payment_method,
+        p_total_amount: offlineSale.final_total,
+        p_total_quantity: offlineSale.items.reduce((sum, i) => sum + i.quantity, 0),
+        p_received_amount: offlineSale.received_cash,
+        p_change: offlineSale.change_amount,
+        p_items: offlineSale.items,
+        p_global_discount: offlineSale.cart_discount_amount,
+        p_subtotal: offlineSale.final_total + offlineSale.total_discount,
+        p_item_discount_amount: offlineSale.item_discount_amount,
+        p_cart_discount_percent: offlineSale.cart_discount_percent,
+        p_cart_discount_amount: offlineSale.cart_discount_amount,
+        p_total_discount: offlineSale.total_discount,
+        p_final_total: offlineSale.final_total
+      });
+      return !error;
+    }, (syncedCount) => {
+      showToast(`⚡ 오프라인 결제 ${syncedCount}건이 DB에 자동 동기화되었습니다!`, 'success');
+    });
+
+    return cleanup;
+  }, []);
 
   // Fetch products from Supabase and auto-seed if database is empty.
   // `role` must be passed explicitly by the caller (not read from `currentCashier`
@@ -832,6 +859,38 @@ const App: React.FC = () => {
       }, 150);
     } catch (err: any) {
       console.error('Checkout error:', err);
+
+      const errStr = err?.message || String(err);
+      const isNetworkFail = !navigator.onLine || errStr.includes('Failed to fetch') || errStr.includes('NetworkError') || errStr.includes('Timeout');
+
+      if (isNetworkFail && currentCashier) {
+        saveOfflineSale({
+          id: finalIdempotencyKey,
+          store_id: currentCashier.store_id,
+          items: cart.map(i => ({
+            product_id: i.product.id,
+            quantity: i.quantity,
+            unit_price: i.product.price,
+            discount_amount: getItemDiscountInfo(i).totalDiscount
+          })),
+          payment_method: paymentMethod,
+          received_cash: receivedCashVal || finalTotal,
+          change_amount: changeVal || 0,
+          cart_discount_percent: cartDiscountPercent,
+          cart_discount_amount: cartDiscountAmount,
+          item_discount_amount: totalItemDiscount,
+          total_discount: totalDiscount,
+          final_total: finalTotal,
+          created_at: new Date().toISOString()
+        });
+
+        showToast('⚠️ 오프라인 상태로 결제 보관되었습니다. 인터넷 연결 시 자동 동기화됩니다.', 'info');
+        setIsPaymentModalOpen(false);
+        setCart([]);
+        setCartDiscountPercent(0);
+        setActiveIdempotencyKey(null);
+        return;
+      }
       
       // Log failed transaction
       auditLog({
