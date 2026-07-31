@@ -44,6 +44,8 @@ export interface CashierUser {
   role: 'Owner' | 'Staff';
   store_id: string;
   is_approved?: boolean;
+  can_refund?: boolean;
+  can_view_reports?: boolean;
 }
 
 export interface Customer {

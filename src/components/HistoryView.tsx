@@ -704,7 +704,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
                             <button type="button" className="bo-action-btn" onClick={() => handleSelectOrderForReceipt(o)} title="영수증 상세">
                               <Eye size={14} />
                             </button>
-                            {!o.is_refunded && role !== 'Staff' && (
+                            {!o.is_refunded && (
                               <>
                                 <button type="button" className="bo-action-btn bo-action-btn--danger" onClick={() => handleRefund(o)} title="전체 환불 처리">
                                   <Undo size={14} />
