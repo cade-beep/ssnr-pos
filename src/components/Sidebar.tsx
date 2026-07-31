@@ -11,6 +11,7 @@ interface SidebarProps {
   onTabChange: (tab: TabKey) => void;
   currentCashier: CashierUser;
   onLogout: () => void;
+  pendingStaffCount?: number;
 }
 
 const NAV_ITEMS: { key: TabKey; label: string; icon: LucideIcon; roles: Role[] }[] = [
@@ -22,7 +23,7 @@ const NAV_ITEMS: { key: TabKey; label: string; icon: LucideIcon; roles: Role[] }
   { key: 'settings', label: '설정', icon: Settings, roles: ['Owner'] },
 ];
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, currentCashier, onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, currentCashier, onLogout, pendingStaffCount }) => {
   const [online, setOnline] = useState<boolean>(navigator.onLine);
 
   useEffect(() => {
@@ -52,9 +53,28 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, currentCashie
             type="button"
             className={`sidebar-nav-item ${activeTab === key ? 'active' : ''}`}
             onClick={() => onTabChange(key)}
+            style={{ position: 'relative' }}
           >
             <span className="sidebar-nav-icon"><Icon size={20} /></span>
             <span className="sidebar-nav-label">{label}</span>
+            {key === 'employees' && pendingStaffCount && pendingStaffCount > 0 ? (
+              <span
+                className="pending-badge"
+                title={`${pendingStaffCount}명의 승인 대기 직원이 있습니다`}
+                style={{
+                  marginLeft: 'auto',
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  padding: '2px 6px',
+                  borderRadius: '10px',
+                  lineHeight: '1'
+                }}
+              >
+                {pendingStaffCount}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>

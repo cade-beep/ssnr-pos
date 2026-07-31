@@ -222,6 +222,32 @@ const App: React.FC = () => {
     }
   }, [activeTab, currentCashier]);
 
+  const [pendingStaffCount, setPendingStaffCount] = useState<number>(0);
+
+  const fetchPendingStaff = async () => {
+    if (!currentCashier || currentCashier.role !== 'Owner') {
+      setPendingStaffCount(0);
+      return;
+    }
+    try {
+      const { data } = await supabase.rpc('get_employees_rpc');
+      if (data) {
+        const pending = data.filter((e: any) => e.is_approved === false).length;
+        setPendingStaffCount(pending);
+      }
+    } catch (err) {
+      console.warn('Pending staff count check failed:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchPendingStaff();
+    if (currentCashier?.role === 'Owner') {
+      const interval = setInterval(fetchPendingStaff, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [currentCashier, activeTab]);
+
   // Fetch products from Supabase and auto-seed if database is empty.
   // `role` must be passed explicitly by the caller (not read from `currentCashier`
   // state) because callers invoke this in the same tick as `setCurrentCashier(...)`,
@@ -862,6 +888,7 @@ const App: React.FC = () => {
         onTabChange={setActiveTab}
         currentCashier={currentCashier}
         onLogout={handleLogout}
+        pendingStaffCount={pendingStaffCount}
       />
 
       <main className="app-main">
