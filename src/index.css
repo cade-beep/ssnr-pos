@@ -2739,6 +2739,16 @@ input:checked + .toggle-slider:before {
     align-items: center;
     justify-content: center;
   }
+  .cart-fab-discount-tag {
+    font-size: 12px;
+    font-weight: 700;
+    background: #fee2e2;
+    color: #ef4444;
+    padding: 3px 8px;
+    border-radius: 12px;
+    margin-left: 2px;
+    letter-spacing: -0.2px;
+  }
 
   .bottom-control-bar { padding: 0 16px; }
   .bottom-right-recent { display: none; }

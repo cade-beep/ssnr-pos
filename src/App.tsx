@@ -922,7 +922,7 @@ const App: React.FC = () => {
             {/* Tablet drawer backdrop (only visible when the cart is open in drawer mode) */}
             <div className="cart-backdrop" onClick={() => setCartCollapsed(true)} />
 
-            {/* Tablet floating cart button — opens the drawer, shows live count + total */}
+            {/* Tablet floating cart button — opens the drawer, shows live count, discount tag + total */}
             <button
               type="button"
               className="cart-fab"
@@ -933,6 +933,11 @@ const App: React.FC = () => {
                 <ShoppingCart size={22} />
                 {cart.length > 0 && <span className="cart-fab-count">{cart.length}</span>}
               </span>
+              {totalDiscount > 0 && (
+                <span className="cart-fab-discount-tag">
+                  🏷️ -{totalDiscount.toLocaleString()}원
+                </span>
+              )}
               <span className="cart-fab-total">{finalTotal.toLocaleString()}원</span>
               <ChevronRight size={18} className="cart-fab-arrow" />
             </button>

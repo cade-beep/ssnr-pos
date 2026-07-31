@@ -293,8 +293,8 @@ const Cart: React.FC<CartProps> = ({
                 </div>
 
                 {/* Bottom Row: Controls [-] 1 [+]   🏷 Discount   ✕ */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '2px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', flexWrap: 'wrap', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                     {/* Quantity Controls */}
                     <div className="cart-item-controls">
                       <button
