@@ -190,13 +190,13 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
       </div>
 
       {/* Pending Approval Requests */}
-      {employees.some(emp => emp.is_approved === false) && (
+      {employees.some(emp => !emp.is_approved) && (
         <div className="bo-card" style={{ marginBottom: '16px', borderColor: 'var(--danger)', padding: '16px' }}>
           <div className="bo-card-header" style={{ color: 'var(--danger)', fontWeight: 'bold', marginBottom: '12px', fontSize: '15px' }}>
             ⏳ 승인 대기 중인 직원 가입 요청
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {employees.filter(emp => emp.is_approved === false).map(emp => (
+            {employees.filter(emp => !emp.is_approved).map(emp => (
               <div key={emp.user_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid var(--border-color)', borderRadius: '10px', backgroundColor: 'var(--bg-secondary)' }}>
                 <div>
                   <div className="cell-bold" style={{ fontSize: '14px' }}>{emp.name}</div>
@@ -233,12 +233,12 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({ role, storeId, currentUse
               <tr>
                 <td colSpan={5} className="cell-empty">불러오는 중...</td>
               </tr>
-            ) : employees.filter(emp => emp.is_approved !== false).length === 0 ? (
+            ) : employees.filter(emp => emp.is_approved).length === 0 ? (
               <tr>
                 <td colSpan={5} className="cell-empty">등록된 승인 직원이 없습니다.</td>
               </tr>
             ) : (
-              employees.filter(emp => emp.is_approved !== false).map((emp) => {
+              employees.filter(emp => emp.is_approved).map((emp) => {
                 const isSelf = emp.user_id === currentUserId;
                 return (
                   <tr key={emp.user_id}>
