@@ -9,6 +9,8 @@ export interface Product {
   barcode?: string;
   isActive?: boolean;
   store_id?: string;
+  discountType?: 'none' | 'regular' | 'expiry';
+  discountPercent?: number;
 }
 
 export interface ClosingReport {

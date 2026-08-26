@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'danger-outline' | 'outline' | 'ghost';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -9,7 +9,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   fullWidth?: boolean;
 }
 
-const Button: React.FC<ButtonProps> = ({
+const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
   variant = 'secondary',
   size = 'md',
   fullWidth = false,
@@ -17,16 +17,18 @@ const Button: React.FC<ButtonProps> = ({
   type = 'button',
   children,
   ...rest
-}) => {
+}, ref) => {
   const classes = ['btn', `btn--${variant}`, `btn--${size}`];
   if (fullWidth) classes.push('btn--full');
   if (className) classes.push(className);
 
   return (
-    <button type={type} className={classes.join(' ')} {...rest}>
+    <button ref={ref} type={type} className={classes.join(' ')} {...rest}>
       {children}
     </button>
   );
-};
+});
+
+Button.displayName = 'Button';
 
 export default Button;

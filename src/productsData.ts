@@ -8,6 +8,42 @@ export const STATIC_PRODUCTS: Omit<StaticProduct, 'id'>[] = [
 
   // BAKERY
   {
+    name: '[임박할인] 단팥빵',
+    category: 'bakery',
+    emoji: '🍞',
+    price: 1800,
+    imageUrl: '/images/p-1.png',
+    discountType: 'expiry',
+    discountPercent: 30
+  },
+  {
+    name: '[임박할인] 소보로빵',
+    category: 'bakery',
+    emoji: '🍞',
+    price: 1800,
+    imageUrl: '/images/p-3.png',
+    discountType: 'expiry',
+    discountPercent: 30
+  },
+  {
+    name: '[할인] 소보로단팥빵',
+    category: 'bakery',
+    emoji: '🍞',
+    price: 2000,
+    imageUrl: '/images/p-5.png',
+    discountType: 'regular',
+    discountPercent: 10
+  },
+  {
+    name: '[할인] 완두앙금빵',
+    category: 'bakery',
+    emoji: '🍞',
+    price: 1800,
+    imageUrl: '/images/p-7.png',
+    discountType: 'regular',
+    discountPercent: 10
+  },
+  {
     name: '단팥빵',
     category: 'bakery',
     emoji: '🍞',

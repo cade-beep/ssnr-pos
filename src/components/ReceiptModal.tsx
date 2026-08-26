@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Receipt } from '../types';
 import { CheckCircle } from 'lucide-react';
 import Button from './ui/Button';
@@ -7,18 +7,51 @@ import Modal from './ui/Modal';
 interface ReceiptModalProps {
   receipt: Receipt;
   onClose: () => void;
+  autoCloseDelay?: number;
 }
 
-const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose }) => {
+const ReceiptModal: React.FC<ReceiptModalProps> = ({ receipt, onClose, autoCloseDelay = 3000 }) => {
+  const [timeLeft, setTimeLeft] = useState<number>(() => {
+    return autoCloseDelay > 0 ? Math.ceil(autoCloseDelay / 1000) : 0;
+  });
+
+  useEffect(() => {
+    if (!autoCloseDelay || autoCloseDelay <= 0) return;
+
+    const timer = setTimeout(() => {
+      onClose();
+    }, autoCloseDelay);
+
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, [autoCloseDelay, onClose]);
+
   return (
     <Modal
       maxWidth={440}
       onClose={onClose}
       bodyStyle={{ padding: '24px 24px 4px 24px', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
       footer={
-        <Button variant="primary" onClick={onClose}>
-          닫기
-        </Button>
+        <div style={{ display: 'flex', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+          {autoCloseDelay > 0 && timeLeft > 0 ? (
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              ⏱️ <strong>{timeLeft}초</strong> 후 자동 닫힘 (ESC 로 즉시 닫기)
+            </span>
+          ) : (
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              ESC 로 즉시 닫기
+            </span>
+          )}
+          <Button variant="primary" onClick={onClose}>
+            닫기
+          </Button>
+        </div>
       }
     >
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '16px', flexShrink: 0 }}>

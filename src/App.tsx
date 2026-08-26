@@ -611,7 +611,7 @@ const App: React.FC = () => {
 
   // Helper to safely calculate item discount details
   const getItemDiscountInfo = (item: CartItem) => {
-    if (item.discountPercent && item.discountPercent > 0) {
+    if (item.discountPercent !== undefined && item.discountPercent > 0) {
       const pct = Math.min(100, Math.max(0, item.discountPercent));
       const unitDiscount = Math.round(item.product.price * (pct / 100));
       return {
@@ -620,13 +620,22 @@ const App: React.FC = () => {
         discountPercent: pct,
         isPercent: true
       };
-    } else if (item.discount && item.discount > 0) {
+    } else if (item.discount !== undefined && item.discount > 0) {
       const discountQty = item.discountQty ?? item.quantity;
       return {
         unitDiscount: item.discount,
         totalDiscount: item.discount * discountQty,
         discountPercent: 0,
         isPercent: false
+      };
+    } else if (item.product.discountPercent && item.product.discountPercent > 0) {
+      const pct = item.product.discountPercent;
+      const unitDiscount = Math.round(item.product.price * (pct / 100));
+      return {
+        unitDiscount,
+        totalDiscount: unitDiscount * item.quantity,
+        discountPercent: pct,
+        isPercent: true
       };
     }
     return {
@@ -1194,12 +1203,21 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const [method, setMethod] = useState<PaymentMethod>('CARD');
   const [receivedCash, setReceivedCash] = useState<string>('');
   const [change, setChange] = useState<number>(0);
+  const submitButtonRef = React.useRef<HTMLButtonElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
     onPaymentComplete(method, Number(receivedCash) || totalAmount, change);
   };
+
+  // 모달 오픈 시 결제 버튼에 자동 포커스
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      submitButtonRef.current?.focus();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const cashVal = Number(receivedCash) || 0;
@@ -1220,32 +1238,40 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     const handleModalKeyDown = (e: KeyboardEvent) => {
       if (isSubmitting) return;
 
-      if (e.key === '1' || e.key === 'F5') {
-        e.preventDefault();
-        setMethod('CARD');
-      } else if (e.key === '2' || e.key === 'F6') {
-        e.preventDefault();
-        setMethod('TRANSFER');
+      const target = e.target as HTMLElement;
+      const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+
+      if (!isTyping) {
+        if (e.key === '1' || e.key === 'F5') {
+          e.preventDefault();
+          setMethod('CARD');
+        } else if (e.key === '2' || e.key === 'F6') {
+          e.preventDefault();
+          setMethod('TRANSFER');
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          onPaymentComplete(method, Number(receivedCash) || totalAmount, change);
+        }
       }
     };
     window.addEventListener('keydown', handleModalKeyDown);
     return () => window.removeEventListener('keydown', handleModalKeyDown);
-  }, [isSubmitting]);
+  }, [isSubmitting, method, receivedCash, totalAmount, change, onPaymentComplete]);
 
   return (
     <Modal
       as="form"
       maxWidth={440}
       title="결제 처리"
-      description="결제 수단을 선택하고 결제액을 확인합니다."
+      description="결제 수단을 선택하고 결제액을 확인합니다. (단축키: 1 카드, 2 계좌이체, Enter 결제)"
       onClose={onClose}
       onSubmit={handleSubmit}
       bodyStyle={{ paddingBottom: '10px' }}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>취소</Button>
-          <Button type="submit" variant="primary" disabled={isSubmitting}>
-            {isSubmitting ? '결제 처리 중...' : '결제 완료'}
+          <Button ref={submitButtonRef} type="submit" variant="primary" disabled={isSubmitting}>
+            {isSubmitting ? '결제 처리 중...' : '결제 완료 (Enter)'}
           </Button>
         </>
       }
