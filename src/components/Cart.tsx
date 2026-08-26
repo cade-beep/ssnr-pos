@@ -220,10 +220,9 @@ const Cart: React.FC<CartProps> = ({
   );
 
   return (
-    <div className="cart-panel-root">
-      <div className="cart-items-column">
+    <div className="cart-panel-root" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       {/* Cart Header */}
-      <div className="cart-header">
+      <div className="cart-header" style={{ flexShrink: 0 }}>
         <h2>장바구니</h2>
         {items.length > 0 && (
           <button type="button" className="clear-cart-btn" onClick={onClear}>
@@ -234,7 +233,7 @@ const Cart: React.FC<CartProps> = ({
       </div>
 
       {/* Cart Items List */}
-      <div className="cart-items-list" style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+      <div className="cart-items-list" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 16px' }}>
         {items.length === 0 ? (
           <div className="cart-empty">
             <span className="cart-empty-icon">🛒</span>
@@ -356,10 +355,9 @@ const Cart: React.FC<CartProps> = ({
           })
         )}
       </div>
-      </div>
 
-      {/* Cart Summary & Footer Controls */}
-      <div className="cart-footer" style={{ borderTop: '1px solid var(--border-color)', padding: '16px', background: '#f8fafc' }}>
+      {/* Cart Summary & Footer Controls (Fixed at bottom) */}
+      <div className="cart-footer" style={{ flexShrink: 0, marginTop: 'auto', borderTop: '1px solid var(--border-color)', padding: '16px', background: '#f8fafc' }}>
         <div className="summary-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13.5px', color: 'var(--text-secondary)' }}>
           <span>상품 금액</span>
           <span>{originalSubtotal.toLocaleString()}원</span>
