@@ -914,8 +914,9 @@ input:checked + .toggle-slider:before {
 /* Cart item list elements */
 .cart-items-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 0 24px;
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
   background: #ffffff;
@@ -1135,14 +1136,15 @@ input:checked + .toggle-slider:before {
 
 /* Cart Footer totals */
 .cart-footer {
+  flex-shrink: 0;
+  margin-top: auto;
   border-top: 1px solid var(--border-color);
-  padding: 24px;
-  background: var(--bg-secondary);
+  padding: 16px;
+  background: #f8fafc;
   display: flex;
   flex-direction: column;
   gap: 12px;
   box-shadow: none;
-  flex-shrink: 0;
 }
 .summary-row {
   display: flex;
@@ -1160,9 +1162,10 @@ input:checked + .toggle-slider:before {
   margin-top: 8px;
   align-items: center;
 }
-.summary-row.total .total-price {
+.summary-row.total .total-price,
+.cart-footer .total-price {
   color: var(--primary);
-  font-size: 30px;
+  font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.8px;
 }
@@ -1174,6 +1177,14 @@ input:checked + .toggle-slider:before {
   gap: 8px;
   margin-top: 12px;
 }
+
+.cart-footer .action-buttons button:last-child {
+  height: 56px;
+  font-size: 18px;
+  font-weight: 700;
+  border-radius: 8px;
+}
+
 /* Receipt container */
 .receipt-paper {
   background: #ffffff;

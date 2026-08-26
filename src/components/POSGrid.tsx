@@ -179,6 +179,11 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
     return cart.some(item => item.product.id === productId);
   };
 
+  const getCartProductQuantity = (productId: string) => {
+    const item = cart.find(item => item.product.id === productId);
+    return item ? item.quantity : 0;
+  };
+
   const emptyStateText = {
     all: { title: '일치하는 상품이 없습니다', desc: '다른 검색어를 입력하시거나 카테고리를 확인해 주세요.' },
     bestsellers: { title: '아직 인기 상품 데이터가 없습니다', desc: '최근 30일간 판매 내역이 쌓이면 자동으로 표시됩니다.' },
@@ -319,6 +324,7 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
           <div className="products-grid">
             {filteredProducts.map((product) => {
               const inCart = isProductInCart(product.id);
+              const cartQty = getCartProductQuantity(product.id);
               const isFavorite = favoriteIds.has(product.id);
 
               return (
@@ -326,24 +332,75 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
                   key={product.id}
                   role="button"
                   tabIndex={0}
-                  className={`product-card ${inCart ? 'in-cart' : ''}`}
+                  className={`product-card pos-product-card ${inCart ? 'in-cart' : ''}`}
                   onClick={() => onProductClick(product)}
                   onKeyDown={(e) => handleCardKeyDown(e, product)}
                   title={inCart ? '탭하여 장바구니에서 빼기' : '탭하여 장바구니에 담기'}
+                  style={{
+                    minHeight: '120px',
+                    padding: '12px',
+                    position: 'relative',
+                    transition: 'transform 0.1s ease',
+                  }}
                 >
-                  {/* Product Photo */}
+                  {/* Cart Quantity Badge */}
+                  {cartQty > 0 && (
+                    <span
+                      className="cart-qty-badge"
+                      style={{
+                        position: 'absolute',
+                        top: '8px',
+                        right: '8px',
+                        background: 'var(--primary)',
+                        color: '#ffffff',
+                        borderRadius: '50%',
+                        width: '24px',
+                        height: '24px',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
+                        zIndex: 3,
+                      }}
+                    >
+                      {cartQty}
+                    </span>
+                  )}
+
+                  {/* Product Photo / Emoji */}
                   <div className="product-image-container">
-                    <img
-                      src={product.imageUrl || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80'}
-                      alt={product.name}
-                      className="product-image"
-                      loading="lazy"
-                    />
+                    {product.imageUrl ? (
+                      <img
+                        src={product.imageUrl}
+                        alt={product.name}
+                        className="product-image"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div
+                        className="product-image-emoji"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '40px',
+                          width: '100%',
+                          height: '100%',
+                          background: '#f8fafc',
+                          borderRadius: '8px',
+                        }}
+                      >
+                        {product.emoji || '🍞'}
+                      </div>
+                    )}
                     <button
                       type="button"
                       className={`product-favorite-btn ${isFavorite ? 'active' : ''}`}
                       onClick={(e) => toggleFavorite(e, product.id)}
                       title={isFavorite ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+                      style={{ zIndex: 4 }}
                     >
                       <Star size={15} fill={isFavorite ? 'currentColor' : 'none'} />
                     </button>
