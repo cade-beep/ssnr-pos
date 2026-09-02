@@ -973,6 +973,68 @@ body {
 }
 
 /* ==========================================================================
+   2.5 Resizable Split Handle (between POSGrid and OrderPanel)
+   ========================================================================== */
+.panel-split-resizer {
+  position: relative;
+  width: 18px;
+  margin-left: -9px;
+  margin-right: -9px;
+  flex: 0 0 0;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 25;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Central hairline divider */
+.panel-split-resizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--border-color);
+  transform: translateX(-50%);
+  transition: background-color 0.15s ease, width 0.15s ease;
+}
+
+/* Subtle Apple-style Grip Pill for Touch & Affordance */
+.panel-split-grip {
+  position: relative;
+  width: 4px;
+  height: 38px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Hover & Dragging Active States */
+.panel-split-resizer:hover::before,
+.panel-split-resizer.is-dragging::before {
+  background: var(--primary);
+  width: 2px;
+}
+
+.panel-split-resizer:hover .panel-split-grip,
+.panel-split-resizer.is-dragging .panel-split-grip {
+  background: var(--primary);
+  height: 52px;
+  width: 5px;
+  box-shadow: 0 0 10px rgba(0, 122, 255, 0.45);
+}
+
+/* ==========================================================================
    3. Right Order Panel (Order Console)
    ========================================================================== */
 
@@ -980,6 +1042,7 @@ body {
   flex: 0 0 var(--order-panel-width, 420px);
   width: var(--order-panel-width, 420px);
   min-width: var(--order-panel-width, 420px);
+  max-width: var(--order-panel-width, 420px);
   flex-shrink: 0;
   min-height: 0;
   height: 100vh;
@@ -3478,6 +3541,9 @@ body {
 
 /* Tablet portrait / narrow — pack even tighter */
 @media (max-width: 860px) {
+  .panel-split-resizer {
+    display: none !important;
+  }
   .product-grid,
   .product-grid.comfortable {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;

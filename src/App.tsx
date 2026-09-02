@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { Product, CartItem, PaymentMethod, Receipt, CashierUser, CartDraft, normalizeCategory, mapCategoryToDB } from './types';
 import POSGrid from './components/POSGrid';
 import Cart from './components/Cart';
@@ -51,6 +51,12 @@ const getFriendlyErrorMessage = (error: any): string => {
 const DRAFTS_STORAGE_KEY = 'ssnr_pos_cart_drafts';
 const MAX_DRAFTS = 3;
 
+// Resizable Order Panel Width Settings
+const ORDER_PANEL_WIDTH_KEY = 'ssnr_pos_order_panel_width_v1';
+const DEFAULT_ORDER_PANEL_WIDTH = 420;
+const MIN_ORDER_PANEL_WIDTH = 320;
+const MAX_ORDER_PANEL_WIDTH = 520;
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'sales' | 'history' | 'products' | 'customers' | 'employees' | 'settings'>('sales');
   const [products, setProducts] = useState<Product[]>([]);
@@ -72,6 +78,25 @@ const App: React.FC = () => {
   const [isSessionLoading, setIsSessionLoading] = useState<boolean>(true);
   const [activeIdempotencyKey, setActiveIdempotencyKey] = useState<string | null>(null);
   const [isCheckoutSubmitting, setIsCheckoutSubmitting] = useState<boolean>(false);
+
+  // Resizable Order Panel States
+  const [orderPanelWidth, setOrderPanelWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(ORDER_PANEL_WIDTH_KEY);
+      if (saved) {
+        const parsed = Number(saved);
+        if (!isNaN(parsed) && parsed >= MIN_ORDER_PANEL_WIDTH && parsed <= MAX_ORDER_PANEL_WIDTH) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return DEFAULT_ORDER_PANEL_WIDTH;
+  });
+  const [isResizingPanel, setIsResizingPanel] = useState<boolean>(false);
+  const isResizingRef = useRef<boolean>(false);
+  const startWidthRef = useRef<number>(DEFAULT_ORDER_PANEL_WIDTH);
 
   // Helper to fetch user role and store_id from the database
   const fetchUserRoleAndStore = async (user: any): Promise<CashierUser> => {
@@ -418,6 +443,98 @@ const App: React.FC = () => {
       setToast(null);
     }, onAction ? 3500 : 2500);
   };
+
+  // Resizable Order Panel Actions
+  const handleResetOrderPanelWidth = useCallback(() => {
+    setOrderPanelWidth(DEFAULT_ORDER_PANEL_WIDTH);
+    try {
+      localStorage.setItem(ORDER_PANEL_WIDTH_KEY, String(DEFAULT_ORDER_PANEL_WIDTH));
+    } catch (e) {
+      console.error(e);
+    }
+    showToast('주문 패널 너비가 기본값(420px)으로 초기화되었습니다.', 'info');
+  }, []);
+
+  const finishResize = useCallback((isCancel: boolean, target?: HTMLElement | null, pointerId?: number) => {
+    if (!isResizingRef.current) return;
+    isResizingRef.current = false;
+    setIsResizingPanel(false);
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    if (target && pointerId !== undefined) {
+      try {
+        target.releasePointerCapture(pointerId);
+      } catch {}
+    }
+    if (isCancel) {
+      // 드래그 취소(시스템 제스처/화면 회전 등) 시 시작 전 폭으로 안전 복구
+      setOrderPanelWidth(startWidthRef.current);
+    } else {
+      // 정상 완료 시 최종 폭을 localStorage에 1회 저장
+      setOrderPanelWidth((current) => {
+        try {
+          localStorage.setItem(ORDER_PANEL_WIDTH_KEY, String(current));
+        } catch (err) {
+          console.error(err);
+        }
+        return current;
+      });
+    }
+  }, []);
+
+  const handleResizePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    startWidthRef.current = orderPanelWidth;
+    isResizingRef.current = true;
+    setIsResizingPanel(true);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handleResizePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isResizingRef.current) return;
+    e.preventDefault();
+    const newWidth = window.innerWidth - e.clientX;
+    const maxAllowed = Math.min(MAX_ORDER_PANEL_WIDTH, Math.max(MIN_ORDER_PANEL_WIDTH, window.innerWidth - 72 - 300));
+    const clamped = Math.max(MIN_ORDER_PANEL_WIDTH, Math.min(maxAllowed, newWidth));
+    setOrderPanelWidth(clamped);
+  };
+
+  const handleResizePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    finishResize(false, e.currentTarget, e.pointerId);
+  };
+
+  const handleResizePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    finishResize(true, e.currentTarget, e.pointerId);
+  };
+
+  useEffect(() => {
+    const handleWindowResize = () => {
+      if (isResizingRef.current) {
+        finishResize(true);
+      }
+      const maxAllowed = Math.min(MAX_ORDER_PANEL_WIDTH, Math.max(MIN_ORDER_PANEL_WIDTH, window.innerWidth - 72 - 300));
+      setOrderPanelWidth((prev) => Math.min(prev, maxAllowed));
+    };
+
+    const handleWindowBlur = () => {
+      if (isResizingRef.current) {
+        finishResize(true);
+      }
+    };
+
+    window.addEventListener('resize', handleWindowResize);
+    window.addEventListener('blur', handleWindowBlur);
+    return () => {
+      window.removeEventListener('resize', handleWindowResize);
+      window.removeEventListener('blur', handleWindowBlur);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [finishResize]);
 
   // Helper to update cart while preserving previous snapshot for Undo (Ctrl+Z)
   const updateCartWithHistory = (updater: (prevCart: CartItem[]) => CartItem[]) => {
@@ -968,7 +1085,10 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className={`app-shell ${activeTab === 'sales' ? 'sales-mode' : 'management-mode'}`}>
+    <div
+      className={`app-shell ${activeTab === 'sales' ? 'sales-mode' : 'management-mode'}`}
+      style={{ '--order-panel-width': `${orderPanelWidth}px` } as React.CSSProperties}
+    >
       <Sidebar
         activeTab={activeTab}
         onTabChange={handleTabChange}
@@ -986,6 +1106,24 @@ const App: React.FC = () => {
             onQuickAdd={handleAddToCart}
             cart={cart}
           />
+
+          {/* Vertical Resizable Split Handle */}
+          <div
+            className={`panel-split-resizer ${isResizingPanel ? 'is-dragging' : ''}`}
+            onPointerDown={handleResizePointerDown}
+            onPointerMove={handleResizePointerMove}
+            onPointerUp={handleResizePointerUp}
+            onPointerCancel={handleResizePointerCancel}
+            role="separator"
+            aria-orientation="vertical"
+            aria-valuenow={orderPanelWidth}
+            aria-valuemin={MIN_ORDER_PANEL_WIDTH}
+            aria-valuemax={MAX_ORDER_PANEL_WIDTH}
+            aria-label="주문 패널 너비 조절"
+            title="좌우로 드래그하여 주문 패널 너비 조절"
+          >
+            <div className="panel-split-grip" />
+          </div>
 
           {/* Right Console: Order & Payment */}
           <Cart
@@ -1016,6 +1154,7 @@ const App: React.FC = () => {
             products={products.filter(p => p.isActive !== false)}
             onQuickAdd={handleAddToCart}
             role={currentCashier.role}
+            onResetPanelWidth={handleResetOrderPanelWidth}
           />
         </>
       ) : (

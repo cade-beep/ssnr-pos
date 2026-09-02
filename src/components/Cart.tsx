@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CartItem, CartDraft, Product } from '../types';
-import { Plus, Minus, Undo2, X, MoreHorizontal, Tag, Save, FileText, Trash2, Zap, CreditCard } from 'lucide-react';
+import { Plus, Minus, Undo2, X, MoreHorizontal, Tag, Save, FileText, Trash2, Zap, CreditCard, RotateCcw } from 'lucide-react';
 import Button from './ui/Button';
 import Modal from './ui/Modal';
 import { Input } from './ui/Field';
@@ -29,6 +29,7 @@ interface CartProps {
   products?: Product[];
   onQuickAdd?: (product: Product) => void;
   role: 'Owner' | 'Staff';
+  onResetPanelWidth?: () => void;
 }
 
 const Cart: React.FC<CartProps> = ({
@@ -54,6 +55,7 @@ const Cart: React.FC<CartProps> = ({
   onRemoveDraft,
   products = [],
   onQuickAdd,
+  onResetPanelWidth,
 }) => {
   // Modal Visibility States
   const [isCartDiscountOpen, setIsCartDiscountOpen] = useState(false);
@@ -425,6 +427,23 @@ const Cart: React.FC<CartProps> = ({
               >
                 <Save size={16} />
                 <span>임시저장 목록 확인 ({drafts.length}건)</span>
+              </Button>
+            )}
+
+            {onResetPanelWidth && (
+              <Button
+                variant="outline"
+                size="md"
+                fullWidth
+                onClick={() => {
+                  setIsMoreMenuOpen(false);
+                  onResetPanelWidth();
+                }}
+                title="주문 패널 너비 초기화 (420px)"
+                aria-label="주문 패널 너비 초기화"
+              >
+                <RotateCcw size={16} />
+                <span>주문 패널 너비 초기화 (420px)</span>
               </Button>
             )}
 
