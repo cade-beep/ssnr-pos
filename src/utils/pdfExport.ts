@@ -1,6 +1,3 @@
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
-
 // Rasterizes `node` and wraps it in a PDF sized exactly to its content at
 // `widthMm` wide. Bypasses the OS print pipeline entirely (no window.print,
 // no printer driver in the loop), so the output width is exact regardless
@@ -10,6 +7,11 @@ export async function downloadElementAsPdf(
   filename: string,
   widthMm: number = 58
 ): Promise<void> {
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+    import('html2canvas'),
+    import('jspdf')
+  ]);
+
   const canvas = await html2canvas(node, { scale: 2, backgroundColor: '#ffffff' });
   const imgData = canvas.toDataURL('image/png');
   const heightMm = (canvas.height / canvas.width) * widthMm;

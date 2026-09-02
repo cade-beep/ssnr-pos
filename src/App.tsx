@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Product, CartItem, PaymentMethod, Receipt, CashierUser, CartDraft, normalizeCategory, mapCategoryToDB } from './types';
 import POSGrid from './components/POSGrid';
 import Cart from './components/Cart';
 import ReceiptModal from './components/ReceiptModal';
 import LoginOverlay from './components/LoginOverlay';
-import ProductsView from './components/ProductsView';
-import HistoryView from './components/HistoryView';
-import SettingsView from './components/SettingsView';
-import CustomersView from './components/CustomersView';
-import EmployeesView from './components/EmployeesView';
 import Sidebar from './components/Sidebar';
+
+// Lazy-loaded management tab views for optimized initial bundle loading
+const ProductsView = lazy(() => import('./components/ProductsView'));
+const HistoryView = lazy(() => import('./components/HistoryView'));
+const SettingsView = lazy(() => import('./components/SettingsView'));
+const CustomersView = lazy(() => import('./components/CustomersView'));
+const EmployeesView = lazy(() => import('./components/EmployeesView'));
 import Button from './components/ui/Button';
 import Modal from './components/ui/Modal';
 import { showAlert, showConfirm, showPrompt } from './components/ui/dialogs';
@@ -1018,42 +1020,61 @@ const App: React.FC = () => {
         </>
       ) : (
         <main className="app-main management-main">
-          {activeTab === 'history' ? (
-            <HistoryView 
-              onSelectReceipt={(r) => {
-                setCurrentReceipt(r);
-                setReceiptAutoClose(false);
-              }}
-              showToast={showToast}
-              role={currentCashier.role}
-            />
-          ) : activeTab === 'products' ? (
-            <ProductsView 
-              products={products}
-              onRefresh={loadProducts}
-              showToast={showToast}
-              role={currentCashier.role}
-            />
-          ) : activeTab === 'customers' ? (
-            <CustomersView
-              role={currentCashier.role}
-              showToast={showToast}
-            />
-          ) : activeTab === 'employees' ? (
-            <EmployeesView
-              role={currentCashier.role}
-              storeId={currentCashier.store_id}
-              currentUserId={currentCashier.id}
-              showToast={showToast}
-            />
-          ) : (
-            <SettingsView 
-              currentCashier={currentCashier}
-              onLogout={handleLogout}
-              showToast={showToast}
-              onRefreshProducts={loadProducts}
-            />
-          )}
+          <Suspense
+            fallback={
+              <div
+                style={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'var(--bg-primary)',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                <RefreshCw size={28} color="var(--primary)" style={{ animation: 'spin 1.5s linear infinite', marginBottom: '12px' }} />
+                <span style={{ fontSize: '13.5px', fontWeight: 600 }}>화면을 불러오는 중...</span>
+              </div>
+            }
+          >
+            {activeTab === 'history' ? (
+              <HistoryView 
+                onSelectReceipt={(r) => {
+                  setCurrentReceipt(r);
+                  setReceiptAutoClose(false);
+                }}
+                showToast={showToast}
+                role={currentCashier.role}
+              />
+            ) : activeTab === 'products' ? (
+              <ProductsView 
+                products={products}
+                onRefresh={loadProducts}
+                showToast={showToast}
+                role={currentCashier.role}
+              />
+            ) : activeTab === 'customers' ? (
+              <CustomersView
+                role={currentCashier.role}
+                showToast={showToast}
+              />
+            ) : activeTab === 'employees' ? (
+              <EmployeesView
+                role={currentCashier.role}
+                storeId={currentCashier.store_id}
+                currentUserId={currentCashier.id}
+                showToast={showToast}
+              />
+            ) : (
+              <SettingsView 
+                currentCashier={currentCashier}
+                onLogout={handleLogout}
+                showToast={showToast}
+                onRefreshProducts={loadProducts}
+              />
+            )}
+          </Suspense>
         </main>
       )}
 
