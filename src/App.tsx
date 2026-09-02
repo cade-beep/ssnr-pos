@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Product, CartItem, PaymentMethod, Receipt, CashierUser, normalizeCategory, mapCategoryToDB } from './types';
+import { Product, CartItem, PaymentMethod, Receipt, CashierUser, CartDraft, normalizeCategory, mapCategoryToDB } from './types';
 import POSGrid from './components/POSGrid';
 import Cart from './components/Cart';
 import ReceiptModal from './components/ReceiptModal';
@@ -13,7 +13,7 @@ import Sidebar from './components/Sidebar';
 import Button from './components/ui/Button';
 import Modal from './components/ui/Modal';
 import { showAlert, showConfirm, showPrompt } from './components/ui/dialogs';
-import { RefreshCw, X, ChevronRight, ShoppingCart } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { supabase } from './supabase';
 import { STATIC_PRODUCTS } from './productsData';
 import { auditLog } from './utils/auditLogger';
@@ -46,14 +46,6 @@ const getFriendlyErrorMessage = (error: any): string => {
   return `데이터베이스 처리 중 오류가 발생했습니다.\n(${msg})`;
 };
 
-// A held-aside cart snapshot — local-only, never synced to the server.
-interface CartDraft {
-  id: string;
-  items: CartItem[];
-  discountPercent: number;
-  savedAt: number;
-}
-
 const DRAFTS_STORAGE_KEY = 'ssnr_pos_cart_drafts';
 const MAX_DRAFTS = 3;
 
@@ -61,16 +53,17 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'sales' | 'history' | 'products' | 'customers' | 'employees' | 'settings'>('sales');
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartHistory, setCartHistory] = useState<CartItem[][]>([]);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState<boolean>(false);
   const [currentReceipt, setCurrentReceipt] = useState<Receipt | null>(null);
+  const [receiptAutoClose, setReceiptAutoClose] = useState<boolean>(false);
   
-  // Custom Toast State
-  const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'error' } | null>(null);
-  const [isReceiptChecked, setIsReceiptChecked] = useState<boolean>(true);
+  // Custom Toast State (supports undo action button)
+  const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'error'; onAction?: () => void; actionLabel?: string } | null>(null);
+  const [pendingTabChange, setPendingTabChange] = useState<'sales' | 'history' | 'products' | 'customers' | 'employees' | 'settings' | null>(null);
+  const [isReceiptChecked] = useState<boolean>(true);
   const [cartDiscountPercent, setCartDiscountPercent] = useState<number>(0);
   const [drafts, setDrafts] = useState<CartDraft[]>([]);
-  // Tablet: the cart becomes an overlay drawer. Start closed on tablet-width, open on desktop.
-  const [cartCollapsed, setCartCollapsed] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth <= 1200);
 
   // Cashier Authentication States
   const [currentCashier, setCurrentCashier] = useState<CashierUser | null>(null);
@@ -205,11 +198,21 @@ const App: React.FC = () => {
           setIsPaymentModalOpen(true);
         }
       }
+
+      // Ctrl+Z to Undo last cart modification
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        const target = e.target as HTMLElement;
+        const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+        if (!isInput && cartHistory.length > 0 && activeTab === 'sales' && !isPaymentModalOpen) {
+          e.preventDefault();
+          handleUndo();
+        }
+      }
     };
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [currentCashier, cart, isPaymentModalOpen, isCheckoutSubmitting, activeTab]);
+  }, [currentCashier, cart, cartHistory, isPaymentModalOpen, isCheckoutSubmitting, activeTab]);
 
   // Auto-focus search input when activeTab is sales
   useEffect(() => {
@@ -402,64 +405,90 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [products]);
 
-  const showToast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
-    setToast({ message, type });
+  const showToast = (
+    message: string,
+    type: 'info' | 'success' | 'error' = 'info',
+    onAction?: () => void,
+    actionLabel?: string
+  ) => {
+    setToast({ message, type, onAction, actionLabel });
     setTimeout(() => {
       setToast(null);
-    }, 2500);
+    }, onAction ? 3500 : 2500);
   };
 
-  // Add to cart
-  const handleAddToCart = (product: Product) => {
+  // Helper to update cart while preserving previous snapshot for Undo (Ctrl+Z)
+  const updateCartWithHistory = (updater: (prevCart: CartItem[]) => CartItem[]) => {
     setCart((prevCart) => {
-      const existing = prevCart.find((item) => item.product.id === product.id);
+      const nextCart = updater(prevCart);
+      if (prevCart !== nextCart) {
+        setCartHistory((prevHist) => [...prevHist.slice(-9), prevCart]);
+      }
+      return nextCart;
+    });
+  };
+
+  // Undo last cart modification
+  const handleUndo = () => {
+    if (cartHistory.length === 0) return;
+    const previous = cartHistory[cartHistory.length - 1];
+    setCartHistory((prevHist) => prevHist.slice(0, -1));
+    setCart(previous);
+    showToast('이전 장바구니 상태로 되돌렸습니다.', 'info');
+  };
+
+  // Safe Tab Change: if cart has items when leaving sales tab, prompt cashier
+  const handleTabChange = (newTab: 'sales' | 'history' | 'products' | 'customers' | 'employees' | 'settings') => {
+    if (activeTab === 'sales' && newTab !== 'sales' && cart.length > 0) {
+      setPendingTabChange(newTab);
+      return;
+    }
+    setActiveTab(newTab);
+  };
+
+  // Add to cart: 동일 상품 + 동일 가격유형이면 수량 누적, 다르면 별도 행으로 추가
+  const handleAddToCart = (product: Product, priceType: 'adult' | 'child' | 'default' = 'default') => {
+    const unitPrice = priceType === 'child' && product.childPrice ? product.childPrice : product.price;
+    const itemKey = `${product.id}_${priceType}`;
+
+    updateCartWithHistory((prevCart) => {
+      const existing = prevCart.find((item) => (item.id || `${item.product.id}_${item.priceType || 'default'}`) === itemKey);
       if (existing) {
         return prevCart.map((item) =>
-          item.product.id === product.id
+          (item.id || `${item.product.id}_${item.priceType || 'default'}`) === itemKey
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
-      return [...prevCart, { product, quantity: 1 }];
+      return [...prevCart, { id: itemKey, product, quantity: 1, priceType, unitPrice }];
     });
-    showToast(`${product.name}이(가) 추가되었습니다.`, 'success');
+    showToast(
+      `${product.name}${priceType === 'child' ? ' (어린이)' : ''} 수량이 추가되었습니다.`,
+      'success',
+      handleUndo,
+      '되돌리기'
+    );
   };
 
-  // Product grid card tap — toggles cart membership (add if absent, remove if
-  // already there). Quantity can only be changed from the cart's own +/-
-  // controls afterward; this keeps repeat-tap-to-add (barcode scan, recent-
-  // sold quick chips) using handleAddToCart's increment behavior untouched.
-  const handleToggleCartItem = (product: Product) => {
-    const existing = cart.find((item) => item.product.id === product.id);
-    if (existing) {
-      handleRemoveFromCart(product.id);
-      return;
-    }
-    setCart((prevCart) => [...prevCart, { product, quantity: 1 }]);
-    showToast(`${product.name}이(가) 추가되었습니다.`, 'success');
-  };
-
-  // Increase qty
-  const handleIncreaseQty = (productId: string) => {
-    const product = products.find(p => p.id === productId);
-    const existing = cart.find(item => item.product.id === productId);
-    if (!product || !existing) return;
-
-    setCart((prevCart) =>
-      prevCart.map((item) =>
-        item.product.id === productId
+  // Increase qty (supports both cartItem.id and productId)
+  const handleIncreaseQty = (itemKeyOrProductId: string) => {
+    updateCartWithHistory((prevCart) =>
+      prevCart.map((item) => {
+        const key = item.id || `${item.product.id}_${item.priceType || 'default'}`;
+        return key === itemKeyOrProductId || item.product.id === itemKeyOrProductId
           ? { ...item, quantity: item.quantity + 1 }
-          : item
-      )
+          : item;
+      })
     );
   };
 
   // Decrease qty
-  const handleDecreaseQty = (productId: string) => {
-    setCart((prevCart) =>
+  const handleDecreaseQty = (itemKeyOrProductId: string) => {
+    updateCartWithHistory((prevCart) =>
       prevCart
         .map((item) => {
-          if (item.product.id === productId) {
+          const key = item.id || `${item.product.id}_${item.priceType || 'default'}`;
+          if (key === itemKeyOrProductId || item.product.id === itemKeyOrProductId) {
             return { ...item, quantity: item.quantity - 1 };
           }
           return item;
@@ -469,26 +498,27 @@ const App: React.FC = () => {
   };
 
   // Remove single item
-  const handleRemoveFromCart = (productId: string) => {
-    const deletedItem = cart.find((item) => item.product.id === productId);
-    setCart((prevCart) => prevCart.filter((item) => item.product.id !== productId));
+  const handleRemoveFromCart = (itemKeyOrProductId: string) => {
+    const deletedItem = cart.find((item) => (item.id || `${item.product.id}_${item.priceType || 'default'}`) === itemKeyOrProductId || item.product.id === itemKeyOrProductId);
+    updateCartWithHistory((prevCart) => prevCart.filter((item) => (item.id || `${item.product.id}_${item.priceType || 'default'}`) !== itemKeyOrProductId && item.product.id !== itemKeyOrProductId));
     if (deletedItem) {
       showToast(`${deletedItem.product.name}이(가) 취소되었습니다.`, 'info');
     }
   };
 
   // Set explicit quantity
-  const handleSetQty = (productId: string, quantity: number) => {
+  const handleSetQty = (itemKeyOrProductId: string, quantity: number) => {
     if (quantity <= 0) {
-      handleRemoveFromCart(productId);
+      handleRemoveFromCart(itemKeyOrProductId);
       return;
     }
-    setCart((prevCart) =>
-      prevCart.map((item) =>
-        item.product.id === productId
+    updateCartWithHistory((prevCart) =>
+      prevCart.map((item) => {
+        const key = item.id || `${item.product.id}_${item.priceType || 'default'}`;
+        return key === itemKeyOrProductId || item.product.id === itemKeyOrProductId
           ? { ...item, quantity }
-          : item
-      )
+          : item;
+      })
     );
   };
 
@@ -496,7 +526,7 @@ const App: React.FC = () => {
   const handleClearCart = async () => {
     if (cart.length === 0) return;
     if (await showConfirm('장바구니에 담긴 모든 내역을 삭제하시겠습니까?', { title: '장바구니 비우기', danger: true, confirmText: '전체 삭제' })) {
-      setCart([]);
+      updateCartWithHistory(() => []);
       showToast('장바구니가 초기화되었습니다.', 'info');
     }
   };
@@ -593,27 +623,12 @@ const App: React.FC = () => {
     persistDrafts(drafts.filter(d => d.id !== draftId));
   };
 
-  // Dynamic Recent Products
-  const getRecentProducts = (): string[] => {
-    const fallbacks = ['단팥빵', '소보로빵', '소금빵', '초코칩쿠키'];
-    const activeProds = products.filter(p => p.isActive !== false).map(p => p.name);
-    return activeProds.filter(name => fallbacks.includes(name)).slice(0, 4);
-  };
-
-  const handleRecentChipClick = (productName: string) => {
-    const found = products.find(p => p.name === productName && p.isActive !== false);
-    if (found) {
-      handleAddToCart(found);
-    } else {
-      showToast(`상품 '${productName}'을(를) 찾을 수 없습니다.`, 'error');
-    }
-  };
-
   // Helper to safely calculate item discount details
   const getItemDiscountInfo = (item: CartItem) => {
+    const basePrice = item.unitPrice || item.product.price;
     if (item.discountPercent !== undefined && item.discountPercent > 0) {
       const pct = Math.min(100, Math.max(0, item.discountPercent));
-      const unitDiscount = Math.round(item.product.price * (pct / 100));
+      const unitDiscount = Math.round(basePrice * (pct / 100));
       return {
         unitDiscount,
         totalDiscount: unitDiscount * item.quantity,
@@ -630,7 +645,7 @@ const App: React.FC = () => {
       };
     } else if (item.product.discountPercent && item.product.discountPercent > 0) {
       const pct = item.product.discountPercent;
-      const unitDiscount = Math.round(item.product.price * (pct / 100));
+      const unitDiscount = Math.round(basePrice * (pct / 100));
       return {
         unitDiscount,
         totalDiscount: unitDiscount * item.quantity,
@@ -684,13 +699,13 @@ const App: React.FC = () => {
     return val;
   };
 
-  const originalSubtotal = safeNumber(cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0));
+  const originalSubtotal = safeNumber(cart.reduce((sum, item) => sum + ((item.unitPrice || item.product.price) * item.quantity), 0));
   const totalItemDiscount = safeNumber(cart.reduce((sum, item) => sum + getItemDiscountInfo(item).totalDiscount, 0));
   const subtotalAfterItemDiscounts = Math.max(0, originalSubtotal - totalItemDiscount);
   const discountableSubtotalAfterItemDiscounts = safeNumber(
     cart
       .filter((item) => !item.excludeFromCartDiscount)
-      .reduce((sum, item) => sum + (item.product.price * item.quantity - getItemDiscountInfo(item).totalDiscount), 0)
+      .reduce((sum, item) => sum + (((item.unitPrice || item.product.price) * item.quantity) - getItemDiscountInfo(item).totalDiscount), 0)
   );
   const cartDiscountAmount = safeNumber(Math.round(discountableSubtotalAfterItemDiscounts * (Math.min(100, Math.max(0, cartDiscountPercent)) / 100)));
   const totalDiscount = safeNumber(totalItemDiscount + cartDiscountAmount);
@@ -852,6 +867,7 @@ const App: React.FC = () => {
       showToast('💳 결제가 완료되고 재고가 정상 차감되었습니다.', 'success');
       if (isReceiptChecked) {
         setCurrentReceipt(receipt);
+        setReceiptAutoClose(true);
       }
       setIsPaymentModalOpen(false);
       setCart([]);
@@ -950,197 +966,96 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${activeTab === 'sales' ? 'sales-mode' : 'management-mode'}`}>
       <Sidebar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         currentCashier={currentCashier}
         onLogout={handleLogout}
         pendingStaffCount={pendingStaffCount}
       />
 
-      <main className="app-main">
-      {/* Main Content Area switched by tabs */}
-      <div className="pos-dashboard" style={{ flex: 1, overflow: 'hidden' }}>
-        {activeTab === 'sales' ? (
-          <>
-            <div className="pos-main-panel">
-              {products.length === 0 ? (
-                <div className="products-grid">
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
-                    <div key={n} className="product-card" style={{ pointerEvents: 'none', border: '1px solid var(--border-color)', background: 'var(--bg-secondary)', width: '100%' }}>
-                      <div className="product-image-container skeleton" style={{ width: '100%', height: '100px', marginBottom: '12px' }} />
-                      <div className="product-info" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div className="skeleton" style={{ width: '70%', height: '16px', borderRadius: '4px' }} />
-                        <div className="skeleton" style={{ width: '40%', height: '14px', borderRadius: '4px' }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <POSGrid products={products.filter(p => p.isActive !== false)} onProductClick={handleToggleCartItem} onQuickAdd={handleAddToCart} cart={cart} />
-              )}
-            </div>
-            
-            <aside className={`pos-side-panel ${cartCollapsed ? 'is-collapsed' : 'is-open'}`}>
-              <button
-                type="button"
-                className="cart-drawer-close"
-                onClick={() => setCartCollapsed(true)}
-                title="장바구니 접기"
-              >
-                <ChevronRight size={20} />
-              </button>
-              <Cart
-                items={cart}
-                totalAmount={finalTotal}
-                cartDiscountPercent={cartDiscountPercent}
-                cartDiscountAmount={cartDiscountAmount}
-                itemDiscountAmount={totalItemDiscount}
-                onIncrease={handleIncreaseQty}
-                onDecrease={handleDecreaseQty}
-                onDelete={handleRemoveFromCart}
-                onClear={handleClearCart}
-                onCheckout={() => {
-                  const key = crypto.randomUUID ? crypto.randomUUID() : `SSNR-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-                  setActiveIdempotencyKey(key);
-                  setIsPaymentModalOpen(true);
-                }}
-                onApplyDiscount={handleApplyGlobalDiscount}
-                onApplyItemDiscount={handleApplyItemDiscount}
-                onToggleDiscountExclusion={handleToggleItemDiscountExclusion}
-                onSetQuantity={handleSetQty}
-                role={currentCashier.role}
-              />
-            </aside>
+      {activeTab === 'sales' ? (
+        <>
+          {/* Central Workspace: Product Navigation & Grid */}
+          <POSGrid
+            products={products.filter(p => p.isActive !== false)}
+            onProductClick={handleAddToCart}
+            onQuickAdd={handleAddToCart}
+            cart={cart}
+          />
 
-            {/* Tablet drawer backdrop (only visible when the cart is open in drawer mode) */}
-            <div className="cart-backdrop" onClick={() => setCartCollapsed(true)} />
-
-            {/* Tablet floating cart button — opens the drawer, shows live count, discount tag + total */}
-            <button
-              type="button"
-              className="cart-fab"
-              onClick={() => setCartCollapsed(false)}
-              title="장바구니 열기"
-            >
-              <span className="cart-fab-icon">
-                <ShoppingCart size={22} />
-                {cart.length > 0 && <span className="cart-fab-count">{cart.length}</span>}
-              </span>
-              {totalDiscount > 0 && (
-                <span className="cart-fab-discount-tag">
-                  🏷️ -{totalDiscount.toLocaleString()}원
-                </span>
-              )}
-              <span className="cart-fab-total">{finalTotal.toLocaleString()}원</span>
-              <ChevronRight size={18} className="cart-fab-arrow" />
-            </button>
-          </>
-        ) : activeTab === 'history' ? (
-          <HistoryView 
-            onSelectReceipt={(r) => setCurrentReceipt(r)}
-            showToast={showToast}
+          {/* Right Console: Order & Payment */}
+          <Cart
+            items={cart}
+            totalAmount={finalTotal}
+            cartDiscountPercent={cartDiscountPercent}
+            cartDiscountAmount={cartDiscountAmount}
+            itemDiscountAmount={totalItemDiscount}
+            onIncrease={handleIncreaseQty}
+            onDecrease={handleDecreaseQty}
+            onDelete={handleRemoveFromCart}
+            onClear={handleClearCart}
+            onCheckout={() => {
+              const key = crypto.randomUUID ? crypto.randomUUID() : `SSNR-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+              setActiveIdempotencyKey(key);
+              setIsPaymentModalOpen(true);
+            }}
+            onApplyDiscount={handleApplyGlobalDiscount}
+            onApplyItemDiscount={handleApplyItemDiscount}
+            onToggleDiscountExclusion={handleToggleItemDiscountExclusion}
+            onSetQuantity={handleSetQty}
+            onUndo={handleUndo}
+            canUndo={cartHistory.length > 0}
+            drafts={drafts}
+            onSaveDraft={handleSaveDraft}
+            onLoadDraft={handleLoadDraft}
+            onRemoveDraft={handleRemoveDraft}
+            products={products.filter(p => p.isActive !== false)}
+            onQuickAdd={handleAddToCart}
             role={currentCashier.role}
           />
-        ) : activeTab === 'products' ? (
-          <ProductsView 
-            products={products}
-            onRefresh={loadProducts}
-            showToast={showToast}
-            role={currentCashier.role}
-          />
-
-        ) : activeTab === 'customers' ? (
-          <CustomersView
-            role={currentCashier.role}
-            showToast={showToast}
-          />
-        ) : activeTab === 'employees' ? (
-          <EmployeesView
-            role={currentCashier.role}
-            storeId={currentCashier.store_id}
-            currentUserId={currentCashier.id}
-            showToast={showToast}
-          />
-
-        ) : (
-          <SettingsView 
-            currentCashier={currentCashier}
-            onLogout={handleLogout}
-            showToast={showToast}
-            onRefreshProducts={loadProducts}
-          />
-        )}
-      </div>
-
-      {/* Bottom control bar (Only on Sales tab) */}
-      {activeTab === 'sales' && (
-        <footer className="bottom-control-bar">
-          <div className="bottom-left-controls">
-            <div className="receipt-toggle-label">
-              <span>영수증</span>
-              <label className="receipt-toggle-switch">
-                <input 
-                  type="checkbox" 
-                  checked={isReceiptChecked} 
-                  onChange={(e) => setIsReceiptChecked(e.target.checked)} 
-                />
-                <span className="toggle-slider"></span>
-              </label>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Button variant="secondary" size="sm" onClick={handleSaveDraft}>
-                임시저장{drafts.length > 0 ? ` (${drafts.length}/${MAX_DRAFTS})` : ''}
-              </Button>
-              {drafts.length > 0 && (
-                <div className="draft-chips">
-                  {drafts.map((d, idx) => {
-                    const draftTotal = d.items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-                    return (
-                      <div key={d.id} className="draft-chip">
-                        <button
-                          type="button"
-                          className="draft-chip-load"
-                          onClick={() => handleLoadDraft(d.id)}
-                          title={`품목 ${d.items.length}개 · ${draftTotal.toLocaleString()}원 · 클릭하여 불러오기`}
-                        >
-                          임시{idx + 1} ({d.items.length})
-                        </button>
-                        <button
-                          type="button"
-                          className="draft-chip-remove"
-                          onClick={() => handleRemoveDraft(d.id)}
-                          title="임시저장 삭제"
-                        >
-                          <X size={11} />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="bottom-right-recent">
-            <span className="recent-label">최근 판매 상품</span>
-            <div className="recent-chips">
-              {getRecentProducts().map(name => (
-                <button 
-                  key={name}
-                  type="button" 
-                  className="recent-chip"
-                  onClick={() => handleRecentChipClick(name)}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          </div>
-        </footer>
+        </>
+      ) : (
+        <main className="app-main management-main">
+          {activeTab === 'history' ? (
+            <HistoryView 
+              onSelectReceipt={(r) => {
+                setCurrentReceipt(r);
+                setReceiptAutoClose(false);
+              }}
+              showToast={showToast}
+              role={currentCashier.role}
+            />
+          ) : activeTab === 'products' ? (
+            <ProductsView 
+              products={products}
+              onRefresh={loadProducts}
+              showToast={showToast}
+              role={currentCashier.role}
+            />
+          ) : activeTab === 'customers' ? (
+            <CustomersView
+              role={currentCashier.role}
+              showToast={showToast}
+            />
+          ) : activeTab === 'employees' ? (
+            <EmployeesView
+              role={currentCashier.role}
+              storeId={currentCashier.store_id}
+              currentUserId={currentCashier.id}
+              showToast={showToast}
+            />
+          ) : (
+            <SettingsView 
+              currentCashier={currentCashier}
+              onLogout={handleLogout}
+              showToast={showToast}
+              onRefreshProducts={loadProducts}
+            />
+          )}
+        </main>
       )}
-      </main>
 
       {/* Payment Selector Modal */}
       {isPaymentModalOpen && (
@@ -1162,14 +1077,87 @@ const App: React.FC = () => {
         <ReceiptModal
           receipt={currentReceipt}
           onClose={() => setCurrentReceipt(null)}
+          autoCloseDelay={receiptAutoClose ? 3000 : 0}
         />
       )}
 
-      {/* Notification Toast */}
+      {/* Unsaved Cart Tab Change Warning Modal */}
+      {pendingTabChange && (
+        <Modal
+          title="⚠️ 장바구니에 담긴 주문이 있습니다"
+          description="다른 메뉴로 이동하기 전에 현재 장바구니의 상품을 어떻게 처리할까요?"
+          maxWidth={420}
+          zIndex={1400}
+          onClose={() => setPendingTabChange(null)}
+          closeOnOverlay
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <Button
+              variant="primary"
+              size="md"
+              fullWidth
+              onClick={async () => {
+                await handleSaveDraft();
+                const target = pendingTabChange;
+                setPendingTabChange(null);
+                setActiveTab(target);
+              }}
+            >
+              💾 임시저장 후 이동
+            </Button>
+            <Button
+              variant="outline"
+              size="md"
+              fullWidth
+              style={{ color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
+              onClick={() => {
+                setCart([]);
+                const target = pendingTabChange;
+                setPendingTabChange(null);
+                setActiveTab(target);
+              }}
+            >
+              🗑️ 장바구니 비우고 이동
+            </Button>
+            <Button
+              variant="secondary"
+              size="md"
+              fullWidth
+              onClick={() => setPendingTabChange(null)}
+            >
+              취소 (판매 화면 유지)
+            </Button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Notification Toast with optional Undo Action */}
       {toast && (
-        <div className={`toast toast-${toast.type}`}>
+        <div className={`toast toast-${toast.type}`} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span>{toast.type === 'success' ? '✅' : toast.type === 'error' ? '⚠️' : 'ℹ️'}</span>
-          <span>{toast.message}</span>
+          <span style={{ flex: 1 }}>{toast.message}</span>
+          {toast.onAction && (
+            <button
+              type="button"
+              onClick={() => {
+                toast.onAction?.();
+                setToast(null);
+              }}
+              style={{
+                background: 'rgba(255, 255, 255, 0.25)',
+                border: '1px solid rgba(255, 255, 255, 0.45)',
+                borderRadius: '6px',
+                color: '#ffffff',
+                fontWeight: '700',
+                fontSize: '11.5px',
+                padding: '2px 8px',
+                cursor: 'pointer',
+                marginLeft: '4px'
+              }}
+            >
+              {toast.actionLabel || '되돌리기'}
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@ export interface Product {
   id: string;
   name: string;
   price: number;
+  childPrice?: number; // 어린이/할인 가격 (선택적)
   category: 'bakery' | 'food' | 'etc';
   emoji: string;
   color?: string; // Card accent color
@@ -30,13 +31,23 @@ export interface ClosingReport {
 }
 
 export interface CartItem {
+  id?: string; // CartItem 고유 키 (product.id + priceType)
   product: Product;
   quantity: number;
+  priceType?: 'adult' | 'child' | 'default';
+  unitPrice?: number; // 적용된 단가
   discount?: number; // 개당 할인 금액 (원 단위)
   discountQty?: number; // 할인을 적용할 수량 (개수)
   isPercent?: boolean; // 퍼센트 할인 여부
   discountPercent?: number; // 할인 퍼센트 수치 (예: 10)
   excludeFromCartDiscount?: boolean; // 전체 할인 계산에서 이 품목을 제외할지 여부
+}
+
+export interface CartDraft {
+  id: string;
+  savedAt: string | number;
+  items: CartItem[];
+  discountPercent?: number;
 }
 
 export interface CashierUser {
@@ -96,17 +107,17 @@ declare global {
 
 export const normalizeCategory = (cat: string, name?: string): 'bakery' | 'food' | 'etc' => {
   if (!cat) return 'etc';
-  const c = cat.trim();
+  const c = cat.trim().toLowerCase();
   
   if (name) {
     const n = name.toLowerCase();
-    if (n.includes('쿠키') || n.includes('머핀') || n.includes('마들렌') || n.includes('브라우니')) {
+    if (n.includes('쿠키') || n.includes('머핀') || n.includes('마들렌') || n.includes('브라우니') || n.includes('빵') || n.includes('식빵')) {
       return 'bakery';
     }
   }
 
-  if (c === '베이커리' || c === '쿠키/제과' || c === '제과류' || c === 'bakery') return 'bakery';
-  if (c === '간식및선물세트' || c === 'food') return 'food';
+  if (c === '베이커리' || c === '쿠키/제과' || c === '제과류' || c === 'bakery' || c === 'bread' || c === '빵' || c === 'pastry' || c === 'cake') return 'bakery';
+  if (c === '간식및선물세트' || c === 'food' || c === '선물세트' || c === '선물' || c === 'gift' || c === '간식') return 'food';
   if (c === '기타' || c === 'etc') return 'etc';
   return 'etc';
 };

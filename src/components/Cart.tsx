@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { CartItem } from '../types';
-import { Plus, Minus, RotateCcw, X } from 'lucide-react';
+import { CartItem, CartDraft, Product } from '../types';
+import { Plus, Minus, Undo2, X, MoreHorizontal, Tag, Save, FileText, Trash2, Zap, CreditCard } from 'lucide-react';
 import Button from './ui/Button';
 import Modal from './ui/Modal';
 import { Input } from './ui/Field';
@@ -11,15 +11,23 @@ interface CartProps {
   cartDiscountPercent: number;
   cartDiscountAmount: number;
   itemDiscountAmount: number;
-  onIncrease: (productId: string) => void;
-  onDecrease: (productId: string) => void;
-  onDelete: (productId: string) => void;
+  onIncrease: (itemKeyOrProductId: string) => void;
+  onDecrease: (itemKeyOrProductId: string) => void;
+  onDelete: (itemKeyOrProductId: string) => void;
   onClear: () => void;
   onCheckout: () => void;
   onApplyDiscount: (percent: number) => void;
   onApplyItemDiscount: (productId: string, amount: number, qty: number, isPercent?: boolean, percentVal?: number) => void;
-  onToggleDiscountExclusion: (productId: string) => void;
-  onSetQuantity: (productId: string, quantity: number) => void;
+  onToggleDiscountExclusion?: (productId: string) => void;
+  onSetQuantity: (itemKeyOrProductId: string, quantity: number) => void;
+  onUndo?: () => void;
+  canUndo?: boolean;
+  drafts?: CartDraft[];
+  onSaveDraft?: () => void;
+  onLoadDraft?: (draftId: string) => void;
+  onRemoveDraft?: (draftId: string) => void;
+  products?: Product[];
+  onQuickAdd?: (product: Product) => void;
   role: 'Owner' | 'Staff';
 }
 
@@ -36,32 +44,46 @@ const Cart: React.FC<CartProps> = ({
   onCheckout,
   onApplyDiscount,
   onApplyItemDiscount,
-  onToggleDiscountExclusion,
+  onToggleDiscountExclusion: _onToggleDiscountExclusion,
   onSetQuantity,
+  onUndo,
+  canUndo = false,
+  drafts = [],
+  onSaveDraft,
+  onLoadDraft,
+  onRemoveDraft,
+  products = [],
+  onQuickAdd,
 }) => {
   // Modal Visibility States
   const [isCartDiscountOpen, setIsCartDiscountOpen] = useState(false);
   const [isItemDiscountOpen, setIsItemDiscountOpen] = useState(false);
-  const [isStackingOpen, setIsStackingOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isDraftsModalOpen, setIsDraftsModalOpen] = useState(false);
+  const [isOrderMemoOpen, setIsOrderMemoOpen] = useState(false);
+  const [orderMemo, setOrderMemo] = useState('');
   const [qtyModalItem, setQtyModalItem] = useState<CartItem | null>(null);
   const [qtyInputVal, setQtyInputVal] = useState<string>('1');
 
-  // Focus Items
+  // Item Discount Focus
   const [selectedItem, setSelectedItem] = useState<CartItem | null>(null);
-  const [pendingCartPercent, setPendingCartPercent] = useState<number>(0);
-
-  // Input states
   const [customCartPercent, setCustomCartPercent] = useState('');
   const [customItemPercent, setCustomItemPercent] = useState('');
 
-  const originalSubtotal = items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+  const originalSubtotal = items.reduce(
+    (sum, item) => sum + ((item.unitPrice || item.product.price) * item.quantity),
+    0
+  );
 
-  // Helper to retrieve calculated unit and total discount for visual rendering
+  const totalItemTypes = items.length;
+  const totalItemQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Helper to retrieve calculated discount info
   const getItemDiscountDetails = (item: CartItem) => {
-    // 1. Check explicit item-level discount override
+    const basePrice = item.unitPrice || item.product.price;
     if (item.discountPercent !== undefined && item.discountPercent > 0) {
       const pct = Math.min(100, Math.max(0, item.discountPercent));
-      const unitDiscount = Math.round(item.product.price * (pct / 100));
+      const unitDiscount = Math.round(basePrice * (pct / 100));
       return {
         unitDiscount,
         totalDiscount: unitDiscount * item.quantity,
@@ -80,581 +102,637 @@ const Cart: React.FC<CartProps> = ({
       };
     }
 
-    // 2. Fallback to product-defined discount (e.g. Expiry 30%, Regular 10%)
     if (item.product.discountPercent && item.product.discountPercent > 0) {
       const pct = item.product.discountPercent;
-      const unitDiscount = Math.round(item.product.price * (pct / 100));
+      const unitDiscount = Math.round(basePrice * (pct / 100));
       return {
         unitDiscount,
         totalDiscount: unitDiscount * item.quantity,
         percent: pct,
         isPercent: true,
-        discountType: item.product.discountType || (item.product.name.includes('임박') ? 'expiry' : 'regular')
+        discountType: item.product.discountType || 'regular'
       };
     }
 
-    return {
-      unitDiscount: 0,
-      totalDiscount: 0,
-      percent: 0,
-      isPercent: false,
-      discountType: item.product.discountType || 'none'
-    };
+    return { unitDiscount: 0, totalDiscount: 0, percent: 0, isPercent: false, discountType: 'none' };
   };
 
-  // Calculate discounts separated by discount type
-  const calculateDiscounts = (cartItems: CartItem[]) => {
-    const normalItems: CartItem[] = [];
-    const regularDiscountItems: CartItem[] = [];
-    const expiryDiscountItems: CartItem[] = [];
-
-    let regularDiscountTotal = 0;
-    let expiryDiscountTotal = 0;
-
-    cartItems.forEach(item => {
-      const disc = getItemDiscountDetails(item);
-      if (disc.discountType === 'expiry') {
-        expiryDiscountItems.push(item);
-        expiryDiscountTotal += disc.totalDiscount;
-      } else if (disc.discountType === 'regular' || disc.percent === 10) {
-        regularDiscountItems.push(item);
-        regularDiscountTotal += disc.totalDiscount;
-      } else {
-        normalItems.push(item);
-      }
-    });
-
-    return {
-      normalItems,
-      regularDiscountItems,
-      expiryDiscountItems,
-      regularDiscountTotal,
-      expiryDiscountTotal
-    };
-  };
-
-  // Cart-wide discount handler
-  const requestCartDiscount = (percent: number) => {
-    const cleanPercent = Math.min(100, Math.max(0, percent));
-    setIsCartDiscountOpen(false);
-
-    // Check if any cart item already has an item discount
-    const hasItemDiscount = items.some(item => {
-      const info = getItemDiscountDetails(item);
-      return info.totalDiscount > 0;
-    });
-
-    if (cleanPercent > 0 && hasItemDiscount) {
-      setPendingCartPercent(cleanPercent);
-      setIsStackingOpen(true);
-    } else {
-      onApplyDiscount(cleanPercent);
-    }
-  };
-
-  const handleCustomCartDiscountSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const parsed = parseInt(customCartPercent, 10);
-    if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) {
-      requestCartDiscount(parsed);
-    }
-    setCustomCartPercent('');
-  };
-
-  // Stacking Modal Actions
-  const handleStackingApplyBoth = () => {
-    onApplyDiscount(pendingCartPercent);
-    setIsStackingOpen(false);
-  };
-
-  const handleStackingReplace = () => {
-    // Clear all individual item discounts
-    items.forEach(item => {
-      onApplyItemDiscount(item.product.id, 0, 0, false, 0);
-    });
-    onApplyDiscount(pendingCartPercent);
-    setIsStackingOpen(false);
-  };
-
-  const handleStackingCancel = () => {
-    setIsStackingOpen(false);
-  };
-
-  // Item discount handlers
-  const openItemDiscountModal = (item: CartItem) => {
-    setSelectedItem(item);
-    setCustomItemPercent('');
-    setIsItemDiscountOpen(true);
-  };
-
-  const applyItemDiscount = (percent: number) => {
-    if (!selectedItem) return;
-    const cleanPercent = Math.min(100, Math.max(0, percent));
-    if (cleanPercent > 0) {
-      const calculatedAmt = Math.round(selectedItem.product.price * (cleanPercent / 100));
-      onApplyItemDiscount(selectedItem.product.id, calculatedAmt, selectedItem.quantity, true, cleanPercent);
-    } else {
-      onApplyItemDiscount(selectedItem.product.id, 0, 0, false, 0);
-    }
-    setIsItemDiscountOpen(false);
-    setSelectedItem(null);
-  };
-
-  const handleCustomItemDiscountSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const parsed = parseInt(customItemPercent, 10);
-    if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) {
-      applyItemDiscount(parsed);
-    }
-    setCustomItemPercent('');
-  };
-
-  // Direct quantity modal trigger
-  const handleQuantityClick = (item: CartItem) => {
+  const handleOpenQtyModal = (item: CartItem) => {
     setQtyModalItem(item);
     setQtyInputVal(String(item.quantity));
   };
 
-  const handleQuantitySubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleApplyQtyModal = () => {
     if (!qtyModalItem) return;
+    const itemKey = qtyModalItem.id || `${qtyModalItem.product.id}_${qtyModalItem.priceType || 'default'}`;
     const parsed = parseInt(qtyInputVal, 10);
-    if (!isNaN(parsed) && parsed >= 0) {
-      onSetQuantity(qtyModalItem.product.id, parsed);
+    if (!isNaN(parsed) && parsed > 0) {
+      onSetQuantity(itemKey, parsed);
+    } else if (parsed === 0) {
+      onDelete(itemKey);
     }
     setQtyModalItem(null);
   };
 
-  // Shared content for the two percent-discount modals
-  const renderPercentPicker = (
-    onPick: (pct: number) => void,
-    formValue: string,
-    setFormValue: (v: string) => void,
-    onFormSubmit: (e: React.FormEvent) => void
-  ) => (
-    <>
-      {/* Quick Percentage Buttons */}
-      <div style={{ marginBottom: '20px' }}>
-        <div className="bo-label" style={{ marginBottom: '8px' }}>할인율 (%) 선택</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-          {[5, 10, 20, 30].map((pct) => (
-            <Button key={pct} variant="secondary" size="sm" onClick={() => onPick(pct)}>
-              {pct}%
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {/* Custom Percentage Form */}
-      <form onSubmit={onFormSubmit} style={{ marginBottom: '20px' }}>
-        <div className="bo-label" style={{ marginBottom: '8px' }}>할인율 직접 입력 (%)</div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <Input
-            type="number"
-            placeholder="0~100"
-            value={formValue}
-            onChange={(e) => setFormValue(e.target.value)}
-            min="0"
-            max="100"
-            style={{ flex: 1 }}
-          />
-          <Button type="submit" variant="primary" size="md">적용</Button>
-        </div>
-      </form>
-
-      {/* Reset Button */}
-      <hr className="bo-divider" />
-      <Button variant="secondary" size="md" fullWidth onClick={() => onPick(0)}>
-        할인 적용 해제
-      </Button>
-    </>
-  );
+  const openItemDiscountModal = (item: CartItem) => {
+    setSelectedItem(item);
+    const existing = getItemDiscountDetails(item);
+    setCustomItemPercent(existing.percent > 0 ? String(existing.percent) : '');
+    setIsItemDiscountOpen(true);
+  };
 
   return (
-    <div className="cart-panel-root" style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      {/* Cart Header */}
-      <div className="cart-header" style={{ flexShrink: 0 }}>
-        <h2>장바구니</h2>
-        {items.length > 0 && (
-          <button type="button" className="clear-cart-btn" onClick={onClear}>
-            <RotateCcw size={12} />
-            <span>전체 삭제</span>
-          </button>
-        )}
-      </div>
+    <aside className="order-panel" aria-label="주문 및 결제 콘솔">
+      {/* 1. Order Header */}
+      <header className="order-header">
+        <div className="order-header-info">
+          <div className="order-header-title-row">
+            <h2 className="order-title">새 주문</h2>
+            {orderMemo && <span className="order-memo-badge" title={orderMemo}>📝 메모</span>}
+          </div>
+          <p className="order-subtitle">
+            상품 {totalItemTypes}종 · 총 {totalItemQuantity}개
+          </p>
+        </div>
 
-      {/* Cart Items List */}
-      <div className="cart-items-list" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '12px 16px' }}>
+        <div className="order-header-actions">
+          {canUndo && onUndo && (
+            <button
+              type="button"
+              className="order-undo-btn"
+              onClick={onUndo}
+              title="직전 변경 되돌리기 (Ctrl+Z)"
+              aria-label="되돌리기"
+            >
+              <Undo2 size={14} />
+              <span>되돌리기</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="order-more-btn"
+            onClick={() => setIsMoreMenuOpen(true)}
+            title="주문 추가 메뉴"
+            aria-label="주문 추가 옵션 메뉴 열기"
+          >
+            <MoreHorizontal size={18} />
+          </button>
+        </div>
+      </header>
+
+      {/* 2. Order Items Scroll List */}
+      <main className="order-items-scroll">
         {items.length === 0 ? (
-          <div className="cart-empty">
-            <span className="cart-empty-icon">🛒</span>
-            <div className="cart-empty-text">선택된 상품이 없습니다.</div>
+          <div className="order-empty">
+            <span className="order-empty-icon" aria-hidden="true">🛒</span>
+            <p className="order-empty-title">선택된 상품이 없습니다</p>
+            <p className="order-empty-desc">왼쪽 상품 카드를 클릭하여 주문을 추가하세요.</p>
+
+            {products.length > 0 && onQuickAdd && (
+              <div className="quick-recommend-box">
+                <div className="quick-recommend-title">
+                  <Zap size={13} className="quick-zap-icon" />
+                  <span>자주 찾는 인기 상품 빠른 추가</span>
+                </div>
+                <div className="quick-recommend-chips">
+                  {products.slice(0, 6).map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className="quick-recommend-chip"
+                      onClick={() => onQuickAdd(p)}
+                      title={`${p.name} (${p.price.toLocaleString()}원) 바로 담기`}
+                    >
+                      <span className="quick-chip-emoji">{p.emoji || '🍞'}</span>
+                      <span className="quick-chip-name">{p.name}</span>
+                      <span className="quick-chip-price">{p.price.toLocaleString()}원</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
-          items.map((item) => {
-            const discInfo = getItemDiscountDetails(item);
-            const isDiscounted = discInfo.totalDiscount > 0;
-            const finalItemPrice = item.product.price - discInfo.unitDiscount;
+          <div className="order-items-list">
+            {items.map((item) => {
+              const itemKey = item.id || `${item.product.id}_${item.priceType || 'default'}`;
+              const itemUnitPrice = item.unitPrice || item.product.price;
+              const discInfo = getItemDiscountDetails(item);
+              const isDiscounted = discInfo.totalDiscount > 0;
+              const finalItemPrice = itemUnitPrice - discInfo.unitDiscount;
+              const lineTotal = (isDiscounted ? finalItemPrice : itemUnitPrice) * item.quantity;
 
-            return (
-              <div key={item.product.id} className="cart-item">
-                {item.product.imageUrl ? (
-                  <img src={item.product.imageUrl} alt={item.product.name} className="cart-item-thumb" />
-                ) : (
-                  <div className="cart-item-thumb cart-item-thumb--emoji">{item.product.emoji || '🍞'}</div>
-                )}
-                <div className="cart-item-body">
-                {/* Top Row: Name on Left, Total Price on Right */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                  <div className="cart-item-name">
-                    {item.product.name}
+              return (
+                <article key={itemKey} className="order-item-row">
+                  {/* Top: Name on Left, Total Amount on Right */}
+                  <div className="order-item-top">
+                    <span className="order-item-name" title={item.product.name}>
+                      {item.product.name}
+                    </span>
+                    <span className="order-item-line-total">
+                      {lineTotal.toLocaleString()}원
+                    </span>
+                  </div>
+
+                  {/* Middle: Subtitle Info (Price Type, Unit Price, Discount Badge) */}
+                  <div className="order-item-sub">
+                    {item.priceType && item.priceType !== 'default' && (
+                      <span className="order-badge price-type-badge">
+                        {item.priceType === 'child' ? '어린이' : '성인'}
+                      </span>
+                    )}
+                    <span className="order-unit-price">
+                      단가 {itemUnitPrice.toLocaleString()}원
+                    </span>
+                    {isDiscounted && (
+                      <span className="order-badge discount-badge">
+                        -{discInfo.unitDiscount.toLocaleString()}원
+                      </span>
+                    )}
                     {item.excludeFromCartDiscount && (
-                      <span
-                        className="bo-badge"
-                        style={{ marginLeft: '6px', fontSize: '10px', fontWeight: '700', padding: '1px 6px', borderRadius: '4px', background: '#f1f5f9', color: 'var(--text-secondary)' }}
-                      >
-                        할인 제외
+                      <span className="order-badge neutral-badge">
+                        전체할인제외
                       </span>
                     )}
                   </div>
-                  <div className="cart-item-total" style={{ width: 'auto', textAlign: 'right' }}>
-                    {((isDiscounted ? finalItemPrice : item.product.price) * item.quantity).toLocaleString()}원
-                  </div>
-                </div>
 
-                {/* Middle Row: Unit Price & Discount Badge */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-                  {isDiscounted ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      <span style={{ textDecoration: 'line-through', opacity: 0.5 }}>
-                        {item.product.price.toLocaleString()}원
-                      </span>
-                      <span style={{ fontWeight: '700', color: 'var(--primary)' }}>
-                        {finalItemPrice.toLocaleString()}원
-                      </span>
-                      {discInfo.discountType === 'expiry' ? (
-                        <span
-                          className="bo-badge"
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            background: '#fee2e2',
-                            color: '#dc2626',
-                            border: '1px solid #fca5a5'
-                          }}
-                        >
-                          ⏰ 유통기한 임박 30% 할인
-                        </span>
-                      ) : discInfo.discountType === 'regular' || discInfo.percent === 10 ? (
-                        <span
-                          className="bo-badge"
-                          style={{
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            background: '#fff4e6',
-                            color: '#d9480f',
-                            border: '1px solid #fed7aa'
-                          }}
-                        >
-                          🏷️ 10% 할인
-                        </span>
-                      ) : (
-                        <span className="bo-badge bo-badge--danger" style={{ fontSize: '10.5px', fontWeight: '700', padding: '1px 6px', borderRadius: '4px' }}>
-                          {discInfo.percent > 0 ? `${discInfo.percent}% 할인` : `-${discInfo.unitDiscount.toLocaleString()}원 할인`}
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <span>{item.product.price.toLocaleString()}원</span>
-                  )}
-                </div>
-
-                {/* Bottom Row: Controls [-] 1 [+]   🏷 Discount   ✕ */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px', flexWrap: 'wrap', gap: '6px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                    {/* Quantity Controls */}
-                    <div className="cart-item-controls">
+                  {/* Bottom: Quantity Controls Group [-] Qty [+] & Action Buttons */}
+                  <div className="order-item-bottom">
+                    <div className="order-qty-control" role="group" aria-label="수량 조절">
                       <button
                         type="button"
-                        className="quantity-btn"
-                        onClick={() => onDecrease(item.product.id)}
+                        className="qty-btn minus"
+                        onClick={() => onDecrease(itemKey)}
+                        title="수량 1 감소"
+                        aria-label={`${item.product.name} 수량 1 감소`}
                       >
-                        <Minus size={12} />
+                        <Minus size={14} />
                       </button>
-                      <span
-                        className="cart-item-quantity"
-                        onClick={() => handleQuantityClick(item)}
-                        style={{ cursor: 'pointer', textDecoration: 'underline dotted' }}
+                      <button
+                        type="button"
+                        className="qty-value-btn"
+                        onClick={() => handleOpenQtyModal(item)}
                         title="클릭하여 수량 직접 입력"
+                        aria-label={`현재 수량 ${item.quantity}개, 클릭하여 변경`}
                       >
                         {item.quantity}
-                      </span>
+                      </button>
                       <button
                         type="button"
-                        className="quantity-btn"
-                        onClick={() => onIncrease(item.product.id)}
+                        className="qty-btn plus"
+                        onClick={() => onIncrease(itemKey)}
+                        title="수량 1 증가"
+                        aria-label={`${item.product.name} 수량 1 증가`}
                       >
-                        <Plus size={12} />
+                        <Plus size={14} />
                       </button>
                     </div>
 
-                    {/* Dedicated Per-Item Discount Button */}
-                    <button
-                      type="button"
-                      className={`item-discount-btn ${isDiscounted ? 'discounted' : ''}`}
-                      onClick={() => openItemDiscountModal(item)}
-                    >
-                      <span>🏷️</span>
-                      <span>{isDiscounted ? '할인 수정' : '할인'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`item-exclude-btn ${item.excludeFromCartDiscount ? 'active' : ''}`}
-                      onClick={() => onToggleDiscountExclusion(item.product.id)}
-                      title="전체 할인 적용 시 이 상품을 제외합니다"
-                    >
-                      <span>{item.excludeFromCartDiscount ? '✅' : '⬜'}</span>
-                      <span>할인 제외</span>
-                    </button>
+                    <div className="order-item-actions">
+                      <button
+                        type="button"
+                        className={`item-action-tag-btn ${isDiscounted ? 'active' : ''}`}
+                        onClick={() => openItemDiscountModal(item)}
+                        title="개별 품목 할인 설정"
+                      >
+                        <Tag size={13} />
+                        <span>{isDiscounted ? '할인중' : '할인'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="item-action-delete-btn"
+                        onClick={() => onDelete(itemKey)}
+                        title="품목 삭제"
+                        aria-label={`${item.product.name} 삭제`}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
                   </div>
-
-                  {/* Remove button */}
-                  <button
-                    type="button"
-                    className="delete-item-btn"
-                    onClick={() => onDelete(item.product.id)}
-                    title="상품 삭제"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-                </div>
-              </div>
-            );
-          })
+                </article>
+              );
+            })}
+          </div>
         )}
-      </div>
+      </main>
 
-      {/* Cart Summary & Footer Controls (Fixed at bottom) */}
-      <div className="cart-footer" style={{ flexShrink: 0, marginTop: 'auto', borderTop: '1px solid var(--border-color)', padding: '16px', background: '#f8fafc' }}>
-        <div className="summary-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13.5px', color: 'var(--text-secondary)' }}>
-          <span>상품 금액</span>
-          <span>{originalSubtotal.toLocaleString()}원</span>
+      {/* 3. Order Summary Section */}
+      <section className="order-summary-box" aria-label="주문 금액 요약">
+        <div className="summary-line">
+          <span className="summary-label">상품 금액</span>
+          <span className="summary-value">{originalSubtotal.toLocaleString()}원</span>
         </div>
 
-        {(() => {
-          const discountBreakdown = calculateDiscounts(items);
-          return (
-            <>
-              {discountBreakdown.expiryDiscountTotal > 0 && (
-                <div className="summary-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13.5px', color: '#dc2626', fontWeight: '600' }}>
-                  <span>⏰ 임박 할인 (30%)</span>
-                  <span>- {discountBreakdown.expiryDiscountTotal.toLocaleString()}원</span>
-                </div>
-              )}
-              {discountBreakdown.regularDiscountTotal > 0 && (
-                <div className="summary-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13.5px', color: '#d9480f', fontWeight: '600' }}>
-                  <span>🏷️ 일반 할인 (10%)</span>
-                  <span>- {discountBreakdown.regularDiscountTotal.toLocaleString()}원</span>
-                </div>
-              )}
-              {itemDiscountAmount > 0 && discountBreakdown.expiryDiscountTotal === 0 && discountBreakdown.regularDiscountTotal === 0 && (
-                <div className="summary-row" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13.5px', color: 'var(--danger)', fontWeight: '500' }}>
-                  <span>품목 할인 합계</span>
-                  <span>- {itemDiscountAmount.toLocaleString()}원</span>
-                </div>
-              )}
-            </>
-          );
-        })()}
-
         <div
-          className="summary-row"
-          style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px', fontSize: '13.5px', color: cartDiscountAmount > 0 ? 'var(--danger)' : 'var(--text-secondary)', fontWeight: cartDiscountAmount > 0 ? '600' : 'normal' }}
+          className="summary-line clickable"
+          onClick={() => setIsCartDiscountOpen(true)}
+          title="클릭하여 전체 할인 설정"
+          role="button"
+          tabIndex={0}
         >
-          <span>전체 할인</span>
-          <span>
-            {cartDiscountAmount > 0
-              ? `${cartDiscountPercent}% 할인 적용`
+          <span className="summary-label">할인</span>
+          <span className={`summary-value ${cartDiscountAmount + itemDiscountAmount > 0 ? 'has-discount' : 'no-discount'}`}>
+            {cartDiscountAmount + itemDiscountAmount > 0
+              ? `- ${(cartDiscountAmount + itemDiscountAmount).toLocaleString()}원`
               : '할인 없음'}
           </span>
         </div>
 
-        <div className="summary-row total" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #cbd5e1', paddingTop: '14px', marginBottom: '16px' }}>
-          <span style={{ fontWeight: '700', fontSize: '15.5px', color: 'var(--text-primary)' }}>총 결제 금액</span>
-          <span className="total-price" style={{ fontWeight: '800', fontSize: '24px', color: 'var(--primary)' }}>
-            {totalAmount.toLocaleString()}원
-          </span>
-        </div>
+        <div className="summary-divider" aria-hidden="true" />
 
-        <div className="action-buttons">
-          <Button
-            variant="outline"
-            size="md"
-            fullWidth
+        <div className="summary-total-line">
+          <span className="total-label">결제 금액</span>
+          <span className="total-value">{totalAmount.toLocaleString()}원</span>
+        </div>
+      </section>
+
+      {/* 4. Bottom Order Actions (Fixed) */}
+      <footer className="order-actions-footer">
+        <div className="sub-actions-row">
+          <button
+            type="button"
+            className="sub-action-btn"
             onClick={() => setIsCartDiscountOpen(true)}
             disabled={items.length === 0}
           >
-            🏷️ 할인 적용
-          </Button>
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            onClick={onCheckout}
-            disabled={items.length === 0}
-          >
-            결제하기
-          </Button>
-        </div>
-      </div>
+            <Tag size={15} />
+            <span>할인</span>
+          </button>
 
-      {/* Cart Discount Modal */}
+          <button
+            type="button"
+            className="sub-action-btn"
+            onClick={() => {
+              if (drafts.length > 0 && items.length === 0) {
+                setIsDraftsModalOpen(true);
+              } else if (onSaveDraft) {
+                onSaveDraft();
+              }
+            }}
+          >
+            <Save size={15} />
+            <span>임시 저장{drafts.length > 0 ? ` (${drafts.length})` : ''}</span>
+          </button>
+        </div>
+
+        <button
+          type="button"
+          className={`main-checkout-btn ${items.length > 0 ? 'active-ready' : ''}`}
+          onClick={onCheckout}
+          disabled={items.length === 0}
+          aria-label={totalAmount > 0 ? `${totalAmount.toLocaleString()}원 결제하기` : '결제하기'}
+        >
+          <CreditCard size={20} className="checkout-icon" />
+          <span>{totalAmount > 0 ? `${totalAmount.toLocaleString()}원 결제하기` : '결제하기'}</span>
+        </button>
+      </footer>
+
+      {/* --- Modals & Popovers --- */}
+
+      {/* 1. More Menu Modal */}
+      {isMoreMenuOpen && (
+        <Modal
+          title="주문 옵션"
+          maxWidth={360}
+          onClose={() => setIsMoreMenuOpen(false)}
+          closeOnOverlay
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <Button
+              variant="outline"
+              size="md"
+              fullWidth
+              onClick={() => {
+                setIsMoreMenuOpen(false);
+                setIsOrderMemoOpen(true);
+              }}
+            >
+              <FileText size={16} />
+              <span>주문 메모 {orderMemo ? '(작성됨)' : '추가'}</span>
+            </Button>
+
+            {drafts.length > 0 && (
+              <Button
+                variant="outline"
+                size="md"
+                fullWidth
+                onClick={() => {
+                  setIsMoreMenuOpen(false);
+                  setIsDraftsModalOpen(true);
+                }}
+              >
+                <Save size={16} />
+                <span>임시저장 목록 확인 ({drafts.length}건)</span>
+              </Button>
+            )}
+
+            {items.length > 0 && (
+              <Button
+                variant="outline"
+                size="md"
+                fullWidth
+                style={{ color: 'var(--danger)', borderColor: 'var(--danger-border)' }}
+                onClick={() => {
+                  setIsMoreMenuOpen(false);
+                  onClear();
+                }}
+              >
+                <Trash2 size={16} />
+                <span>전체 주문 삭제</span>
+              </Button>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* 2. Order Memo Modal */}
+      {isOrderMemoOpen && (
+        <Modal
+          title="📝 주문 메모"
+          maxWidth={380}
+          onClose={() => setIsOrderMemoOpen(false)}
+          closeOnOverlay
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <textarea
+              className="order-memo-textarea"
+              placeholder="예: 포장 요청, 컷팅 요청, 견과류 알레르기 등"
+              value={orderMemo}
+              onChange={(e) => setOrderMemo(e.target.value)}
+              rows={4}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color)',
+                fontSize: '14px',
+                fontFamily: 'inherit',
+                resize: 'none',
+                outline: 'none'
+              }}
+            />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Button variant="secondary" size="md" fullWidth onClick={() => { setOrderMemo(''); setIsOrderMemoOpen(false); }}>
+                초기화
+              </Button>
+              <Button variant="primary" size="md" fullWidth onClick={() => setIsOrderMemoOpen(false)}>
+                저장
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* 3. Drafts List Modal */}
+      {isDraftsModalOpen && (
+        <Modal
+          title={`💾 임시저장 주문 목록 (${drafts.length}건)`}
+          maxWidth={440}
+          onClose={() => setIsDraftsModalOpen(false)}
+          closeOnOverlay
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '360px', overflowY: 'auto' }}>
+            {drafts.length === 0 ? (
+              <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '24px 0' }}>저장된 임시 주문이 없습니다.</p>
+            ) : (
+              drafts.map((d, idx) => {
+                const draftSum = d.items.reduce((s: number, i: CartItem) => s + (i.product.price * i.quantity), 0);
+                return (
+                  <div
+                    key={d.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-secondary)'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: '700', fontSize: '14.5px' }}>
+                        임시 주문 #{idx + 1} ({d.items.length}종)
+                      </div>
+                      <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        {d.savedAt ? new Date(d.savedAt).toLocaleTimeString() : ''} · {draftSum.toLocaleString()}원
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => {
+                          if (onLoadDraft) onLoadDraft(d.id);
+                          setIsDraftsModalOpen(false);
+                        }}
+                      >
+                        불러오기
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        style={{ color: 'var(--danger)' }}
+                        onClick={() => {
+                          if (onRemoveDraft) onRemoveDraft(d.id);
+                        }}
+                      >
+                        삭제
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* 4. Cart-Wide Discount Modal */}
       {isCartDiscountOpen && (
         <Modal
           title="🏷️ 전체 할인 설정"
           maxWidth={380}
-          zIndex={1200}
           onClose={() => setIsCartDiscountOpen(false)}
           closeOnOverlay
         >
-          {renderPercentPicker(
-            requestCartDiscount,
-            customCartPercent,
-            setCustomCartPercent,
-            handleCustomCartDiscountSubmit
-          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+              {[5, 10, 15, 20].map((pct) => (
+                <button
+                  key={pct}
+                  type="button"
+                  className={`cat-btn ${cartDiscountPercent === pct ? 'selected' : ''}`}
+                  style={{ height: '44px', fontWeight: '700' }}
+                  onClick={() => {
+                    onApplyDiscount(pct);
+                    setIsCartDiscountOpen(false);
+                  }}
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Input
+                type="number"
+                placeholder="직접 입력 (%)"
+                value={customCartPercent}
+                onChange={(e) => setCustomCartPercent(e.target.value)}
+                autoFocus
+              />
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => {
+                  const val = parseInt(customCartPercent, 10);
+                  if (!isNaN(val) && val >= 0 && val <= 100) {
+                    onApplyDiscount(val);
+                    setIsCartDiscountOpen(false);
+                  }
+                }}
+              >
+                적용
+              </Button>
+            </div>
+
+            {cartDiscountPercent > 0 && (
+              <Button
+                variant="secondary"
+                size="md"
+                fullWidth
+                onClick={() => {
+                  onApplyDiscount(0);
+                  setIsCartDiscountOpen(false);
+                }}
+              >
+                할인 해제 (0%)
+              </Button>
+            )}
+          </div>
         </Modal>
       )}
 
-      {/* Item Discount Modal */}
+      {/* 5. Item-Level Discount Modal */}
       {isItemDiscountOpen && selectedItem && (
         <Modal
-          title="🏷️ 품목 개별 할인 설정"
-          description={
-            <>
-              <strong>{selectedItem.product.name}</strong> (정가: {selectedItem.product.price.toLocaleString()}원)
-            </>
-          }
+          title={`🏷️ ${selectedItem.product.name} 할인`}
           maxWidth={380}
-          zIndex={1200}
           onClose={() => setIsItemDiscountOpen(false)}
           closeOnOverlay
         >
-          {renderPercentPicker(
-            applyItemDiscount,
-            customItemPercent,
-            setCustomItemPercent,
-            handleCustomItemDiscountSubmit
-          )}
-        </Modal>
-      )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+              {[5, 10, 20, 30].map((pct) => (
+                <button
+                  key={pct}
+                  type="button"
+                  className="cat-btn"
+                  style={{ height: '44px', fontWeight: '700' }}
+                  onClick={() => {
+                    onApplyItemDiscount(selectedItem.product.id, 0, selectedItem.quantity, true, pct);
+                    setIsItemDiscountOpen(false);
+                  }}
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
 
-      {/* Stacking Confirmation Modal */}
-      {isStackingOpen && (
-        <Modal
-          title="할인 중복 적용"
-          description="일부 상품에 개별 할인이 이미 적용되어 있습니다. 전체 할인을 어떻게 적용할까요?"
-          maxWidth={400}
-          zIndex={1300}
-          onClose={handleStackingCancel}
-          closeOnOverlay
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <Button variant="primary" size="md" fullWidth onClick={handleStackingApplyBoth}>
-              개별 할인과 함께 적용
-            </Button>
-            <Button variant="outline" size="md" fullWidth onClick={handleStackingReplace}>
-              개별 할인 해제 후 전체 할인만 적용
-            </Button>
-            <Button variant="secondary" size="md" fullWidth onClick={handleStackingCancel}>
-              취소
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Input
+                type="number"
+                placeholder="직접 입력 (%)"
+                value={customItemPercent}
+                onChange={(e) => setCustomItemPercent(e.target.value)}
+                autoFocus
+              />
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => {
+                  const val = parseInt(customItemPercent, 10);
+                  if (!isNaN(val) && val >= 0 && val <= 100) {
+                    onApplyItemDiscount(selectedItem.product.id, 0, selectedItem.quantity, true, val);
+                    setIsItemDiscountOpen(false);
+                  }
+                }}
+              >
+                적용
+              </Button>
+            </div>
+
+            <Button
+              variant="secondary"
+              size="md"
+              fullWidth
+              onClick={() => {
+                onApplyItemDiscount(selectedItem.product.id, 0, selectedItem.quantity, false, 0);
+                setIsItemDiscountOpen(false);
+              }}
+            >
+              품목 할인 해제
             </Button>
           </div>
         </Modal>
       )}
 
-      {/* Quantity Change Modal */}
+      {/* 6. Quantity Direct Input Modal */}
       {qtyModalItem && (
         <Modal
-          title={`수량 변경: ${qtyModalItem.product.name}`}
-          description="구매하실 수량을 직접 입력하거나 빠른 버튼을 선택해 주세요."
+          title={`🔢 ${qtyModalItem.product.name} 수량 변경`}
           maxWidth={360}
-          zIndex={1250}
           onClose={() => setQtyModalItem(null)}
           closeOnOverlay
         >
-          <form onSubmit={handleQuantitySubmit}>
-            <div style={{ marginBottom: '16px' }}>
-              <div className="bo-label" style={{ marginBottom: '8px' }}>빠른 수량 선택</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
-                {[1, 2, 3, 5, 10].map((qty) => (
-                  <Button
-                    key={qty}
-                    type="button"
-                    variant={qtyInputVal === String(qty) ? 'primary' : 'secondary'}
-                    size="sm"
-                    onClick={() => {
-                      onSetQuantity(qtyModalItem.product.id, qty);
-                      setQtyModalItem(null);
-                    }}
-                  >
-                    {qty}
-                  </Button>
-                ))}
-              </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+              {[1, 2, 3, 5, 10].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className="cat-btn"
+                  style={{ height: '44px', fontWeight: '700' }}
+                  onClick={() => setQtyInputVal(String(n))}
+                >
+                  {n}
+                </button>
+              ))}
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
-              <div className="bo-label" style={{ marginBottom: '8px' }}>수량 직접 입력</div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <Input
-                  type="number"
-                  autoFocus
-                  min="0"
-                  max="999"
-                  value={qtyInputVal}
-                  onChange={(e) => setQtyInputVal(e.target.value)}
-                  style={{ flex: 1, fontSize: '16px', fontWeight: '700', textAlign: 'center' }}
-                />
-                <Button type="submit" variant="primary" size="md">
-                  적용
-                </Button>
-              </div>
-            </div>
+            <Input
+              type="number"
+              value={qtyInputVal}
+              onChange={(e) => setQtyInputVal(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleApplyQtyModal()}
+              autoFocus
+            />
 
             <div style={{ display: 'flex', gap: '8px' }}>
               <Button
-                type="button"
-                variant="outline"
-                size="sm"
+                variant="secondary"
+                size="md"
                 fullWidth
+                style={{ color: 'var(--danger)' }}
                 onClick={() => {
-                  onSetQuantity(qtyModalItem.product.id, 0);
+                  const itemKey = qtyModalItem.id || `${qtyModalItem.product.id}_${qtyModalItem.priceType || 'default'}`;
+                  onDelete(itemKey);
                   setQtyModalItem(null);
                 }}
-                style={{ color: 'var(--danger)' }}
               >
-                품목 삭제 (0개)
+                삭제
               </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                fullWidth
-                onClick={() => setQtyModalItem(null)}
-              >
-                닫기
+              <Button variant="primary" size="md" fullWidth onClick={handleApplyQtyModal}>
+                확인
               </Button>
             </div>
-          </form>
+          </div>
         </Modal>
       )}
-    </div>
+    </aside>
   );
 };
 
