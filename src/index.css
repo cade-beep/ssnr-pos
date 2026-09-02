@@ -702,35 +702,51 @@ body {
   margin: 0;
 }
 
-/* Product Grid Densities */
+/* Product Grid Densities (Desktop: auto-fill responsive, iPad: 3/4 cols fixed) */
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
   align-content: start;
-  gap: 12px;
+  gap: 14px;
   padding: 16px 20px 32px;
   transition: all 0.2s ease;
 }
+.product-grid.comfortable {
+  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+  align-content: start;
+  gap: 14px;
+}
 .product-grid.compact {
-  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   align-content: start;
   gap: 10px;
+  padding: 14px 16px 28px;
 }
-.product-grid.comfortable {
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  align-content: start;
-  gap: 16px;
+
+/* iPad Landscape & Tablet Workspace (861px ~ 1260px)
+   사이드바(72px) + 주문패널(420px)을 제외한 가용 폭(약 540~720px)에서
+   기본 3열, 작게 4열을 정확하고 안정적으로 고정 */
+@media (min-width: 861px) and (max-width: 1260px) {
+  .product-grid,
+  .product-grid.comfortable {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 12px;
+  }
+  .product-grid.compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 9px;
+  }
 }
 
 /* 2.4 Product Card (Keypad-Style Dense POS Card) */
 .product-card {
   position: relative;
-  min-height: 145px;
+  min-height: 160px;
   height: auto;
   background: #FFFFFF;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  padding: 12px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
   cursor: pointer;
@@ -740,9 +756,17 @@ body {
   user-select: none;
 }
 .product-card.comfortable {
-  min-height: 190px;
+  min-height: 165px;
   height: auto;
-  padding: 16px;
+  padding: 14px;
+}
+.product-card.compact,
+.product-grid.compact .product-card {
+  min-height: 120px;
+  height: auto;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  gap: 2px;
 }
 .product-card:hover {
   border-color: #B4DBFF;
@@ -882,6 +906,70 @@ body {
   font-weight: 600;
   color: var(--text-secondary);
   margin-left: 2px;
+}
+
+/* Compact Card Specific Overrides (Clean 4-column POS display) */
+.product-card.compact .card-image-wrap,
+.product-grid.compact .card-image-wrap {
+  height: 64px;
+  max-height: 64px;
+  aspect-ratio: auto;
+  margin-bottom: 6px;
+  border-radius: 6px;
+}
+.product-card.compact .card-image-emoji,
+.product-grid.compact .card-image-emoji {
+  font-size: 32px;
+}
+.product-card.compact .card-body,
+.product-grid.compact .card-body {
+  gap: 3px;
+}
+.product-card.compact .card-name-row,
+.product-grid.compact .card-name-row {
+  align-items: center;
+  gap: 4px;
+}
+/* Compact mode: single-line ellipsis instead of multi-line */
+.product-card.compact .card-name,
+.product-grid.compact .card-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: auto;
+  flex: 1;
+}
+.product-card.compact .card-favorite-btn,
+.product-grid.compact .card-favorite-btn {
+  width: 24px;
+  height: 24px;
+  top: 5px;
+  right: 5px;
+}
+.product-card.compact .card-favorite-btn svg,
+.product-grid.compact .card-favorite-btn svg {
+  width: 13px;
+  height: 13px;
+}
+.product-card.compact .card-qty-badge,
+.product-grid.compact .card-qty-badge {
+  font-size: 11px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
+}
+.product-card.compact .card-price,
+.product-grid.compact .card-price {
+  font-size: 14.5px;
+  letter-spacing: -0.3px;
+}
+.product-card.compact .currency-unit,
+.product-grid.compact .currency-unit {
+  font-size: 11.5px;
 }
 
 /* ==========================================================================
@@ -3390,6 +3478,17 @@ body {
 
 /* Tablet portrait / narrow — pack even tighter */
 @media (max-width: 860px) {
+  .product-grid,
+  .product-grid.comfortable {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px;
+    padding: 12px 14px 24px;
+  }
+  .product-grid.compact {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px;
+    padding: 10px 12px 20px;
+  }
   .products-grid {
     grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
     gap: 10px;
@@ -3404,6 +3503,13 @@ body {
   .sidebar-nav-label { font-size: 10px; }
   .sidebar-brand-text { display: none; }
 
+  .product-grid,
+  .product-grid.comfortable,
+  .product-grid.compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px;
+    padding: 8px 10px 16px;
+  }
   .products-grid {
     grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
   }

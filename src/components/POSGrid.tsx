@@ -30,7 +30,7 @@ const CATEGORY_ORDER: Record<string, number> = {
 };
 
 const FAVORITES_STORAGE_KEY = 'ssnr_pos_favorite_products';
-const DENSITY_STORAGE_KEY = 'ssnr_pos_grid_density';
+const DENSITY_STORAGE_KEY = 'ssnr_pos_grid_density_v2';
 const SALES_INSIGHT_LOOKBACK_DAYS = 30;
 const SALES_INSIGHT_ROW_LIMIT = 1000;
 
@@ -42,9 +42,9 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
   const [density, setDensity] = useState<GridDensity>(() => {
     try {
       const saved = localStorage.getItem(DENSITY_STORAGE_KEY);
-      return (saved === 'comfortable' || saved === 'compact') ? saved : 'compact';
+      return (saved === 'comfortable' || saved === 'compact') ? saved : 'comfortable';
     } catch {
-      return 'compact';
+      return 'comfortable';
     }
   });
 
@@ -181,41 +181,66 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
     }
   };
 
-  const bestSellerRank = new Map(bestSellerIds.map((id, idx) => [id, idx]));
-  const recentSoldRank = new Map(recentSoldIds.map((id, idx) => [id, idx]));
+  const bestSellerRank = useMemo(
+    () => new Map(bestSellerIds.map((id, idx) => [id, idx])),
+    [bestSellerIds]
+  );
 
-  const filteredProducts = products.filter((p) => {
-    if (searchTerm.trim() !== '') {
-      if (!matchProductSearch(p, searchTerm)) {
-        return false;
+  const recentSoldRank = useMemo(
+    () => new Map(recentSoldIds.map((id, idx) => [id, idx])),
+    [recentSoldIds]
+  );
+
+  const cartQuantityMap = useMemo(() => {
+    const quantityMap = new Map<string, number>();
+    for (const item of cart) {
+      if (!item?.product?.id) continue;
+      const productId = item.product.id;
+      const previousQuantity = quantityMap.get(productId) ?? 0;
+      quantityMap.set(productId, previousQuantity + (item.quantity || 0));
+    }
+    return quantityMap;
+  }, [cart]);
+
+  const filteredProducts = useMemo(() => {
+    const list = products.filter((p) => {
+      if (searchTerm.trim() !== '') {
+        if (!matchProductSearch(p, searchTerm)) {
+          return false;
+        }
       }
+
+      if (smartFilter === 'favorites') return favoriteIds.has(p.id);
+      if (smartFilter === 'bestsellers') return bestSellerRank.has(p.id);
+      if (smartFilter === 'recent') return recentSoldRank.has(p.id);
+
+      if (selectedCategory === 'all' || selectedCategory === '전체') return true;
+      return normalizeCategory(p.category, p.name) === selectedCategory;
+    });
+
+    if (sortOption === 'price_asc') {
+      list.sort((a, b) => a.price - b.price);
+    } else if (sortOption === 'price_desc') {
+      list.sort((a, b) => b.price - a.price);
+    } else if (smartFilter === 'bestsellers') {
+      list.sort((a, b) => (bestSellerRank.get(a.id) ?? 0) - (bestSellerRank.get(b.id) ?? 0));
+    } else if (smartFilter === 'recent') {
+      list.sort((a, b) => (recentSoldRank.get(a.id) ?? 0) - (recentSoldRank.get(b.id) ?? 0));
+    } else {
+      list.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
     }
 
-    if (smartFilter === 'favorites') return favoriteIds.has(p.id);
-    if (smartFilter === 'bestsellers') return bestSellerRank.has(p.id);
-    if (smartFilter === 'recent') return recentSoldRank.has(p.id);
-
-    if (selectedCategory === 'all' || selectedCategory === '전체') return true;
-    return normalizeCategory(p.category, p.name) === selectedCategory;
-  });
-
-  if (sortOption === 'price_asc') {
-    filteredProducts.sort((a, b) => a.price - b.price);
-  } else if (sortOption === 'price_desc') {
-    filteredProducts.sort((a, b) => b.price - a.price);
-  } else if (smartFilter === 'bestsellers') {
-    filteredProducts.sort((a, b) => (bestSellerRank.get(a.id) ?? 0) - (bestSellerRank.get(b.id) ?? 0));
-  } else if (smartFilter === 'recent') {
-    filteredProducts.sort((a, b) => (recentSoldRank.get(a.id) ?? 0) - (recentSoldRank.get(b.id) ?? 0));
-  } else {
-    filteredProducts.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
-  }
-
-  const getCartProductQuantity = (productId: string) => {
-    return cart
-      .filter((item) => item.product.id === productId)
-      .reduce((sum, item) => sum + item.quantity, 0);
-  };
+    return list;
+  }, [
+    products,
+    searchTerm,
+    smartFilter,
+    selectedCategory,
+    favoriteIds,
+    bestSellerRank,
+    recentSoldRank,
+    sortOption
+  ]);
 
   return (
     <div className="sales-workspace">
@@ -252,27 +277,27 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Density Toggle (Compact vs Comfortable) */}
+          {/* Density Toggle (기본 3열 vs 작게 4열) */}
           <div className="density-toggle-group" role="group" aria-label="카드 크기 보기 전환">
-            <button
-              type="button"
-              className={`density-btn ${density === 'compact' ? 'active' : ''}`}
-              onClick={() => handleToggleDensity('compact')}
-              title="기본 보기 (한 화면에 더 많이 보기)"
-              aria-label="기본 보기"
-            >
-              <Grid3X3 size={16} />
-              <span>기본</span>
-            </button>
             <button
               type="button"
               className={`density-btn ${density === 'comfortable' ? 'active' : ''}`}
               onClick={() => handleToggleDensity('comfortable')}
-              title="크게 보기 (터치 친화 대형 카드)"
-              aria-label="크게 보기"
+              title="기본 보기 (3열)"
+              aria-label="기본 보기 (3열)"
             >
               <LayoutGrid size={16} />
-              <span>크게</span>
+              <span>기본</span>
+            </button>
+            <button
+              type="button"
+              className={`density-btn ${density === 'compact' ? 'active' : ''}`}
+              onClick={() => handleToggleDensity('compact')}
+              title="작게 보기 (4열)"
+              aria-label="작게 보기 (4열)"
+            >
+              <Grid3X3 size={16} />
+              <span>작게</span>
             </button>
           </div>
 
@@ -367,7 +392,7 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
         ) : (
           <div className={`product-grid ${density}`}>
             {filteredProducts.map((product) => {
-              const cartQty = getCartProductQuantity(product.id);
+              const cartQty = cartQuantityMap.get(product.id) ?? 0;
               const inCart = cartQty > 0;
               const isFavorite = favoriteIds.has(product.id);
 
