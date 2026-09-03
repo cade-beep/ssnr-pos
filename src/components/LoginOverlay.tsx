@@ -217,76 +217,6 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    // 임시 테스트용 로컬/바이패스 관리자 계정 지원 (VITE_ENABLE_DEV_LOGIN === 'true' 일 때만 허용)
-    // 브라우저 세션을 얻고 RLS 검증을 통과하기 위해 Supabase Auth로 로그인합니다.
-    if (import.meta.env.VITE_ENABLE_DEV_LOGIN === 'true' && email.trim() === 'admin' && password === 'admin') {
-      setIsLoggingIn(true);
-      try {
-        const devEmail = import.meta.env.VITE_DEV_ADMIN_EMAIL;
-        const devPassword = import.meta.env.VITE_DEV_ADMIN_PASSWORD;
-
-        if (!devEmail || !devPassword) {
-          throw new Error('개발자 로그인 환경변수(VITE_DEV_ADMIN_EMAIL, VITE_DEV_ADMIN_PASSWORD)가 설정되지 않았습니다. .env 파일을 확인해 주십시오.');
-        }
-
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: devEmail,
-          password: devPassword
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        if (data && data.user) {
-          const user = data.user;
-
-          // Debug prints as requested
-          const {
-            data: { session }
-          } = await supabase.auth.getSession();
-          console.log("Logged-in Session User ID (Dev Bypass):", session?.user.id);
-          console.log("Logged-in Session User Email (Dev Bypass):", session?.user.email);
-
-          let devRole: 'Owner' | 'Staff' = 'Owner';
-          let devStoreId = 'ssnr-pos-9877';
-
-          if (session?.user.id) {
-            const { data: roleData } = await supabase
-              .from('user_roles')
-              .select('role, store_id')
-              .eq('user_id', session.user.id)
-              .single();
-            if (roleData) {
-              devRole = roleData.role as 'Owner' | 'Staff';
-              devStoreId = roleData.store_id;
-            }
-          }
-
-          auditLog({ action: 'LOGIN', result: 'SUCCESS', context: { email: devEmail, type: 'dev_bypass' } });
-          
-          let displayName = user.user_metadata?.name || '임시관리자';
-          
-          onLoginSuccess({
-            id: user.id,
-            email: devEmail,
-            name: displayName,
-            role: devRole,
-            store_id: devStoreId
-          });
-          return;
-        } else {
-          throw new Error('사용자 세션 데이터를 찾을 수 없습니다.');
-        }
-      } catch (err: any) {
-        console.error('개발용 바이패스 로그인 에러:', err);
-        setLoginError(`개발용 계정 로그인 실패: ${err.message || err}`);
-      } finally {
-        setIsLoggingIn(false);
-      }
-      return;
-    }
-
     setIsLoggingIn(true);
 
     // 골뱅이(@)가 없는 단순 아이디인 경우, 뒤에 가상 도메인(@ssnr-pos.com)을 자동으로 덧붙여서 처리합니다.
@@ -345,13 +275,10 @@ const LoginOverlay: React.FC<LoginOverlayProps> = ({ onLoginSuccess }) => {
             finalRole = roleData.role as 'Owner' | 'Staff';
             finalStoreId = roleData.store_id;
           } else {
-            // admin 이메일이거나 김규호 계정이면 자동으로 관리자로 설정
-            const isAdmin = 
-              user.user_metadata?.role === '관리자' || 
-              user.email?.startsWith('admin') || 
-              user.email?.startsWith('rbflrbgh') || 
-              displayName === '김규호';
-            finalRole = isAdmin ? 'Owner' : 'Staff';
+            const isOwner = 
+              user.email === 'rbflrbgh@gmail.com' || 
+              user.email === 'rbflrbgh@ssnr-pos.com';
+            finalRole = isOwner ? 'Owner' : 'Staff';
           }
         }
 
