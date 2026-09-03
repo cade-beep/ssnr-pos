@@ -756,13 +756,13 @@ body {
   user-select: none;
 }
 .product-card.comfortable {
-  min-height: 112px;
+  min-height: 124px;
   height: auto;
-  padding: 14px 12px;
+  padding: 16px 12px;
 }
 .product-card.compact,
 .product-grid.compact .product-card {
-  min-height: 82px;
+  min-height: 96px;
   height: auto;
   padding: 10px;
   border-radius: var(--radius-md);
@@ -774,12 +774,15 @@ body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 .product-card:active {
-  transform: scale(0.96);
-  background: #FAFAFB;
+  transform: scale(0.97);
+  background: #E8F1FF;
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 2px var(--primary);
 }
 .product-card.in-cart {
-  border: 1.5px solid var(--primary);
+  border: 2px solid var(--primary);
   background: #F4F8FF;
+  box-shadow: 0 2px 10px rgba(22, 119, 255, 0.18);
 }
 
 /* Favorite Star on Card */
@@ -827,7 +830,7 @@ body {
   gap: 6px;
 }
 .card-name {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1.3;
   color: var(--text-primary);
@@ -837,9 +840,10 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   text-align: center;
+  min-height: 2.5em;
 }
 .product-card.comfortable .card-name {
-  font-size: 18px;
+  font-size: 20px;
 }
 
 .card-qty-badge {
@@ -849,10 +853,10 @@ body {
   z-index: 2;
   background: var(--primary);
   color: #FFFFFF;
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 800;
-  min-width: 24px;
-  height: 24px;
+  min-width: 28px;
+  height: 28px;
   padding: 0 6px;
   border-radius: var(--radius-pill);
   display: flex;
@@ -4039,3 +4043,15 @@ body {
 .product-grid.arranging .product-card:active { transform: none; }
 .product-grid.arranging .card-favorite-btn { display: none; }
 .product-card.dragging { opacity: 0.4; }
+
+/* 카테고리별 색 구분 — 버튼을 색으로 먼저 찾고 글자로 확인한다 */
+.product-card.cat-bakery { background: #FFFBF2; border-color: #F4E3C4; }
+.product-card.cat-bakery .card-price { color: #B45309; }
+.product-card.cat-food { background: #F4FBF6; border-color: #C9E9D5; }
+.product-card.cat-food .card-price { color: #047857; }
+.product-card.cat-etc { background: #F8FAFC; border-color: #DDE3EA; }
+.product-card.cat-etc .card-price { color: #475569; }
+/* 담긴 상품과 누르는 중인 상품은 카테고리 색보다 우선한다 */
+.product-grid .product-card.in-cart { background: #F4F8FF; border-color: var(--primary); }
+.product-grid .product-card.in-cart .card-price { color: var(--primary); }
+.product-grid .product-card:active { background: #E8F1FF; }

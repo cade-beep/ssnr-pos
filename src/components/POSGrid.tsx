@@ -475,7 +475,7 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
                   key={product.id}
                   role="button"
                   tabIndex={0}
-                  className={`product-card ${inCart ? 'in-cart' : ''} ${density} ${draggingId === product.id ? 'dragging' : ''}`}
+                  className={`product-card cat-${normalizeCategory(product.category, product.name)} ${inCart ? 'in-cart' : ''} ${density} ${draggingId === product.id ? 'dragging' : ''}`}
                   draggable={arrangeMode}
                   onDragStart={() => setDraggingId(product.id)}
                   onDragEnd={() => setDraggingId(null)}
