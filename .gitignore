@@ -34,3 +34,6 @@ Thumbs.db
 
 # Wrangler
 .wrangler/
+
+# Excel sync backups
+*.bak

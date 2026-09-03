@@ -61,18 +61,6 @@ export interface CashierUser {
   can_view_reports?: boolean;
 }
 
-export interface Customer {
-  id: string;
-  store_id: string;
-  name: string;
-  phone?: string;
-  email?: string;
-  points: number;
-  notes?: string;
-  created_at?: string;
-}
-
-
 export type PaymentMethod = 'CARD' | 'TRANSFER';
 
 export interface Receipt {
@@ -99,8 +87,11 @@ export interface Receipt {
 // Extend global window object for type safety in React renderer
 declare global {
   interface Window {
-    electronAPI: {
+    electronAPI?: {
       platform: string;
+      syncInventoryExcel?: (session: any) => Promise<any>;
+      openExcelFile?: (type: 'bakery' | 'salepaper') => Promise<boolean>;
+      getExcelPaths?: () => Promise<{ bakeryPath: string; salePaperPath: string }>;
     };
   }
 }

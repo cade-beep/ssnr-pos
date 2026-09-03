@@ -10,8 +10,8 @@ import Sidebar from './components/Sidebar';
 const ProductsView = lazy(() => import('./components/ProductsView'));
 const HistoryView = lazy(() => import('./components/HistoryView'));
 const SettingsView = lazy(() => import('./components/SettingsView'));
-const CustomersView = lazy(() => import('./components/CustomersView'));
 const EmployeesView = lazy(() => import('./components/EmployeesView'));
+const InventoryView = lazy(() => import('./components/InventoryView').then(m => ({ default: m.InventoryView })));
 import Button from './components/ui/Button';
 import Modal from './components/ui/Modal';
 import { showAlert, showConfirm, showPrompt } from './components/ui/dialogs';
@@ -58,7 +58,7 @@ const MIN_ORDER_PANEL_WIDTH = 320;
 const MAX_ORDER_PANEL_WIDTH = 520;
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'sales' | 'history' | 'products' | 'customers' | 'employees' | 'settings'>('sales');
+  const [activeTab, setActiveTab] = useState<'sales' | 'history' | 'products' | 'inventory' | 'employees' | 'settings'>('sales');
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartHistory, setCartHistory] = useState<CartItem[][]>([]);
@@ -68,7 +68,7 @@ const App: React.FC = () => {
   
   // Custom Toast State (supports undo action button)
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'error'; onAction?: () => void; actionLabel?: string } | null>(null);
-  const [pendingTabChange, setPendingTabChange] = useState<'sales' | 'history' | 'products' | 'customers' | 'employees' | 'settings' | null>(null);
+  const [pendingTabChange, setPendingTabChange] = useState<'sales' | 'history' | 'products' | 'inventory' | 'employees' | 'settings' | null>(null);
   const [isReceiptChecked] = useState<boolean>(true);
   const [cartDiscountPercent, setCartDiscountPercent] = useState<number>(0);
   const [drafts, setDrafts] = useState<CartDraft[]>([]);
@@ -113,19 +113,17 @@ const App: React.FC = () => {
         .single();
 
       if (error || !data) {
-        // Fallback for legacy admin
-        const isAdmin = 
-          user.user_metadata?.role === '관리자' || 
-          user.email?.startsWith('admin') || 
-          user.email?.startsWith('rbflrbgh') || 
-          displayName === '김규호';
+        // Fallback for recognized owner accounts only
+        const isOwner = 
+          user.email === 'rbflrbgh@gmail.com' || 
+          user.email === 'rbflrbgh@ssnr-pos.com';
 
         return {
           id: user.id,
           email: user.email || '',
           name: displayName,
-          role: isAdmin ? 'Owner' : 'Staff',
-          store_id: '00000000-0000-0000-0000-000000000000'
+          role: isOwner ? 'Owner' : 'Staff',
+          store_id: 'ssnr-pos-9877'
         };
       }
 
@@ -557,7 +555,7 @@ const App: React.FC = () => {
   };
 
   // Safe Tab Change: if cart has items when leaving sales tab, prompt cashier
-  const handleTabChange = (newTab: 'sales' | 'history' | 'products' | 'customers' | 'employees' | 'settings') => {
+  const handleTabChange = (newTab: 'sales' | 'history' | 'products' | 'inventory' | 'employees' | 'settings') => {
     if (activeTab === 'sales' && newTab !== 'sales' && cart.length > 0) {
       setPendingTabChange(newTab);
       return;
@@ -1193,10 +1191,9 @@ const App: React.FC = () => {
                 showToast={showToast}
                 role={currentCashier.role}
               />
-            ) : activeTab === 'customers' ? (
-              <CustomersView
-                role={currentCashier.role}
-                showToast={showToast}
+            ) : activeTab === 'inventory' ? (
+              <InventoryView 
+                onShowToast={showToast}
               />
             ) : activeTab === 'employees' ? (
               <EmployeesView

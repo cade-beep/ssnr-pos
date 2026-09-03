@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { CashierUser } from '../types';
 import Logo from './Logo';
-import { ShoppingBag, Receipt, Package, Users, UserCog, Settings, LucideIcon } from 'lucide-react';
+import { ShoppingBag, Receipt, Package, ClipboardCheck, UserCog, Settings, LucideIcon } from 'lucide-react';
 
-type TabKey = 'sales' | 'history' | 'products' | 'customers' | 'employees' | 'settings';
+type TabKey = 'sales' | 'history' | 'products' | 'inventory' | 'employees' | 'settings';
 type Role = 'Owner' | 'Staff';
 
 interface SidebarProps {
@@ -18,7 +18,7 @@ const MAIN_NAV_ITEMS: { key: TabKey; label: string; icon: LucideIcon; roles: Rol
   { key: 'sales', label: '판매', icon: ShoppingBag, roles: ['Owner', 'Staff'] },
   { key: 'history', label: '주문 내역', icon: Receipt, roles: ['Owner', 'Staff'] },
   { key: 'products', label: '상품 관리', icon: Package, roles: ['Owner', 'Staff'] },
-  { key: 'customers', label: '고객', icon: Users, roles: ['Owner'] },
+  { key: 'inventory', label: '재고 조사', icon: ClipboardCheck, roles: ['Owner', 'Staff'] },
 ];
 
 const BOTTOM_NAV_ITEMS: { key: TabKey; label: string; icon: LucideIcon; roles: Role[] }[] = [
