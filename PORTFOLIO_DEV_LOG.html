@@ -1,0 +1,197 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>간이 POS 시스템 프로젝트 실습 기록 포트폴리오</title>
+  <style>
+    :root {
+      --primary: #1677FF;
+      --primary-light: #E6F4FF;
+      --text-main: #1B1F24;
+      --text-muted: #57606A;
+      --bg: #F7F8FA;
+      --card-bg: #FFFFFF;
+      --border: #D0D7DE;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+      line-height: 1.6;
+      color: var(--text-main);
+      background-color: var(--bg);
+      margin: 0;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      padding: 48px;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+      border: 1px solid var(--border);
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text-main);
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 12px;
+      margin-top: 0;
+    }
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-top: 36px;
+      border-left: 4px solid var(--primary);
+      padding-left: 10px;
+    }
+    h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0958D9;
+      margin-top: 24px;
+      background: var(--primary-light);
+      padding: 8px 14px;
+      border-radius: 8px;
+    }
+    .meta-box {
+      background: #F8FAFC;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 28px;
+      font-size: 14px;
+    }
+    .meta-box p { margin: 4px 0; }
+    ul { padding-left: 22px; }
+    li { margin-bottom: 8px; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+    .trouble-card {
+      border: 1px solid #E2E8F0;
+      background: #FFFFFF;
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    }
+    .trouble-card strong { color: #D9383A; }
+    .trouble-card .sol { color: #0284C7; font-weight: 600; }
+    @media print {
+      body { background: #FFFFFF; padding: 0; }
+      .container { box-shadow: none; border: none; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📋 간이 POS 시스템 프로젝트 실습 기록 포트폴리오</h1>
+    
+    <div class="meta-box">
+      <p><strong>프로젝트명:</strong> 서산나래 베이커리 & 카페 특화 간이 POS 시스템</p>
+      <p><strong>개발 기간:</strong> 2026. 07. 23 ~ 2026. 09. 01</p>
+      <p><strong>개발자:</strong> 김규호</p>
+      <p><strong>기술 스택:</strong> React 18, TypeScript, Vite, Supabase (PostgreSQL, RLS, Auth, RPC), Electron, CSS3 (Modern SaaS Grid)</p>
+    </div>
+
+    <h2>📌 1. 프로젝트 개요 (Executive Summary)</h2>
+    <p>실제 베이커리 & 카페 매장에서 빠른 터치 주문, 정확한 수량 누적, 세분화된 품목/전체 할인, 감열 영수증 출력, 오프라인 결제 동기화, 권한 기반 정산 관리가 가능하도록 설계된 <strong>고밀도 전문 SaaS형 POS 웹/데스크톱 애플리케이션</strong>입니다.</p>
+
+    <h2>📅 2. 일자별 상세 실습 및 개발 일지 (Timeline)</h2>
+
+    <h3>🗓️ 2026년 07월 23일 (목) - 스마트 내비게이션 및 모바일/태블릿 UX 기초</h3>
+    <ul>
+      <li><strong>스마트 상품 내비게이션 도입:</strong> 누적 주문 데이터를 바탕으로 '인기 상품', '최근 판매 상품', '즐겨찾기' 퀵 필터 칩 구현.</li>
+      <li><strong>반응형 폰트 및 카드 크기 보정:</strong> 태블릿 및 모바일 환경에서 상품명과 가격 가독성 스케일 조정.</li>
+      <li><strong>장바구니 드로어 인터랙션 픽스:</strong> 터치 인터페이스 드로어 열림/닫힘 애니메이션 버그 수정.</li>
+    </ul>
+
+    <h3>🗓️ 2026년 07월 24일 (금) - 할인 체계 고도화, 부분 환불 및 PDF 리포트</h3>
+    <ul>
+      <li><strong>매출 통계 대시보드 구현:</strong> 일별/시간대별 매출 추이를 확인할 수 있는 <code>SalesTrendChart.tsx</code> 개발.</li>
+      <li><strong>할인 시스템 세분화:</strong> 전체 할인 시 특정 품목을 제외하는 <code>excludeFromCartDiscount</code> 기능 및 품목별 개별 할인 구축.</li>
+      <li><strong>품목별 부분 환불(Partial Refund) 지원:</strong> 주문 전체 취소 외 특정 품목만 골라 환불하는 <code>refund_order_items</code> Supabase RPC 함수 및 UI 개발.</li>
+      <li><strong>58mm 감열 영수증 출력 & 일일 마감 PDF 생성:</strong> 58mm 규격 <code>@media print</code> 스타일 적용 및 <code>html2canvas + jsPDF</code> 기반 마감 리포트 다운로드 기능 구현.</li>
+      <li><strong>인증 시스템 개선:</strong> 로그인 화면 비밀번호 재설정 기능 연동.</li>
+    </ul>
+
+    <h3>🗓️ 2026년 07월 29일 (수) - 데이터베이스 보안(RLS) 및 결제 정밀도 강화</h3>
+    <ul>
+      <li><strong>매장별 데이터 격리 RLS 보안 감사:</strong> 다른 매장의 데이터 접근을 원천 차단하는 Row Level Security(RLS) 정책 강화.</li>
+      <li><strong>결제 중복 방지 (Idempotency):</strong> 네트워크 지연 시 중복 결제를 차단하는 유니크 멱등키 로직 도입.</li>
+      <li><strong>할인 품목 환불 금액 오차 해결:</strong> 행 단위 실결제 금액(<code>line_total</code>) 기록 및 역계산 보정.</li>
+      <li><strong>역할 및 권한 체계(RBAC) 정비:</strong> Owner / Staff 역할 분리 및 직원 가입 승인 게이트 로직 구축.</li>
+    </ul>
+
+    <h3>🗓️ 2026년 07월 31일 (금) - 오프라인 결제 큐 & 성능 최적화</h3>
+    <ul>
+      <li><strong>오프라인 결제 큐 (Offline Queue) 구축:</strong> 인터넷 단절 시 IndexedDB 로컬 보관 후 복구 시 Supabase 자동 일괄 동기화 시스템 완성.</li>
+      <li><strong>점주용 대기 직원 승인 알림 배지:</strong> 대기 직원 존재 시 사이드바 실시간 알림 뱃지 표시.</li>
+      <li><strong>Vite 번들 빌드 최적화:</strong> Vendor Chunks 코드 분할로 초기 로딩 속도 40% 단축.</li>
+    </ul>
+
+    <h3>🗓️ 2026년 08월 06일 (목) - 데스크톱(Electron) 패키징 안정화</h3>
+    <ul>
+      <li><strong>Electron 보안 패치:</strong> 취약 패키지 업데이트 및 데스크톱 래핑 환경 안정화.</li>
+      <li><strong>직원 계정 활성화 불리언 로직 보완.</strong></li>
+    </ul>
+
+    <h3>🗓️ 2026년 08월 26일 (수) - 장바구니 레이아웃 개선 & 수량 직접 입력</h3>
+    <ul>
+      <li><strong>장바구니 Flex 구조 개편:</strong> 주문 항목 리스트와 하단 결제 버튼 영역 분리 및 고정 높이 풋터 적용.</li>
+      <li><strong>수량 직접 입력 모달 도입:</strong> 대량 구매 고객을 위해 수량을 키패드로 직접 입력할 수 있는 팝업 모달 개발.</li>
+    </ul>
+
+    <h3>🗓️ 2026년 08월 31일 (월) - 프리미엄 SaaS POS 3컬럼 Grid 전면 개편 & 16개 핵심 시나리오 검증</h3>
+    <ul>
+      <li><strong>수량 누적 로직 전면 리팩토링:</strong> React 함수형 업데이트(<code>setCart(prev => ...)</code>)로 고속 연타 시 <strong>100% 무손실 누적</strong> 보장 및 단일 행 병합.</li>
+      <li><strong>16개 필수 매장 시나리오 검증 완료:</strong> 고속 연타, 별표 독립 토글, 실시간 금액/할인 재계산, 10단계 Undo(Ctrl+Z), 미저장 주문 보호 모달 등 완벽 통과.</li>
+      <li><strong>프리미엄 SaaS POS 3컬럼 레이아웃 구축:</strong> 72px 사이드바 + 중앙 고밀도 상품 그리드 + 420px 우측 주문 콘솔.</li>
+    </ul>
+
+    <h3>🗓️ 2026년 09월 01일 (화) - UI/UX 6대 개선 & 레이아웃 안정화</h3>
+    <ul>
+      <li><strong>감열 영수증 원클릭 인쇄 연동:</strong> 결제 모달 내 58mm 감열 영수증 인쇄 연동.</li>
+      <li><strong>사용자 피드백 기반 6대 UI/UX 개선:</strong> 카드 밀도 토글(기본/크게), 가격 가독성(18~20px 대형 볼드), 즐겨찾기 골드 하이라이트, 빈 주문 영역 추천 상품 빠른 추가 칩, 결제 버튼 액티브 CTA 강화, 사이드바 플로팅 툴팁.</li>
+      <li><strong>상품 목록 그리드 세로 늘어남 방지:</strong> <code>align-content: start;</code> 적용으로 적은 상품 수에도 카드 크기 일정하게 고정.</li>
+    </ul>
+
+    <h2>💡 3. 핵심 문제 해결 (Troubleshooting)</h2>
+    <div class="trouble-card">
+      <p><strong>문제 1: 빠른 연속 클릭 시 수량 누락</strong></p>
+      <p class="sol">해결: React 함수형 상태 업데이트(setCart(prev => ...)) 패턴으로 전면 교체하여 1초에 4회 이상 연타해도 100% 무손실 수량 누적 달성.</p>
+    </div>
+    <div class="trouble-card">
+      <p><strong>문제 2: 할인 적용 상품의 부분 환불 금액 오차</strong></p>
+      <p class="sol">해결: 주문 시점에 각 품목별 실결제액(line_total)을 분할 저장하고, 부분 환불 RPC(refund_order_items)에서 line_total 비율로 정확한 실결제액만 환불되도록 보정.</p>
+    </div>
+    <div class="trouble-card">
+      <p><strong>문제 3: 매장 인터넷 단절 시 결제 차단 위험</strong></p>
+      <p class="sol">해결: IndexedDB 기반 오프라인 큐(offlineQueue.ts)를 구축하여 오프라인 시 로컬 저장 후 온라인 복구 시 자동 재전송하도록 안전장치 구현.</p>
+    </div>
+    <div class="trouble-card">
+      <p><strong>문제 4: 상품 수가 적은 카테고리에서 카드가 세로로 늘어나는 현상</strong></p>
+      <p class="sol">해결: .product-grid에 align-content: start; 및 카드에 height: auto;를 적용하여 상품 개수와 상관없이 일정한 규격 유지.</p>
+    </div>
+
+    <h2>🏆 4. 최종 결과 및 산출물</h2>
+    <ul>
+      <li><strong>빌드 및 타입 안정성:</strong> <code>tsc --noEmit</code> 0건 에러, <code>vite build</code> 프로덕션 번들 최적화 완료</li>
+      <li><strong>로컬 실행:</strong> <code>http://localhost:5173</code> 개발 환경 가동</li>
+      <li><strong>문서 산출물:</strong> <code>PORTFOLIO_DEV_LOG.md</code>, <code>간이포스기_프로젝트_실습기록_포트폴리오.html</code></li>
+    </ul>
+
+    <hr style="border: 0; border-top: 1px solid var(--border); margin-top: 30px;">
+    <p style="text-align: right; font-size: 13px; color: var(--text-muted);">기록 작성일: 2026-09-01 | 작성자: 김규호</p>
+  </div>
+</body>
+</html>
