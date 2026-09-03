@@ -132,6 +132,13 @@ export const getPosGroup = (name: string, cat?: string): PosGroup => {
   return 'etc';
 };
 
+/**
+ * 봉투 is a pass-through charge, so it is never discounted — not by an item
+ * discount, not by the cart-wide percentage, not by the 전체할인제외 toggle
+ * being switched off. complete_sale re-checks this server side.
+ */
+export const isDiscountable = (product: Product): boolean => product.name.trim() !== '봉투';
+
 export const mapCategoryToDB = (cat: 'bakery' | 'food' | 'etc'): string => {
   if (cat === 'bakery') return '베이커리';
   if (cat === 'food') return '간식및선물세트';

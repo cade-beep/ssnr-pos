@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CartItem, CartDraft, Product } from '../types';
+import { CartItem, CartDraft, Product, isDiscountable } from '../types';
 import { Plus, Minus, Undo2, X, MoreHorizontal, Tag, Save, FileText, Trash2, Zap, CreditCard, RotateCcw } from 'lucide-react';
 import Button from './ui/Button';
 import Modal from './ui/Modal';
@@ -252,7 +252,11 @@ const Cart: React.FC<CartProps> = ({
                         -{discInfo.unitDiscount.toLocaleString()}원
                       </span>
                     )}
-                    {item.excludeFromCartDiscount && (
+                    {!isDiscountable(item.product) ? (
+                      <span className="order-badge neutral-badge">
+                        할인 불가
+                      </span>
+                    ) : item.excludeFromCartDiscount && (
                       <span className="order-badge neutral-badge">
                         전체할인제외
                       </span>
@@ -296,7 +300,8 @@ const Cart: React.FC<CartProps> = ({
                         type="button"
                         className={`item-action-tag-btn ${isDiscounted ? 'active' : ''}`}
                         onClick={() => openItemDiscountModal(item)}
-                        title="개별 품목 할인 설정"
+                        disabled={!isDiscountable(item.product)}
+                        title={isDiscountable(item.product) ? '개별 품목 할인 설정' : `${item.product.name}은(는) 할인 대상이 아닙니다`}
                       >
                         <Tag size={13} />
                         <span>{isDiscounted ? '할인중' : '할인'}</span>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
-import { Product, CartItem, PaymentMethod, Receipt, CashierUser, CartDraft, normalizeCategory, mapCategoryToDB } from './types';
+import { Product, CartItem, PaymentMethod, Receipt, CashierUser, CartDraft, normalizeCategory, mapCategoryToDB, isDiscountable } from './types';
 import POSGrid from './components/POSGrid';
 import Cart from './components/Cart';
 import ReceiptModal from './components/ReceiptModal';
@@ -742,6 +742,11 @@ const App: React.FC = () => {
 
   // Helper to safely calculate item discount details
   const getItemDiscountInfo = (item: CartItem) => {
+    // Undiscountable products report zero here, which zeroes them everywhere:
+    // the subtotal, the RPC payload, the receipt and the cart badges.
+    if (!isDiscountable(item.product)) {
+      return { unitDiscount: 0, totalDiscount: 0, discountPercent: 0, isPercent: false };
+    }
     const basePrice = item.unitPrice || item.product.price;
     if (item.discountPercent !== undefined && item.discountPercent > 0) {
       const pct = Math.min(100, Math.max(0, item.discountPercent));
@@ -811,6 +816,12 @@ const App: React.FC = () => {
     setCartDiscountPercent(Math.min(100, Math.max(0, percent)));
   };
 
+  // A line only takes a share of the cart-wide discount if the product may be
+  // discounted at all; the manual 전체할인제외 toggle can exclude it further but
+  // can never put it back in.
+  const takesCartDiscount = (item: CartItem): boolean =>
+    isDiscountable(item.product) && !item.excludeFromCartDiscount;
+
   const safeNumber = (val: number): number => {
     if (isNaN(val) || !isFinite(val)) return 0;
     return val;
@@ -821,7 +832,7 @@ const App: React.FC = () => {
   const subtotalAfterItemDiscounts = Math.max(0, originalSubtotal - totalItemDiscount);
   const discountableSubtotalAfterItemDiscounts = safeNumber(
     cart
-      .filter((item) => !item.excludeFromCartDiscount)
+      .filter(takesCartDiscount)
       .reduce((sum, item) => sum + (((item.unitPrice || item.product.price) * item.quantity) - getItemDiscountInfo(item).totalDiscount), 0)
   );
   const cartDiscountAmount = safeNumber(Math.round(discountableSubtotalAfterItemDiscounts * (Math.min(100, Math.max(0, cartDiscountPercent)) / 100)));
@@ -842,7 +853,7 @@ const App: React.FC = () => {
       // discount (0 if the item is excluded from the cart discount). The last discountable item
       // absorbs the rounding remainder so the shares always sum to exactly cartDiscountAmount.
       const discountableItemIds = cart
-        .filter(item => !item.excludeFromCartDiscount)
+        .filter(takesCartDiscount)
         .map(item => item.product.id);
       const lastDiscountableItemId = discountableItemIds[discountableItemIds.length - 1];
       let remainingCartDiscount = cartDiscountAmount;
@@ -852,7 +863,7 @@ const App: React.FC = () => {
         const postItemDiscountValue = item.product.price * item.quantity - info.totalDiscount;
 
         let cartDiscountShare = 0;
-        if (!item.excludeFromCartDiscount && discountableSubtotalAfterItemDiscounts > 0) {
+        if (takesCartDiscount(item) && discountableSubtotalAfterItemDiscounts > 0) {
           if (item.product.id === lastDiscountableItemId) {
             cartDiscountShare = remainingCartDiscount;
           } else {
