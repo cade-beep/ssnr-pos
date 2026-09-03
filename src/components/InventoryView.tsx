@@ -16,7 +16,6 @@ import {
   RefreshCw, 
   Trash2 
 } from 'lucide-react';
-import { Product } from '../types';
 import { InventoryItem, InventoryCheckSession, ExcelSyncResult } from '../types/inventory';
 import { createInitialInventoryItems } from '../data/bakeryInventoryData';
 import { 
@@ -34,15 +33,13 @@ const DENSITY_STORAGE_KEY = 'ssnr_inventory_grid_density_v1';
 
 interface InventoryViewProps {
   onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
-  /** Store products, used only to reuse their photos on the stock cards */
-  products?: Product[];
 }
 
 type CategoryTab = '전체' | '제빵류' | '제과류' | '동전쿠키' | '기타';
 type SortOption = 'default' | 'price_asc' | 'price_desc' | 'sold_desc';
 type GridDensity = 'compact' | 'comfortable';
 
-export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast, products = [] }) => {
+export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast }) => {
   // Store & Round
   const [storeName, setStoreName] = useState<'서산나래' | '복지관'>('서산나래');
   const [round, setRound] = useState<number>(() => getDefaultRound(new Date().getHours()));
@@ -88,23 +85,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast, produ
   // Sync & Print state
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncResult, setLastSyncResult] = useState<ExcelSyncResult | null>(null);
-
-  // Photos come from the store product list so a stock card looks like its sales card
-  const photoByName = useMemo(() => {
-    const loose = (n: string) => n.replace(/[s()]/g, '');
-    const byLoose = new Map<string, Product>();
-    const byExact = new Map<string, Product>();
-    for (const p of products) {
-      if (!byExact.has(p.name)) byExact.set(p.name, p);
-      if (!byLoose.has(loose(p.name))) byLoose.set(loose(p.name), p);
-    }
-    const out = new Map<string, Product>();
-    for (const i of items) {
-      const hit = byExact.get(i.name) || byLoose.get(loose(i.name));
-      if (hit) out.set(i.name, hit);
-    }
-    return out;
-  }, [products, items]);
 
   // Save to isolated localStorage whenever items change
   useEffect(() => {
@@ -410,7 +390,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast, produ
           ) : (
             <div className={`product-grid ${density}`}>
               {filteredProducts.map((product) => {
-                const photo = photoByName.get(product.name);
                 const counted = product.dispatchQty > 0 || product.remainingQty > 0;
 
                 return (
@@ -418,14 +397,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast, produ
                     key={product.id}
                     className={`product-card ${density} ${counted ? 'in-cart' : ''}`}
                   >
-                    <div className="card-image-wrap">
-                      {photo?.imageUrl ? (
-                        <img src={photo.imageUrl} alt="" className="card-image" loading="lazy" />
-                      ) : (
-                        <div className="card-image-emoji">{photo?.emoji || '🍞'}</div>
-                      )}
-                    </div>
-
                     <div className="card-body">
                       <div className="card-name-row">
                         <span className="card-name" title={product.name}>

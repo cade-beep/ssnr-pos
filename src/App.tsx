@@ -1194,7 +1194,6 @@ const App: React.FC = () => {
             ) : activeTab === 'inventory' ? (
               <InventoryView
                 onShowToast={showToast}
-                products={products}
               />
             ) : activeTab === 'employees' ? (
               <EmployeesView

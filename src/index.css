@@ -741,7 +741,7 @@ body {
 /* 2.4 Product Card (Keypad-Style Dense POS Card) */
 .product-card {
   position: relative;
-  min-height: 160px;
+  min-height: 104px;
   height: auto;
   background: #FFFFFF;
   border: 1px solid var(--border-color);
@@ -756,13 +756,13 @@ body {
   user-select: none;
 }
 .product-card.comfortable {
-  min-height: 165px;
+  min-height: 112px;
   height: auto;
-  padding: 14px;
+  padding: 14px 12px;
 }
 .product-card.compact,
 .product-grid.compact .product-card {
-  min-height: 120px;
+  min-height: 82px;
   height: auto;
   padding: 10px;
   border-radius: var(--radius-md);
@@ -812,45 +812,18 @@ body {
   box-shadow: 0 2px 6px rgba(245, 158, 11, 0.35);
 }
 
-.card-image-wrap {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  border-radius: var(--radius-sm);
-  background: var(--surface-alt);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  margin-bottom: 10px;
-}
-.product-card.comfortable .card-image-wrap {
-  margin-bottom: 14px;
-}
-.card-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-.card-image-emoji {
-  font-size: 42px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.product-card.comfortable .card-image-emoji {
-  font-size: 54px;
-}
 
 .card-body {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   flex: 1;
+  justify-content: center;
 }
 .card-name-row {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: center;
   gap: 6px;
 }
 .card-name {
@@ -863,14 +836,17 @@ body {
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  min-height: 2.6em;
-  text-align: left;
+  text-align: center;
 }
 .product-card.comfortable .card-name {
-  font-size: 17px;
+  font-size: 18px;
 }
 
 .card-qty-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
   background: var(--primary);
   color: #FFFFFF;
   font-size: 12.5px;
@@ -887,19 +863,19 @@ body {
 }
 
 .card-price-row {
-  margin-top: auto;
   display: flex;
   align-items: baseline;
+  justify-content: center;
 }
 .card-price {
-  font-size: 17.5px;
+  font-size: 16px;
   font-weight: 800;
   color: var(--primary);
   letter-spacing: -0.4px;
   text-align: left;
 }
 .product-card.comfortable .card-price {
-  font-size: 20px;
+  font-size: 17.5px;
 }
 .currency-unit {
   font-size: 13px;
@@ -909,18 +885,6 @@ body {
 }
 
 /* Compact Card Specific Overrides (Clean 4-column POS display) */
-.product-card.compact .card-image-wrap,
-.product-grid.compact .card-image-wrap {
-  height: 64px;
-  max-height: 64px;
-  aspect-ratio: auto;
-  margin-bottom: 6px;
-  border-radius: 6px;
-}
-.product-card.compact .card-image-emoji,
-.product-grid.compact .card-image-emoji {
-  font-size: 32px;
-}
 .product-card.compact .card-body,
 .product-grid.compact .card-body {
   gap: 3px;
@@ -4016,3 +3980,62 @@ body {
 .product-grid.compact .stock-fields { gap: 4px; margin-top: 8px; }
 .product-grid.compact .stock-stepper button { width: 22px; height: 22px; }
 .product-grid.compact .stock-stepper input { width: 32px; font-size: 13px; }
+
+/* 배치 편집 모드 — 판매 화면에서 상품 버튼 위치를 끌어서 바꾼다 */
+.arrange-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: #FFFFFF;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.arrange-toggle:hover { border-color: var(--primary); color: var(--primary); }
+.arrange-toggle.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #FFFFFF;
+}
+
+.arrange-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 20px;
+  background: #FFF7E6;
+  border-bottom: 1px solid #FFE0A3;
+  color: #8A5A00;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.arrange-hint button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid #FFE0A3;
+  border-radius: var(--radius-sm);
+  background: #FFFFFF;
+  color: #8A5A00;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.arrange-hint button:hover { border-color: #8A5A00; }
+
+.product-grid.arranging .product-card {
+  cursor: grab;
+  border-style: dashed;
+}
+.product-grid.arranging .product-card:active { transform: none; }
+.product-grid.arranging .card-favorite-btn { display: none; }
+.product-card.dragging { opacity: 0.4; }

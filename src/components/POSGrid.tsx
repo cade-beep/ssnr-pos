@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Product, CartItem, normalizeCategory } from '../types';
 import { supabase } from '../supabase';
-import { Search, X, Star, Clock, TrendingUp, ArrowUpDown, LayoutGrid, Grid3X3 } from 'lucide-react';
+import { Search, X, Star, Clock, TrendingUp, ArrowUpDown, LayoutGrid, Grid3X3, Move, RotateCcw } from 'lucide-react';
 import { matchProductSearch } from '../utils/hangul';
 
 interface POSGridProps {
@@ -31,6 +31,9 @@ const CATEGORY_ORDER: Record<string, number> = {
 
 const FAVORITES_STORAGE_KEY = 'ssnr_pos_favorite_products';
 const DENSITY_STORAGE_KEY = 'ssnr_pos_grid_density_v2';
+// ponytail: button layout is per-device (localStorage). Move it to a products.sort_order
+// column if the shop ever runs more than one till and wants a shared layout.
+const ORDER_STORAGE_KEY = 'ssnr_pos_product_order_v1';
 const SALES_INSIGHT_LOOKBACK_DAYS = 30;
 const SALES_INSIGHT_ROW_LIMIT = 1000;
 
@@ -82,6 +85,48 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const [arrangeMode, setArrangeMode] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [customOrder, setCustomOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(ORDER_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const customRank = useMemo(
+    () => new Map(customOrder.map((id, idx) => [id, idx])),
+    [customOrder]
+  );
+
+  const saveOrder = (ids: string[]) => {
+    setCustomOrder(ids);
+    try {
+      localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(ids));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  /** Move one product in front of another. Positions are kept for the whole
+   *  product list, so dragging inside one category tab does not scramble the rest. */
+  const moveProduct = (dragId: string, dropId: string) => {
+    if (dragId === dropId) return;
+    const known = new Set(products.map((p) => p.id));
+    const ordered = customOrder.filter((id) => known.has(id));
+    const seen = new Set(ordered);
+    for (const p of [...products].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }))) {
+      if (!seen.has(p.id)) ordered.push(p.id);
+    }
+    const from = ordered.indexOf(dragId);
+    const to = ordered.indexOf(dropId);
+    if (from === -1 || to === -1) return;
+    ordered.splice(to, 0, ...ordered.splice(from, 1));
+    saveOrder(ordered);
   };
 
   const [bestSellerIds, setBestSellerIds] = useState<string[]>([]);
@@ -227,7 +272,14 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
     } else if (smartFilter === 'recent') {
       list.sort((a, b) => (recentSoldRank.get(a.id) ?? 0) - (recentSoldRank.get(b.id) ?? 0));
     } else {
-      list.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
+      list.sort((a, b) => {
+        const ra = customRank.get(a.id);
+        const rb = customRank.get(b.id);
+        if (ra !== undefined && rb !== undefined) return ra - rb;
+        if (ra !== undefined) return -1;
+        if (rb !== undefined) return 1;
+        return a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' });
+      });
     }
 
     return list;
@@ -239,7 +291,8 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
     favoriteIds,
     bestSellerRank,
     recentSoldRank,
-    sortOption
+    sortOption,
+    customRank
   ]);
 
   return (
@@ -300,6 +353,17 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
               <span>작게</span>
             </button>
           </div>
+
+          <button
+            type="button"
+            className={`arrange-toggle ${arrangeMode ? 'active' : ''}`}
+            onClick={() => setArrangeMode((v) => !v)}
+            title="버튼 위치를 끌어서 바꿉니다"
+            aria-pressed={arrangeMode}
+          >
+            <Move size={16} />
+            <span>{arrangeMode ? '배치 완료' : '배치'}</span>
+          </button>
 
           <div className="sales-sort-wrap">
             <ArrowUpDown size={15} className="sort-icon" aria-hidden="true" />
@@ -382,6 +446,16 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
         </div>
       </nav>
 
+      {arrangeMode && (
+        <div className="arrange-hint">
+          <span>상품을 끌어다 원하는 자리에 놓으세요. 이 상태에서는 주문에 담기지 않습니다.</span>
+          <button type="button" onClick={() => saveOrder([])}>
+            <RotateCcw size={13} />
+            <span>기본 순서로</span>
+          </button>
+        </div>
+      )}
+
       <main className="product-grid-scroll">
         {filteredProducts.length === 0 ? (
           <div className="product-empty-state">
@@ -390,7 +464,7 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
             <p className="empty-desc">다른 상품명, 초성(예: ㄷㅍ) 또는 바코드를 입력해 주세요.</p>
           </div>
         ) : (
-          <div className={`product-grid ${density}`}>
+          <div className={`product-grid ${density} ${arrangeMode ? 'arranging' : ''}`}>
             {filteredProducts.map((product) => {
               const cartQty = cartQuantityMap.get(product.id) ?? 0;
               const inCart = cartQty > 0;
@@ -401,9 +475,19 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
                   key={product.id}
                   role="button"
                   tabIndex={0}
-                  className={`product-card ${inCart ? 'in-cart' : ''} ${density}`}
-                  onClick={() => onProductClick(product)}
-                  onKeyDown={(e) => handleCardKeyDown(e, product)}
+                  className={`product-card ${inCart ? 'in-cart' : ''} ${density} ${draggingId === product.id ? 'dragging' : ''}`}
+                  draggable={arrangeMode}
+                  onDragStart={() => setDraggingId(product.id)}
+                  onDragEnd={() => setDraggingId(null)}
+                  onDragOver={(e) => { if (arrangeMode) e.preventDefault(); }}
+                  onDrop={(e) => {
+                    if (!arrangeMode || !draggingId) return;
+                    e.preventDefault();
+                    moveProduct(draggingId, product.id);
+                    setDraggingId(null);
+                  }}
+                  onClick={() => { if (!arrangeMode) onProductClick(product); }}
+                  onKeyDown={(e) => { if (!arrangeMode) handleCardKeyDown(e, product); }}
                   aria-label={`${product.name}, 가격 ${product.price.toLocaleString()}원${inCart ? `, 장바구니 ${cartQty}개 담김` : ''}`}
                 >
                   <button
@@ -415,21 +499,6 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
                   >
                     <Star size={15} fill={isFavorite ? '#F59E0B' : 'none'} stroke={isFavorite ? '#F59E0B' : 'currentColor'} />
                   </button>
-
-                  <div className="card-image-wrap">
-                    {product.imageUrl ? (
-                      <img
-                        src={product.imageUrl}
-                        alt=""
-                        className="card-image"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="card-image-emoji">
-                        {product.emoji || '🍞'}
-                      </div>
-                    )}
-                  </div>
 
                   <div className="card-body">
                     <div className="card-name-row">
