@@ -113,6 +113,25 @@ export const normalizeCategory = (cat: string, name?: string): 'bakery' | 'food'
   return 'etc';
 };
 
+/**
+ * Which tab a product sits under on the sales screen. This is a display
+ * grouping only — it is derived from the name and never written back, so the
+ * stored category ('베이커리' | '간식및선물세트' | '기타') and every DB path
+ * that uses it stay exactly as they are.
+ */
+export type PosGroup = 'bakery' | 'bakery_sm' | 'pastry' | 'etc';
+
+export const getPosGroup = (name: string, cat?: string): PosGroup => {
+  const n = (name || '').trim();
+  // 제과 first: a 쿠키(小) should still be 제과, not 제빵(小)
+  if (/쿠키|머핀|마들렌|브라우니|카스테라|카스텔라/.test(n)) return 'pastry';
+  // '(小)' with the brackets, so 박스小 is not mistaken for a small loaf
+  if (n.includes('(小)')) return 'bakery_sm';
+  if (n.includes('빵')) return 'bakery';
+  if (cat && normalizeCategory(cat, undefined) === 'bakery') return 'bakery';
+  return 'etc';
+};
+
 export const mapCategoryToDB = (cat: 'bakery' | 'food' | 'etc'): string => {
   if (cat === 'bakery') return '베이커리';
   if (cat === 'food') return '간식및선물세트';

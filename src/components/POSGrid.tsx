@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Product, CartItem, normalizeCategory } from '../types';
+import { Product, CartItem, getPosGroup } from '../types';
 import { supabase } from '../supabase';
 import { Search, X, Star, Clock, TrendingUp, ArrowUpDown, LayoutGrid, Grid3X3, Move, RotateCcw } from 'lucide-react';
 import { matchProductSearch } from '../utils/hangul';
@@ -16,8 +16,9 @@ type SortOption = 'default' | 'price_asc' | 'price_desc';
 type GridDensity = 'compact' | 'comfortable';
 
 const getCategoryLabel = (canonicalCat: string): string => {
-  if (canonicalCat === 'bakery') return '빵';
-  if (canonicalCat === 'food') return '선물세트';
+  if (canonicalCat === 'bakery') return '제빵';
+  if (canonicalCat === 'bakery_sm') return '제빵(小)';
+  if (canonicalCat === 'pastry') return '제과';
   if (canonicalCat === 'etc') return '기타';
   if (canonicalCat === 'all' || canonicalCat === '전체') return '전체';
   return canonicalCat;
@@ -25,8 +26,9 @@ const getCategoryLabel = (canonicalCat: string): string => {
 
 const CATEGORY_ORDER: Record<string, number> = {
   bakery: 1,
-  food: 2,
-  etc: 3
+  bakery_sm: 2,
+  pastry: 3,
+  etc: 4
 };
 
 const FAVORITES_STORAGE_KEY = 'ssnr_pos_favorite_products';
@@ -54,7 +56,7 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
   const productCategories = useMemo(() => {
     const canonicalSet = new Set<string>();
     for (const p of products) {
-      const canonical = normalizeCategory(p.category, p.name);
+      const canonical = getPosGroup(p.name, p.category);
       if (canonical) {
         canonicalSet.add(canonical);
       }
@@ -260,7 +262,7 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
       if (smartFilter === 'recent') return recentSoldRank.has(p.id);
 
       if (selectedCategory === 'all' || selectedCategory === '전체') return true;
-      return normalizeCategory(p.category, p.name) === selectedCategory;
+      return getPosGroup(p.name, p.category) === selectedCategory;
     });
 
     if (sortOption === 'price_asc') {
@@ -475,7 +477,7 @@ const POSGrid: React.FC<POSGridProps> = ({ products, onProductClick, onQuickAdd,
                   key={product.id}
                   role="button"
                   tabIndex={0}
-                  className={`product-card cat-${normalizeCategory(product.category, product.name)} ${inCart ? 'in-cart' : ''} ${density} ${draggingId === product.id ? 'dragging' : ''}`}
+                  className={`product-card cat-${getPosGroup(product.name, product.category)} ${inCart ? 'in-cart' : ''} ${density} ${draggingId === product.id ? 'dragging' : ''}`}
                   draggable={arrangeMode}
                   onDragStart={() => setDraggingId(product.id)}
                   onDragEnd={() => setDraggingId(null)}

@@ -4047,8 +4047,10 @@ body {
 /* 카테고리별 색 구분 — 버튼을 색으로 먼저 찾고 글자로 확인한다 */
 .product-card.cat-bakery { background: #FFFBF2; border-color: #F4E3C4; }
 .product-card.cat-bakery .card-price { color: #B45309; }
-.product-card.cat-food { background: #F4FBF6; border-color: #C9E9D5; }
-.product-card.cat-food .card-price { color: #047857; }
+.product-card.cat-bakery_sm { background: #FAF6FF; border-color: #E4D8F5; }
+.product-card.cat-bakery_sm .card-price { color: #7C3AED; }
+.product-card.cat-pastry { background: #F4FBF6; border-color: #C9E9D5; }
+.product-card.cat-pastry .card-price { color: #047857; }
 .product-card.cat-etc { background: #F8FAFC; border-color: #DDE3EA; }
 .product-card.cat-etc .card-price { color: #475569; }
 /* 담긴 상품과 누르는 중인 상품은 카테고리 색보다 우선한다 */
