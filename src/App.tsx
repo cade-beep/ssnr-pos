@@ -1192,8 +1192,9 @@ const App: React.FC = () => {
                 role={currentCashier.role}
               />
             ) : activeTab === 'inventory' ? (
-              <InventoryView 
+              <InventoryView
                 onShowToast={showToast}
+                products={products}
               />
             ) : activeTab === 'employees' ? (
               <EmployeesView

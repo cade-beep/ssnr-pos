@@ -3913,3 +3913,106 @@ body {
 }
 
 
+
+/* ============================================================
+   재고 조사 (Inventory)
+   판매 화면의 헤더/카테고리/카드 클래스를 그대로 재사용하고,
+   여기서는 재고 입력 줄만 추가한다.
+   ============================================================ */
+.inventory-layout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface-alt);
+}
+.inventory-layout .sales-workspace {
+  border-right: 1px solid var(--border-color);
+}
+/* 재고 카드는 카드를 눌러 담는 게 아니라 아래 스테퍼로 채운다 */
+.inventory-layout .product-card { cursor: default; }
+.inventory-layout .product-card:hover { transform: none; }
+.inventory-layout .product-card:active { transform: none; background: #FFFFFF; }
+
+.sales-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stock-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.stock-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.stock-row.primary {
+  padding: 4px 6px;
+  background: #F4F8FF;
+  border: 1px solid #B4DBFF;
+  border-radius: var(--radius-sm);
+  color: var(--primary);
+}
+.stock-label { white-space: nowrap; }
+
+.stock-stepper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.stock-stepper button {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: #FFFFFF;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.stock-stepper button:hover { border-color: var(--primary); color: var(--primary); }
+.stock-stepper button:active { background: #F4F8FF; }
+.stock-row.primary .stock-stepper button { border-color: #B4DBFF; color: var(--primary); }
+.stock-stepper input {
+  width: 40px;
+  border: none;
+  background: transparent;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-primary);
+  outline: none;
+  -moz-appearance: textfield;
+}
+.stock-row.primary .stock-stepper input { color: var(--primary); }
+.stock-stepper input::-webkit-outer-spin-button,
+.stock-stepper input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.stock-sold {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.stock-sold strong { font-weight: 800; color: var(--text-muted); }
+.stock-sold strong.on { color: #059669; }
+
+.product-grid.compact .stock-fields { gap: 4px; margin-top: 8px; }
+.product-grid.compact .stock-stepper button { width: 22px; height: 22px; }
+.product-grid.compact .stock-stepper input { width: 32px; font-size: 13px; }

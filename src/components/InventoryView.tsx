@@ -16,6 +16,7 @@ import {
   RefreshCw, 
   Trash2 
 } from 'lucide-react';
+import { Product } from '../types';
 import { InventoryItem, InventoryCheckSession, ExcelSyncResult } from '../types/inventory';
 import { createInitialInventoryItems } from '../data/bakeryInventoryData';
 import { 
@@ -33,13 +34,15 @@ const DENSITY_STORAGE_KEY = 'ssnr_inventory_grid_density_v1';
 
 interface InventoryViewProps {
   onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
+  /** Store products, used only to reuse their photos on the stock cards */
+  products?: Product[];
 }
 
 type CategoryTab = '전체' | '제빵류' | '제과류' | '동전쿠키' | '기타';
 type SortOption = 'default' | 'price_asc' | 'price_desc' | 'sold_desc';
 type GridDensity = 'compact' | 'comfortable';
 
-export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast }) => {
+export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast, products = [] }) => {
   // Store & Round
   const [storeName, setStoreName] = useState<'서산나래' | '복지관'>('서산나래');
   const [round, setRound] = useState<number>(() => getDefaultRound(new Date().getHours()));
@@ -63,7 +66,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast }) => 
   });
 
   // Selected item focus for right panel quick editing
-  const [focusedItemId, setFocusedItemId] = useState<string | null>(null);
 
   // Items state (completely isolated from cart)
   const [items, setItems] = useState<InventoryItem[]>(() => {
@@ -86,6 +88,23 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast }) => 
   // Sync & Print state
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [lastSyncResult, setLastSyncResult] = useState<ExcelSyncResult | null>(null);
+
+  // Photos come from the store product list so a stock card looks like its sales card
+  const photoByName = useMemo(() => {
+    const loose = (n: string) => n.replace(/[s()]/g, '');
+    const byLoose = new Map<string, Product>();
+    const byExact = new Map<string, Product>();
+    for (const p of products) {
+      if (!byExact.has(p.name)) byExact.set(p.name, p);
+      if (!byLoose.has(loose(p.name))) byLoose.set(loose(p.name), p);
+    }
+    const out = new Map<string, Product>();
+    for (const i of items) {
+      const hit = byExact.get(i.name) || byLoose.get(loose(i.name));
+      if (hit) out.set(i.name, hit);
+    }
+    return out;
+  }, [products, items]);
 
   // Save to isolated localStorage whenever items change
   useEffect(() => {
@@ -283,344 +302,217 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast }) => 
   };
 
   return (
-    <div style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden', backgroundColor: '#f8fafc' }}>
+    <div className="inventory-layout">
       {/* ======================================================================
-          LEFT PANEL: POS GRID WORKSPACE (판매 화면 POSGrid와 100% 동일한 UX)
+          LEFT PANEL: 판매 화면(POSGrid)과 같은 클래스를 그대로 사용해 UI를 통일
           ====================================================================== */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', borderRight: '1px solid #e2e8f0' }}>
-        {/* Workspace Header */}
-        <header style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '12px 20px',
-          backgroundColor: '#fff',
-          borderBottom: '1px solid #e2e8f0',
-          gap: '12px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>
-              재고 조사
-            </h1>
-            <span style={{
-              fontSize: '11px',
-              padding: '2px 8px',
-              borderRadius: '999px',
-              backgroundColor: '#ecfdf5',
-              color: '#047857',
-              fontWeight: 700,
-              border: '1px solid #a7f3d0'
-            }}>
-              실시간 동기화 모드
-            </span>
+      <div className="sales-workspace">
+        <header className="sales-header">
+          <div className="sales-title-box">
+            <h1 className="sales-title">재고 조사</h1>
+            <span className="sales-status-tag">{storeName} · {round}차</span>
           </div>
 
-          {/* Search Bar with Hangul Chosung Support */}
-          <div style={{
-            position: 'relative',
-            flex: 1,
-            maxWidth: '380px',
-            display: 'flex',
-            alignItems: 'center'
-          }}>
-            <Search size={16} style={{ position: 'absolute', left: '12px', color: '#94a3b8' }} />
+          <div className="search-bar-wrap">
+            <div className="search-bar-icon" aria-hidden="true">
+              <Search size={19} />
+            </div>
             <input
               type="text"
+              className="search-bar-input"
               placeholder="빵 이름 검색 (초성 'ㅅㅂㄹ' 가능)"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 32px 8px 34px',
-                borderRadius: '8px',
-                border: '1px solid #cbd5e1',
-                fontSize: '13px',
-                outline: 'none'
-              }}
+              aria-label="빵 이름 또는 초성 검색"
             />
             {searchTerm && (
               <button
                 type="button"
+                className="search-bar-clear"
                 onClick={() => setSearchTerm('')}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#94a3b8'
-                }}
+                title="검색어 지우기"
+                aria-label="검색어 초기화"
               >
-                <X size={14} />
+                <X size={15} />
               </button>
             )}
           </div>
 
-          {/* Density and Sort controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ display: 'flex', background: '#f1f5f9', padding: '3px', borderRadius: '6px' }}>
+          <div className="sales-header-tools">
+            <div className="density-toggle-group" role="group" aria-label="카드 크기 보기 전환">
               <button
                 type="button"
+                className={`density-btn ${density === 'comfortable' ? 'active' : ''}`}
                 onClick={() => handleToggleDensity('comfortable')}
-                title="기본 3열 보기"
-                style={{
-                  border: 'none',
-                  background: density === 'comfortable' ? '#fff' : 'transparent',
-                  color: density === 'comfortable' ? '#0f172a' : '#64748b',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  boxShadow: density === 'comfortable' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
-                }}
+                title="기본 보기 (3열)"
+                aria-label="기본 보기 (3열)"
               >
-                <LayoutGrid size={14} />
+                <LayoutGrid size={16} />
                 <span>기본</span>
               </button>
               <button
                 type="button"
+                className={`density-btn ${density === 'compact' ? 'active' : ''}`}
                 onClick={() => handleToggleDensity('compact')}
-                title="작게 4열 보기"
-                style={{
-                  border: 'none',
-                  background: density === 'compact' ? '#fff' : 'transparent',
-                  color: density === 'compact' ? '#0f172a' : '#64748b',
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  boxShadow: density === 'compact' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
-                }}
+                title="작게 보기 (4열)"
+                aria-label="작게 보기 (4열)"
               >
-                <Grid3X3 size={14} />
+                <Grid3X3 size={16} />
                 <span>작게</span>
               </button>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 8px', background: '#fff' }}>
-              <ArrowUpDown size={13} color="#64748b" />
+            <div className="sales-sort-wrap">
+              <ArrowUpDown size={15} className="sort-icon" aria-hidden="true" />
               <select
+                className="sales-sort-select"
                 value={sortOption}
                 onChange={(e) => setSortOption(e.target.value as SortOption)}
-                style={{ border: 'none', fontSize: '12px', background: 'transparent', outline: 'none', cursor: 'pointer', color: '#334155' }}
+                aria-label="상품 정렬 기준"
               >
-                <option value="default">기본 순</option>
-                <option value="sold_desc">판매량 높은 순</option>
-                <option value="price_desc">높은 가격 순</option>
-                <option value="price_asc">낮은 가격 순</option>
+                <option value="default">기본순</option>
+                <option value="sold_desc">판매량 많은순</option>
+                <option value="price_asc">낮은 가격순</option>
+                <option value="price_desc">높은 가격순</option>
               </select>
             </div>
           </div>
         </header>
 
-        {/* Category Filter Bar */}
-        <nav style={{
-          display: 'flex',
-          gap: '8px',
-          padding: '10px 20px',
-          backgroundColor: '#fff',
-          borderBottom: '1px solid #e2e8f0',
-          overflowX: 'auto'
-        }}>
-          {(['전체', '제빵류', '제과류', '동전쿠키', '기타'] as CategoryTab[]).map((cat) => {
-            const isSelected = selectedCategory === cat;
-            const count = cat === '전체' ? items.length : items.filter((i) => i.category === cat).length;
-            return (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
-                style={{
-                  border: 'none',
-                  padding: '6px 14px',
-                  borderRadius: '20px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  backgroundColor: isSelected ? '#2563eb' : '#f1f5f9',
-                  color: isSelected ? '#fff' : '#475569',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {cat} ({count})
-              </button>
-            );
-          })}
+        <nav className="category-bar" aria-label="상품 카테고리">
+          <div className="category-group main-cats">
+            {(['전체', '제빵류', '제과류', '동전쿠키', '기타'] as CategoryTab[]).map((cat) => {
+              const count = cat === '전체' ? items.length : items.filter((i) => i.category === cat).length;
+              if (count === 0) return null;
+              const isSelected = selectedCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  className={`cat-btn ${isSelected ? 'selected' : ''}`}
+                  onClick={() => setSelectedCategory(cat)}
+                  aria-pressed={isSelected}
+                >
+                  {cat} ({count})
+                </button>
+              );
+            })}
+          </div>
         </nav>
 
-        {/* Product Cards Grid */}
-        <div style={{
-          flex: 1,
-          padding: '16px 20px',
-          overflowY: 'auto',
-          display: 'grid',
-          gridTemplateColumns: density === 'comfortable' ? 'repeat(auto-fill, minmax(220px, 1fr))' : 'repeat(auto-fill, minmax(175px, 1fr))',
-          gap: '12px',
-          alignContent: 'start'
-        }}>
-          {filteredProducts.map((product) => {
-            const isFocused = focusedItemId === product.id;
-            const hasActivity = product.dispatchQty > 0 || product.remainingQty > 0;
+        <main className="product-grid-scroll">
+          {filteredProducts.length === 0 ? (
+            <div className="product-empty-state">
+              <span className="empty-icon">🔍</span>
+              <p className="empty-title">일치하는 상품이 없습니다</p>
+              <p className="empty-desc">다른 상품명 또는 초성(예: ㄷㅍ)을 입력해 주세요.</p>
+            </div>
+          ) : (
+            <div className={`product-grid ${density}`}>
+              {filteredProducts.map((product) => {
+                const photo = photoByName.get(product.name);
+                const counted = product.dispatchQty > 0 || product.remainingQty > 0;
 
-            return (
-              <div
-                key={product.id}
-                onClick={() => setFocusedItemId(product.id)}
-                style={{
-                  backgroundColor: '#fff',
-                  borderRadius: '12px',
-                  border: isFocused ? '2px solid #2563eb' : hasActivity ? '1px solid #93c5fd' : '1px solid #e2e8f0',
-                  boxShadow: isFocused ? '0 4px 12px rgba(37, 99, 235, 0.15)' : '0 1px 3px rgba(0,0,0,0.05)',
-                  padding: '14px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  cursor: 'pointer',
-                  position: 'relative',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {/* Header: Name & Category */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <span style={{ fontWeight: 700, fontSize: '15px', color: '#1e293b' }}>
-                    {product.name}
-                  </span>
-                  <span style={{
-                    fontSize: '11px',
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    backgroundColor: product.category === '제빵류' ? '#fef3c7' : '#f1f5f9',
-                    color: product.category === '제빵류' ? '#92400e' : '#475569',
-                    fontWeight: 600
-                  }}>
-                    {product.category}
-                  </span>
-                </div>
+                return (
+                  <div
+                    key={product.id}
+                    className={`product-card ${density} ${counted ? 'in-cart' : ''}`}
+                  >
+                    <div className="card-image-wrap">
+                      {photo?.imageUrl ? (
+                        <img src={photo.imageUrl} alt="" className="card-image" loading="lazy" />
+                      ) : (
+                        <div className="card-image-emoji">{photo?.emoji || '🍞'}</div>
+                      )}
+                    </div>
 
-                {/* Price */}
-                <div style={{ fontSize: '13px', color: '#64748b', fontWeight: 600 }}>
-                  {product.unitPrice.toLocaleString()}원
-                </div>
+                    <div className="card-body">
+                      <div className="card-name-row">
+                        <span className="card-name" title={product.name}>
+                          {product.name}
+                        </span>
+                        {product.soldQty > 0 && (
+                          <span className="card-qty-badge" aria-label={`판매 ${product.soldQty}개`}>
+                            {product.soldQty}
+                          </span>
+                        )}
+                      </div>
 
-                {/* Steppers: Dispatch & Remaining */}
-                <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {/* Dispatch row */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-                    <span style={{ color: '#64748b', fontWeight: 600 }}>출고:</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleQtyChange(product.id, 'dispatchQty', -1);
-                        }}
-                        style={{
-                          width: '24px', height: '24px', borderRadius: '4px', border: '1px solid #cbd5e1',
-                          background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                        }}
-                      >
-                        <Minus size={12} />
-                      </button>
-                      <span style={{ minWidth: '24px', textAlign: 'center', fontWeight: 700 }}>
-                        {product.dispatchQty}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleQtyChange(product.id, 'dispatchQty', 1);
-                        }}
-                        style={{
-                          width: '24px', height: '24px', borderRadius: '4px', border: '1px solid #cbd5e1',
-                          background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                        }}
-                      >
-                        <Plus size={12} />
-                      </button>
+                      <div className="card-price-row">
+                        <span className="card-price">
+                          {product.unitPrice.toLocaleString()}<span className="currency-unit">원</span>
+                        </span>
+                      </div>
+
+                      <div className="stock-fields">
+                        <div className="stock-row">
+                          <span className="stock-label">출고</span>
+                          <div className="stock-stepper">
+                            <button
+                              type="button"
+                              onClick={() => handleQtyChange(product.id, 'dispatchQty', -1)}
+                              aria-label={`${product.name} 출고 1개 줄이기`}
+                            >
+                              <Minus size={13} />
+                            </button>
+                            <input
+                              type="number"
+                              min="0"
+                              value={product.dispatchQty}
+                              onChange={(e) => handleQtyChange(product.id, 'dispatchQty', parseInt(e.target.value) || 0, true)}
+                              aria-label={`${product.name} 출고 수량`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleQtyChange(product.id, 'dispatchQty', 1)}
+                              aria-label={`${product.name} 출고 1개 늘리기`}
+                            >
+                              <Plus size={13} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="stock-row primary">
+                          <span className="stock-label">남은재고</span>
+                          <div className="stock-stepper">
+                            <button
+                              type="button"
+                              onClick={() => handleQtyChange(product.id, 'remainingQty', -1)}
+                              aria-label={`${product.name} 남은재고 1개 줄이기`}
+                            >
+                              <Minus size={13} />
+                            </button>
+                            <input
+                              type="number"
+                              min="0"
+                              value={product.remainingQty}
+                              onChange={(e) => handleQtyChange(product.id, 'remainingQty', parseInt(e.target.value) || 0, true)}
+                              aria-label={`${product.name} 남은재고 수량`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleQtyChange(product.id, 'remainingQty', 1)}
+                              aria-label={`${product.name} 남은재고 1개 늘리기`}
+                            >
+                              <Plus size={13} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="stock-sold">
+                          <span>판매</span>
+                          <strong className={product.soldQty > 0 ? 'on' : ''}>
+                            {product.soldQty}개 · {product.subtotal.toLocaleString()}원
+                          </strong>
+                        </div>
+                      </div>
                     </div>
                   </div>
-
-                  {/* Remaining row (Primary audit target) */}
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '4px 6px',
-                    backgroundColor: '#eff6ff',
-                    borderRadius: '6px',
-                    border: '1px solid #bfdbfe'
-                  }}>
-                    <span style={{ color: '#1d4ed8', fontWeight: 700, fontSize: '12px' }}>남은재고:</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleQtyChange(product.id, 'remainingQty', -1);
-                        }}
-                        style={{
-                          width: '24px', height: '24px', borderRadius: '4px', border: '1px solid #93c5fd',
-                          background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1d4ed8'
-                        }}
-                      >
-                        <Minus size={12} />
-                      </button>
-                      <input
-                        type="number"
-                        min="0"
-                        value={product.remainingQty}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => handleQtyChange(product.id, 'remainingQty', parseInt(e.target.value) || 0, true)}
-                        style={{
-                          width: '36px', textAlign: 'center', border: 'none', background: 'transparent',
-                          fontWeight: 800, fontSize: '14px', color: '#1d4ed8'
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleQtyChange(product.id, 'remainingQty', 1);
-                        }}
-                        style={{
-                          width: '24px', height: '24px', borderRadius: '4px', border: '1px solid #93c5fd',
-                          background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1d4ed8'
-                        }}
-                      >
-                        <Plus size={12} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Calculated Sold Badge */}
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    fontSize: '12px',
-                    paddingTop: '2px'
-                  }}>
-                    <span style={{ color: '#64748b' }}>판매 계산:</span>
-                    <span style={{
-                      fontWeight: 800,
-                      color: product.soldQty > 0 ? '#059669' : '#94a3b8'
-                    }}>
-                      {product.soldQty}개 ({product.subtotal.toLocaleString()}원)
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          )}
+        </main>
       </div>
 
       {/* ======================================================================
