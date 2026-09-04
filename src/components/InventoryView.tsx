@@ -168,7 +168,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast }) => 
   // Reset an item
   const handleResetItem = (id: string) => {
     handleQtyChange(id, 'dispatchQty', 0, true);
-    handleQtyChange(id, 'remainingQty', 0, true);
   };
 
   // Reset all
@@ -210,7 +209,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast }) => 
 
   // Active items (items that have been modified or have stock/sold)
   const activeItems = useMemo(() => {
-    return items.filter((i) => i.dispatchQty > 0 || i.remainingQty > 0 || i.soldQty > 0);
+    return items.filter((i) => i.dispatchQty > 0);
   }, [items]);
 
   // Items to show in the right panel
@@ -218,8 +217,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast }) => 
 
   // Summary Metrics
   const totalDispatch = useMemo(() => items.reduce((acc, i) => acc + i.dispatchQty, 0), [items]);
-  const totalRemaining = useMemo(() => items.reduce((acc, i) => acc + i.remainingQty, 0), [items]);
-  const totalSold = useMemo(() => items.reduce((acc, i) => acc + i.soldQty, 0), [items]);
   const totalExpectedAmount = useMemo(() => items.reduce((acc, i) => acc + i.subtotal, 0), [items]);
   const totalInventoryAmount = useMemo(
     () => items.reduce((acc, i) => acc + i.remainingQty * (i.discount10Price || i.unitPrice), 0),
@@ -351,7 +348,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast }) => 
                 aria-label="상품 정렬 기준"
               >
                 <option value="default">기본순</option>
-                <option value="sold_desc">판매량 많은순</option>
                 <option value="price_asc">낮은 가격순</option>
                 <option value="price_desc">높은 가격순</option>
               </select>
@@ -390,7 +386,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast }) => 
           ) : (
             <div className={`product-grid ${density}`}>
               {filteredProducts.map((product) => {
-                const counted = product.dispatchQty > 0 || product.remainingQty > 0;
+                const counted = product.dispatchQty > 0;
 
                 return (
                   <div
@@ -402,9 +398,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast }) => 
                         <span className="card-name" title={product.name}>
                           {product.name}
                         </span>
-                        {product.soldQty > 0 && (
-                          <span className="card-qty-badge" aria-label={`판매 ${product.soldQty}개`}>
-                            {product.soldQty}
+                        {product.dispatchQty > 0 && (
+                          <span className="card-qty-badge" aria-label={`재고 ${product.dispatchQty}개 추가됨`}>
+                            {product.dispatchQty}
                           </span>
                         )}
                       </div>
@@ -416,8 +412,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast }) => 
                       </div>
 
                       <div className="stock-fields">
-                        <div className="stock-row">
-                          <span className="stock-label">출고</span>
+                        <div className="stock-row primary">
+                          <span className="stock-label">재고 추가</span>
                           <div className="stock-stepper">
                             <button
                               type="button"
@@ -443,39 +439,6 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast }) => 
                           </div>
                         </div>
 
-                        <div className="stock-row primary">
-                          <span className="stock-label">남은재고</span>
-                          <div className="stock-stepper">
-                            <button
-                              type="button"
-                              onClick={() => handleQtyChange(product.id, 'remainingQty', -1)}
-                              aria-label={`${product.name} 남은재고 1개 줄이기`}
-                            >
-                              <Minus size={13} />
-                            </button>
-                            <input
-                              type="number"
-                              min="0"
-                              value={product.remainingQty}
-                              onChange={(e) => handleQtyChange(product.id, 'remainingQty', parseInt(e.target.value) || 0, true)}
-                              aria-label={`${product.name} 남은재고 수량`}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleQtyChange(product.id, 'remainingQty', 1)}
-                              aria-label={`${product.name} 남은재고 1개 늘리기`}
-                            >
-                              <Plus size={13} />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="stock-sold">
-                          <span>판매</span>
-                          <strong className={product.soldQty > 0 ? 'on' : ''}>
-                            {product.soldQty}개 · {product.subtotal.toLocaleString()}원
-                          </strong>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -801,9 +764,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast }) => 
         <div style={{ padding: '14px 16px', backgroundColor: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
           {/* Metrics Row */}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px' }}>
-            <span style={{ color: '#64748b' }}>총 출고: <strong>{totalDispatch}개</strong></span>
-            <span style={{ color: '#2563eb' }}>총 재고: <strong>{totalRemaining}개</strong></span>
-            <span style={{ color: '#059669' }}>총 판매: <strong>{totalSold}개</strong></span>
+            <span style={{ color: '#2563eb' }}>총 추가: <strong>{totalDispatch}개</strong></span>
             <span style={{ color: '#0f172a' }}>예상액: <strong>{totalExpectedAmount.toLocaleString()}원</strong></span>
           </div>
 
@@ -1006,9 +967,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({ onShowToast }) => 
         {/* Summary totals */}
         <div style={{ borderTop: '2px solid #000', paddingTop: '10px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '13px' }}>
           <div>
-            <div>총 출고 수량: <strong>{totalDispatch}개</strong></div>
-            <div>총 남은 재고: <strong>{totalRemaining}개</strong></div>
-            <div>총 판매 수량(A): <strong>{totalSold}개</strong></div>
+            <div>총 추가 수량: <strong>{totalDispatch}개</strong></div>
             <div>총 판매 예상액: <strong>{totalExpectedAmount.toLocaleString()}원</strong></div>
           </div>
           <div>

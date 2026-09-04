@@ -4057,3 +4057,52 @@ body {
 .product-grid .product-card.in-cart { background: #F4F8FF; border-color: var(--primary); }
 .product-grid .product-card.in-cart .card-price { color: var(--primary); }
 .product-grid .product-card:active { background: #E8F1FF; }
+
+/* 재고 채우기 알림 — 화~금 오후 3시부터, 닫으면 그날은 안 뜬다 */
+.stock-reminder {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(560px, calc(100vw - 40px));
+  padding: 10px 12px 10px 16px;
+  border-radius: var(--radius-pill);
+  background: #FFF7E6;
+  border: 1px solid #FFD591;
+  color: #8A5A00;
+  font-size: 13.5px;
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+.stock-reminder-text { white-space: nowrap; }
+.stock-reminder-text strong { font-weight: 800; }
+.stock-reminder-go {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: #8A5A00;
+  color: #FFFFFF;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.stock-reminder-go:hover { background: #6B4600; }
+.stock-reminder-close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #8A5A00;
+  cursor: pointer;
+}
+.stock-reminder-close:hover { background: #FFE7BA; }

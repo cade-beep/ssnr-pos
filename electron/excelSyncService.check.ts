@@ -86,8 +86,13 @@ async function verify(root: string, s: InventoryCheckSession, label: string) {
     const item = byName.get(norm(name));
     if (!item) { unmatched.push(name); continue; }
     matched++;
-    assert.strictEqual(cell(ws, R + off, 5), item.dispatchQty, `${label}: '${name}' 출고 수량 불일치`);
-    assert.strictEqual(cell(ws, R + off, 6), item.soldQty, `${label}: '${name}' 판매 수량 불일치`);
+    // A zero is never written, so the sheet keeps whatever it already held
+    if (item.dispatchQty > 0) {
+      assert.strictEqual(cell(ws, R + off, 5), item.dispatchQty, `${label}: '${name}' 출고 수량 불일치`);
+    }
+    if (item.soldQty > 0) {
+      assert.strictEqual(cell(ws, R + off, 6), item.soldQty, `${label}: '${name}' 판매 수량 불일치`);
+    }
     const g = String(cell(ws, R + off, 7) ?? '');
     assert.ok(g.startsWith('=IFERROR('), `${label}: '${name}' 판매액 수식이 사라짐`);
   }
@@ -105,9 +110,10 @@ async function verify(root: string, s: InventoryCheckSession, label: string) {
       const name = String(cell(ws2, r, nameCol) ?? '').trim();
       const item = name ? byName.get(norm(name)) : undefined;
       if (!item) continue;
-      const got = cell(ws2, r, qtyCol);
-      assert.strictEqual(got, item.soldQty, `${label}: 판매지 '${name}' 판매량 불일치`);
-      paperHits++;
+      if (item.soldQty > 0) {
+        assert.strictEqual(cell(ws2, r, qtyCol), item.soldQty, `${label}: 판매지 '${name}' 판매량 불일치`);
+        paperHits++;
+      }
     }
   }
 
@@ -183,6 +189,21 @@ async function main() {
     assert.strictEqual(rows[0], rows[1], `재동기화가 새 블록을 만듦 (${rows[0]} -> ${rows[1]})`);
     console.log(`\n재동기화 멱등성 OK: 두 번 모두 R=${rows[0]} (블록 추가 없음)`);
   }
+  // The zero-skip guard: 식빵 sold 4 in scenario 1 and 0 in scenario 2, so the
+  // sheet must still hold 4 instead of being wiped by the re-sync.
+  if (rows.length >= 2) {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile(getExcelFilePaths(root).bakeryPath);
+    const ws = wb.getWorksheet('서산나래 미니빵집 판매 현황')!;
+    let found = -1;
+    for (let off = 0; off < 43; off++) {
+      if (String(cell(ws, rows[0] + off, 4) ?? '').trim() === '식빵') { found = rows[0] + off; break; }
+    }
+    assert.notStrictEqual(found, -1, '식빵 행을 찾지 못함');
+    assert.strictEqual(cell(ws, found, 6), 4, '0으로 재동기화하면서 기존 판매 수량을 덮어씀');
+    console.log('0 덮어쓰기 방지 OK: 식빵 판매 4개가 재동기화 후에도 남아 있음');
+  }
+
   const backups = fs.readdirSync(root).filter((f) => f.endsWith('.bak'));
   console.log(`백업 파일 ${backups.length}개 생성 (동기화 횟수만큼 누적)`);
 

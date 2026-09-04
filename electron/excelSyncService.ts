@@ -144,8 +144,14 @@ async function syncBakerySalesStatus(filePath: string, session: InventoryCheckSe
       if (!existingName) {
         row.getCell(4).value = matchedItem.name;
       }
-      row.getCell(5).value = matchedItem.dispatchQty ?? 0;
-      row.getCell(6).value = matchedItem.soldQty ?? 0;
+      // Only stamp a cell we actually have a number for. Writing a 0 for a quantity
+      // the app is not collecting would wipe whatever the sheet already holds.
+      if ((matchedItem.dispatchQty ?? 0) > 0) {
+        row.getCell(5).value = matchedItem.dispatchQty;
+      }
+      if ((matchedItem.soldQty ?? 0) > 0) {
+        row.getCell(6).value = matchedItem.soldQty;
+      }
 
       // Preserve or set selling formula
       const currentFormula = row.getCell(7).formula;
@@ -192,16 +198,16 @@ async function syncSalePaper(filePath: string, session: InventoryCheckSession): 
     const leftName = row.getCell(2).value ? String(row.getCell(2).value).trim() : '';
     if (leftName && leftName !== '제빵류' && leftName !== '제과류' && leftName !== '기타') {
       const match = itemMap.get(normalizeName(leftName));
-      if (match) {
-        row.getCell(5).value = match.soldQty ?? 0; // Col E (판매량)
+      if (match && (match.soldQty ?? 0) > 0) {
+        row.getCell(5).value = match.soldQty; // Col E (판매량)
       }
     }
 
     const rightName = row.getCell(7).value ? String(row.getCell(7).value).trim() : '';
     if (rightName && rightName !== '기타' && rightName !== '동전쿠키' && rightName !== '제과류') {
       const match = itemMap.get(normalizeName(rightName));
-      if (match) {
-        row.getCell(10).value = match.soldQty ?? 0; // Col J (판매량)
+      if (match && (match.soldQty ?? 0) > 0) {
+        row.getCell(10).value = match.soldQty; // Col J (판매량)
       }
     }
   }

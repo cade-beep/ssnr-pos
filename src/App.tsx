@@ -5,6 +5,7 @@ import Cart from './components/Cart';
 import ReceiptModal from './components/ReceiptModal';
 import LoginOverlay from './components/LoginOverlay';
 import Sidebar from './components/Sidebar';
+import StockReminder from './components/StockReminder';
 
 // Lazy-loaded management tab views for optimized initial bundle loading
 const ProductsView = lazy(() => import('./components/ProductsView'));
@@ -1104,6 +1105,11 @@ const App: React.FC = () => {
         currentCashier={currentCashier}
         onLogout={handleLogout}
         pendingStaffCount={pendingStaffCount}
+      />
+
+      <StockReminder
+        onGoToStock={() => handleTabChange('inventory')}
+        isOnStockTab={activeTab === 'inventory'}
       />
 
       {activeTab === 'sales' ? (
