@@ -1,11 +1,7 @@
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import * as path from 'path';
-import { syncInventoryToExcel, getExcelFilePaths } from './excelSyncService';
 
 let mainWindow: BrowserWindow | null = null;
-
-// ponytail: packaged app reads/writes the two xlsx next to the .exe; switch to app.getPath('documents') if users want them elsewhere
-const dataDir = () => (app.isPackaged ? path.dirname(app.getPath('exe')) : process.cwd());
 
 function createWindow() {
   const isDev = !app.isPackaged;
@@ -59,35 +55,6 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  ipcMain.handle('inventory:sync-excel', async (_, session) => {
-    try {
-      return await syncInventoryToExcel(session, dataDir());
-    } catch (err: any) {
-      console.error('[IPC] syncInventoryToExcel failed:', err);
-      return {
-        success: false,
-        message: err?.message || '엑셀 파일 동기화 중 오류가 발생했습니다.',
-        timestamp: new Date().toISOString(),
-      };
-    }
-  });
-
-  ipcMain.handle('inventory:open-file', async (_, type: 'bakery' | 'salepaper') => {
-    try {
-      const { bakeryPath, salePaperPath } = getExcelFilePaths(dataDir());
-      const target = type === 'bakery' ? bakeryPath : salePaperPath;
-      await shell.openPath(target);
-      return true;
-    } catch (err) {
-      console.error('[IPC] openExcelFile failed:', err);
-      return false;
-    }
-  });
-
-  ipcMain.handle('inventory:get-paths', async () => {
-    return getExcelFilePaths(dataDir());
-  });
-
   createWindow();
 
   app.on('activate', () => {

@@ -5,14 +5,12 @@ import Cart from './components/Cart';
 import ReceiptModal from './components/ReceiptModal';
 import LoginOverlay from './components/LoginOverlay';
 import Sidebar from './components/Sidebar';
-import StockReminder from './components/StockReminder';
 
 // Lazy-loaded management tab views for optimized initial bundle loading
 const ProductsView = lazy(() => import('./components/ProductsView'));
 const HistoryView = lazy(() => import('./components/HistoryView'));
 const SettingsView = lazy(() => import('./components/SettingsView'));
 const EmployeesView = lazy(() => import('./components/EmployeesView'));
-const InventoryView = lazy(() => import('./components/InventoryView').then(m => ({ default: m.InventoryView })));
 import Button from './components/ui/Button';
 import Modal from './components/ui/Modal';
 import { showAlert, showConfirm, showPrompt } from './components/ui/dialogs';
@@ -59,7 +57,7 @@ const MIN_ORDER_PANEL_WIDTH = 320;
 const MAX_ORDER_PANEL_WIDTH = 520;
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'sales' | 'history' | 'products' | 'inventory' | 'employees' | 'settings'>('sales');
+  const [activeTab, setActiveTab] = useState<'sales' | 'history' | 'products' | 'employees' | 'settings'>('sales');
   const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartHistory, setCartHistory] = useState<CartItem[][]>([]);
@@ -69,7 +67,7 @@ const App: React.FC = () => {
   
   // Custom Toast State (supports undo action button)
   const [toast, setToast] = useState<{ message: string; type: 'info' | 'success' | 'error'; onAction?: () => void; actionLabel?: string } | null>(null);
-  const [pendingTabChange, setPendingTabChange] = useState<'sales' | 'history' | 'products' | 'inventory' | 'employees' | 'settings' | null>(null);
+  const [pendingTabChange, setPendingTabChange] = useState<'sales' | 'history' | 'products' | 'employees' | 'settings' | null>(null);
   const [isReceiptChecked] = useState<boolean>(true);
   const [cartDiscountPercent, setCartDiscountPercent] = useState<number>(0);
   const [drafts, setDrafts] = useState<CartDraft[]>([]);
@@ -556,7 +554,7 @@ const App: React.FC = () => {
   };
 
   // Safe Tab Change: if cart has items when leaving sales tab, prompt cashier
-  const handleTabChange = (newTab: 'sales' | 'history' | 'products' | 'inventory' | 'employees' | 'settings') => {
+  const handleTabChange = (newTab: 'sales' | 'history' | 'products' | 'employees' | 'settings') => {
     if (activeTab === 'sales' && newTab !== 'sales' && cart.length > 0) {
       setPendingTabChange(newTab);
       return;
@@ -993,7 +991,7 @@ const App: React.FC = () => {
         }
       });
 
-      showToast('💳 결제가 완료되고 재고가 정상 차감되었습니다.', 'success');
+      showToast('💳 결제가 완료되었습니다.', 'success');
       if (isReceiptChecked) {
         setCurrentReceipt(receipt);
         setReceiptAutoClose(true);
@@ -1107,11 +1105,6 @@ const App: React.FC = () => {
         pendingStaffCount={pendingStaffCount}
       />
 
-      <StockReminder
-        onGoToStock={() => handleTabChange('inventory')}
-        isOnStockTab={activeTab === 'inventory'}
-      />
-
       {activeTab === 'sales' ? (
         <>
           {/* Central Workspace: Product Navigation & Grid */}
@@ -1207,10 +1200,6 @@ const App: React.FC = () => {
                 onRefresh={loadProducts}
                 showToast={showToast}
                 role={currentCashier.role}
-              />
-            ) : activeTab === 'inventory' ? (
-              <InventoryView
-                onShowToast={showToast}
               />
             ) : activeTab === 'employees' ? (
               <EmployeesView

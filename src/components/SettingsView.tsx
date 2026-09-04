@@ -151,9 +151,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         }
       });
 
-      // Prepare empty snapshot of current stocks (inventory functionality deprecated)
-      const inventorySnapshot: Record<string, { stock: number; threshold: number }> = {};
-
       setClosingData({
         closed_at: new Date().toISOString(),
         cashier_name: currentCashier.name,
@@ -165,8 +162,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         refund_count: refundCount,
         refund_amount: refundAmount,
         sales_count: salesCount,
-        item_details: itemDetails,
-        inventory_snapshot: inventorySnapshot
+        item_details: itemDetails
       });
     } catch (err: any) {
       console.error(err);
@@ -199,8 +195,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             refund_count: closingData.refund_count,
             refund_amount: closingData.refund_amount,
             sales_count: closingData.sales_count,
-            item_details: closingData.item_details,
-            inventory_snapshot: closingData.inventory_snapshot
+            item_details: closingData.item_details
           })
       )) as any;
 
@@ -369,7 +364,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               <BarChart size={16} color="var(--primary)" /> 영업 정산 및 마감
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: '1.5' }}>
-              금일 발생한 매출 합산과 재고 상태를 마감 정산 보고서로 집계하고 데이터베이스에 영구적으로 보존합니다.
+              금일 발생한 매출을 마감 정산 보고서로 집계하고 데이터베이스에 영구적으로 보존합니다.
             </p>
 
             <Button variant="primary" size="md" fullWidth onClick={handleCalculateClose}>

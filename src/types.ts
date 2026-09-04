@@ -27,7 +27,6 @@ export interface ClosingReport {
   refund_amount: number;
   sales_count: number;
   item_details: Record<string, number>;
-  inventory_snapshot: Record<string, { stock: number; threshold: number }>;
 }
 
 export interface CartItem {
@@ -89,9 +88,6 @@ declare global {
   interface Window {
     electronAPI?: {
       platform: string;
-      syncInventoryExcel?: (session: any) => Promise<any>;
-      openExcelFile?: (type: 'bakery' | 'salepaper') => Promise<boolean>;
-      getExcelPaths?: () => Promise<{ bakeryPath: string; salePaperPath: string }>;
     };
   }
 }

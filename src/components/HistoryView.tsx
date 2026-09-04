@@ -329,7 +329,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ onSelectReceipt, showToast, r
     return buckets;
   })();
 
-  // Refund Order & restore inventory (atomic database transaction)
+  // Refund Order (atomic database transaction)
   const handleRefund = async (order: any) => {
     if (isLoading || order.is_refunded) return;
     

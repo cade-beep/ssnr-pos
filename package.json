@@ -9,8 +9,7 @@
     "dev:electron": "tsc && wait-on http://localhost:5173 && electron .",
     "build:vite": "tsc && vite build",
     "build": "npm run build:vite",
-    "typecheck": "tsc --noEmit",
-    "check:excel": "node scripts/runExcelCheck.js"
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "pos",
@@ -22,10 +21,8 @@
   "license": "ISC",
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",
-    "exceljs": "^4.4.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
-    "jszip": "^3.10.1",
     "lucide-react": "^0.344.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"

@@ -89,11 +89,45 @@ npm run dev
 
 ---
 
+## 🔀 Repository Split (POS ↔ 재고 조사 앱)
+
+재고 기능은 **[ssnr-inventory](../ssnr-inventory)** 로 분리되어 있습니다. 같은 Supabase
+프로젝트를 보지만 프론트엔드는 완전히 따로입니다.
+
+| | POS (이 저장소) | 재고 조사 앱 (ssnr-inventory) |
+|---|---|---|
+| 목적 | 판매 · 정산 · 영수증 | 실사 · 입고 · 폐기 · 조정 · 리포트 |
+| 실행 | Electron 데스크톱 (매장 노트북) | 모바일 웹 (매장에서 폰으로) |
+| 쓰는 테이블 | `products`(읽기) `orders` `order_items` `closing_reports` `user_roles` | `products`(읽기) `orders`·`order_items`(읽기) `stock_movements`(읽기/쓰기) |
+| 재고 | **전혀 다루지 않음.** 판매해도 재고를 차감하지 않는다 | 재고를 계산해서 보여주는 유일한 곳 |
+
+**판매 시 재고 차감은 POS 에 없습니다.** 재고는 어디에도 저장하지 않고 재고 앱이
+매번 계산합니다 — `입고 − 이월 − 폐기 ± 조정 − (order_items 의 판매 수량)`. 그래서
+POS 에서 환불이 일어나면 재고 앱의 숫자가 저절로 따라옵니다.
+
+### 공유 테이블 & RLS
+
+모든 테이블은 `store_id` 로 격리되고, 정책은 `public.get_user_store_id()` 와
+`public.get_user_role(auth.uid())` 를 씁니다.
+
+| 테이블 | POS | 재고 앱 | RLS 요약 |
+|---|---|---|---|
+| `products` | 읽기 / Owner 쓰기 | 읽기 | 같은 매장만 |
+| `orders`, `order_items` | 읽기 / `complete_sale` RPC 로만 쓰기 | 읽기 | 같은 매장만. 결제는 서버가 금액을 재검증 |
+| `stock_movements` | **사용 안 함** | 읽기 / 쓰기 | 같은 매장만. `waste`·`adjust` 기록과 모든 삭제는 Owner 만 |
+| `user_roles` | 읽기 | 읽기 | 본인 행 |
+
+마이그레이션 소유권: `stock_movements` 관련은 **재고 앱 저장소**에서 관리하고,
+나머지 판매 · 권한 관련은 이 저장소에서 관리합니다.
+
+---
+
 ## 🚫 Scope Limits (범위 제한)
 
 - ❌ 바코드 리더기 하드웨어 직접 연동 (바코드 값 매칭 로직은 있음, 리더기 자체 드라이버 연동은 없음)
 - ❌ 감열 영수증 프린터 ESC/POS 직접 연동 (정산서 PDF 저장으로 대체)
-- ❌ 재고 관리 (도입했다가 폐기됨 — 소규모 매장 특성상 실익이 없다고 판단)
+- ❌ 재고 관리 전반 — 재고 조사 앱이 전담합니다
+- ❌ 엑셀(`미니빵집 판매현황.xlsx`, `서산나래 판매지.xlsx`) 동기화 — 재고 기능과 함께 제거됨
 
 ---
 
