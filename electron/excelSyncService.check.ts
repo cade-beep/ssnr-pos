@@ -8,7 +8,7 @@ import * as os from 'os';
 import * as path from 'path';
 import assert from 'assert';
 import ExcelJS from 'exceljs';
-import { syncInventoryToExcel, getExcelFilePaths } from './excelSyncService';
+import { syncInventoryToExcel, getExcelFilePaths, readWorkbook } from './excelSyncService';
 import { InventoryCheckSession, InventoryItem } from '../src/types/inventory';
 import { BAKERY_PRODUCTS } from '../src/data/bakeryInventoryData';
 
@@ -61,11 +61,10 @@ function findBlock(ws: ExcelJS.Worksheet, s: InventoryCheckSession): number {
   return -1;
 }
 
-async function verify(root: string, s: InventoryCheckSession, label: string) {
+async function verify(root: string, s: InventoryCheckSession, label: string, sheetName: string) {
   const { bakeryPath, salePaperPath } = getExcelFilePaths(root);
 
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.readFile(bakeryPath);
+  const wb = await readWorkbook(bakeryPath);
   const ws = wb.getWorksheet('서산나래 미니빵집 판매 현황')!;
 
   const R = findBlock(ws, s);
@@ -97,12 +96,17 @@ async function verify(root: string, s: InventoryCheckSession, label: string) {
     assert.ok(g.startsWith('=IFERROR('), `${label}: '${name}' 판매액 수식이 사라짐`);
   }
 
-  const sheet = s.storeName === '복지관' ? '복지관_판매지' : '서산나래_판매지';
-  const wb2 = new ExcelJS.Workbook();
-  await wb2.xlsx.readFile(salePaperPath);
-  const ws2 = wb2.worksheets.find((w) => w.name.trim() === sheet)!;
-  assert.ok(ws2, `${label}: '${sheet}' 시트를 찾지 못함`);
-  assert.strictEqual(String(cell(ws2, 2, 7)), `날짜: ${s.dateStr} ${s.timeStr}`, `${label}: 판매지 G2 날짜 불일치`);
+  // The stocktake goes to its own new sheet, named 재고조사(날짜 시각)
+  const wb2 = await readWorkbook(salePaperPath);
+  const ws2 = wb2.worksheets.find((w) => w.name === sheetName)!;
+  assert.ok(ws2, `${label}: '${sheetName}' 시트를 찾지 못함`);
+  assert.ok(sheetName.startsWith('재고조사('), `${label}: 시트 이름이 재고조사(...) 형식이 아님: ${sheetName}`);
+  assert.ok(sheetName.length <= 31, `${label}: 시트 이름이 31자를 넘음: ${sheetName}`);
+  assert.ok(!/[:\\/?*\[\]]/.test(sheetName), `${label}: 시트 이름에 엑셀 금지 문자가 있음: ${sheetName}`);
+  assert.strictEqual(String(cell(ws2, 2, 7)), `날짜: ${s.dateStr} ${s.timeStr}`, `${label}: 새 시트 G2 날짜 불일치`);
+  assert.strictEqual(String(cell(ws2, 2, 2) ?? '').trim(),
+    s.storeName === '복지관' ? '복지관_판매지' : '서산나래_판매지',
+    `${label}: 새 시트가 다른 매장 서식에서 복사됨`);
 
   let paperHits = 0;
   for (let r = 6; r <= 33; r++) {
@@ -110,18 +114,14 @@ async function verify(root: string, s: InventoryCheckSession, label: string) {
       const name = String(cell(ws2, r, nameCol) ?? '').trim();
       const item = name ? byName.get(norm(name)) : undefined;
       if (!item) continue;
-      if (item.soldQty > 0) {
-        assert.strictEqual(cell(ws2, r, qtyCol), item.soldQty, `${label}: 판매지 '${name}' 판매량 불일치`);
-        paperHits++;
-      }
+      assert.strictEqual(cell(ws2, r, qtyCol), item.soldQty, `${label}: 새 시트 '${name}' 수량 불일치`);
+      paperHits++;
     }
   }
 
-  // The other store's sheet must be untouched by this session
-  const other = s.storeName === '복지관' ? '서산나래_판매지' : '복지관_판매지';
-  const wsOther = wb2.worksheets.find((w) => w.name.trim() === other)!;
-  const otherDate = String(cell(wsOther, 2, 7) ?? '');
-  assert.ok(!otherDate.includes(s.dateStr), `${label}: '${other}' 시트가 오염됨 (${otherDate})`);
+  for (const t of ['서산나래_판매지', '복지관_판매지']) {
+    assert.ok(wb2.worksheets.find((w) => w.name.trim() === t), `${label}: 템플릿 '${t}' 가 사라짐`);
+  }
 
   return { R, matched, unmatched, paperHits };
 }
@@ -132,6 +132,21 @@ async function main() {
     fs.copyFileSync(path.join(process.cwd(), f), path.join(root, f));
   }
   console.log(`temp dir: ${root}\n`);
+
+  /** Every cell a sync could touch in the two store templates. */
+  const snapshotTemplates = async () => {
+    const wb = await readWorkbook(getExcelFilePaths(root).salePaperPath);
+    const out: Record<string, any> = {};
+    for (const t of ['서산나래_판매지', '복지관_판매지']) {
+      const ws = wb.worksheets.find((w) => w.name.trim() === t)!;
+      out[`${t}!G2`] = cell(ws, 2, 7);
+      for (let r = 6; r <= 33; r++) {
+        for (const c of [5, 10]) out[`${t}!${r}:${c}`] = cell(ws, r, c);
+      }
+    }
+    return out;
+  };
+  const templatesBefore = await snapshotTemplates();
 
   const scenarios: { label: string; session: InventoryCheckSession }[] = [
     {
@@ -170,14 +185,17 @@ async function main() {
 
   let failed = 0;
   const rows: number[] = [];
+  const sheetNames: string[] = [];
   for (const { label, session } of scenarios) {
     try {
       const res = await syncInventoryToExcel(session, root);
       assert.ok(res.success, `${label}: sync 실패 - ${res.message}`);
-      const v = await verify(root, session, label);
+      const sheetName = res.details?.sheetName ?? '';
+      const v = await verify(root, session, label, sheetName);
       rows.push(v.R);
+      sheetNames.push(sheetName);
       console.log(`PASS  ${label}`);
-      console.log(`      블록 행 R=${v.R} · 품목 ${v.matched}/43 일치 · 판매지 셀 ${v.paperHits}개 기록` +
+      console.log(`      블록 행 R=${v.R} · 품목 ${v.matched}/43 일치 · 새 시트 '${sheetName}' 에 ${v.paperHits}칸 기록` +
         (v.unmatched.length ? ` · 미매칭: ${v.unmatched.join(', ')}` : ''));
     } catch (err: any) {
       failed++;
@@ -192,8 +210,7 @@ async function main() {
   // The zero-skip guard: 식빵 sold 4 in scenario 1 and 0 in scenario 2, so the
   // sheet must still hold 4 instead of being wiped by the re-sync.
   if (rows.length >= 2) {
-    const wb = new ExcelJS.Workbook();
-    await wb.xlsx.readFile(getExcelFilePaths(root).bakeryPath);
+    const wb = await readWorkbook(getExcelFilePaths(root).bakeryPath);
     const ws = wb.getWorksheet('서산나래 미니빵집 판매 현황')!;
     let found = -1;
     for (let off = 0; off < 43; off++) {
@@ -202,6 +219,20 @@ async function main() {
     assert.notStrictEqual(found, -1, '식빵 행을 찾지 못함');
     assert.strictEqual(cell(ws, found, 6), 4, '0으로 재동기화하면서 기존 판매 수량을 덮어씀');
     console.log('0 덮어쓰기 방지 OK: 식빵 판매 4개가 재동기화 후에도 남아 있음');
+  }
+
+  // Every sync adds one sheet, and two stocktakes in the same minute must not collide
+  if (sheetNames.length === 4) {
+    assert.strictEqual(new Set(sheetNames).size, 4, `시트 이름이 겹침: ${sheetNames.join(', ')}`);
+    assert.ok(sheetNames[1].endsWith('-2'), `같은 시각 재동기화가 -2 를 붙이지 않음: ${sheetNames[1]}`);
+    const wb = await readWorkbook(getExcelFilePaths(root).salePaperPath);
+    const added = wb.worksheets.filter((w) => w.name.startsWith('재고조사(')).map((w) => w.name);
+    assert.strictEqual(added.length, 4, `재고조사 시트 개수가 4가 아님: ${added.length}`);
+    console.log('\n새 시트 4장 생성 OK:');
+    for (const n of added) console.log('  ' + n);
+    const templatesAfter = await snapshotTemplates();
+    assert.deepStrictEqual(templatesAfter, templatesBefore, '원본 판매지 템플릿이 변경됨');
+    console.log(`원본 판매지 템플릿 2장 무변경 OK (${Object.keys(templatesBefore).length}칸 대조)`);
   }
 
   const backups = fs.readdirSync(root).filter((f) => f.endsWith('.bak'));

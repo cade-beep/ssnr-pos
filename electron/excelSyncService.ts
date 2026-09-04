@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import ExcelJS from 'exceljs';
+import JSZip from 'jszip';
 import { InventoryCheckSession, ExcelSyncResult } from '../src/types/inventory';
 
 // Normalize product name for resilient matching across sheets
@@ -18,6 +19,113 @@ export function getExcelFilePaths(root: string = process.cwd()) {
 // so an exact getWorksheet() lookup silently falls through to the wrong sheet.
 function findSheet(workbook: ExcelJS.Workbook, name: string): ExcelJS.Worksheet {
   return workbook.worksheets.find((w) => w.name.trim() === name) || workbook.worksheets[0];
+}
+
+/**
+ * 재고조사(2026-09-04 09-33). Excel forbids : \ / ? * [ ] in a sheet name and caps
+ * it at 31 characters, so the time is dashed. A second stocktake in the same
+ * minute gets -2, -3, … rather than colliding.
+ */
+function stocktakeSheetName(workbook: ExcelJS.Workbook, session: InventoryCheckSession): string {
+  const stamp = `${session.dateStr}${session.timeStr ? ' ' + session.timeStr.replace(/:/g, '-') : ''}`;
+  const base = `재고조사(${stamp})`.slice(0, 31);
+  let name = base;
+  let n = 2;
+  while (workbook.worksheets.some((w) => w.name === name)) {
+    const suffix = `-${n++}`;
+    name = base.slice(0, 31 - suffix.length) + suffix;
+  }
+  return name;
+}
+
+/**
+ * Duplicate a sheet so the original stays a clean template.
+ * Copied cell by cell on purpose: assigning worksheet.model wholesale throws
+ * inside exceljs, and this way the widths, styles and merges are all explicit.
+ */
+function copySheet(workbook: ExcelJS.Workbook, template: ExcelJS.Worksheet, name: string): ExcelJS.Worksheet {
+  const sheet = workbook.addWorksheet(name);
+
+  template.columns?.forEach((col, i) => {
+    if (col?.width) sheet.getColumn(i + 1).width = col.width;
+  });
+
+  template.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+    const target = sheet.getRow(rowNumber);
+    if (row.height) target.height = row.height;
+    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      const t = target.getCell(colNumber);
+      t.value = cell.value;
+      t.style = cell.style;
+    });
+  });
+
+  for (const range of ((template.model as any).merges as string[] | undefined) ?? []) {
+    sheet.mergeCells(range);
+  }
+
+  return sheet;
+}
+
+/**
+ * 한셀(Cell)로 저장한 xlsx 는 모든 요소에 접두사를 붙인다 (<x:sst>, <ep:Properties>).
+ * exceljs 의 파서는 접두사 없는 이름만 알아보고 그대로 죽는다. 그래서 읽기 직전에
+ * 각 XML 조각의 루트 접두사를 벗겨 엑셀이 쓰는 형태로 맞춘다. 메모리에서만 바꾸고
+ * 원본 파일은 건드리지 않는다.
+ * core.xml 은 엑셀도 <cp:coreProperties> 로 쓰므로 손대지 않는다.
+ * ponytail: exceljs 가 접두사를 지원하면 이 정규화는 통째로 지운다.
+ */
+function unprefixXml(xml: string): string {
+  const root = xml.match(/<([A-Za-z_][\w.-]*):[A-Za-z_][\w.-]*[\s>]/);
+  if (!root) return xml;
+  const prefix = root[1];
+  const out = xml
+    .split('<' + prefix + ':').join('<')
+    .split('</' + prefix + ':').join('</');
+  // The elements now sit in the default namespace. If the root already declares
+  // one, drop the prefix declaration; otherwise promote it to the default.
+  return /\sxmlns="/.test(out)
+    ? out.replace(new RegExp('\\s?xmlns:' + prefix + '="[^"]*"'), '')
+    : out.replace('xmlns:' + prefix + '=', 'xmlns=');
+}
+
+/**
+ * Only the parts exceljs parses expecting Excel's unprefixed form. Drawings,
+ * themes and core.xml legitimately use prefixes (`xdr:`, `cp:`) even straight
+ * out of Excel, so touching those breaks a perfectly good file.
+ */
+function needsUnprefix(name: string): boolean {
+  return (
+    name === '[Content_Types].xml' ||
+    name === 'docProps/app.xml' ||
+    name === 'xl/workbook.xml' ||
+    name === 'xl/styles.xml' ||
+    name === 'xl/sharedStrings.xml' ||
+    name.endsWith('.rels') ||
+    /^xl\/(worksheets\/sheet\d+|comments\d*)\.xml$/.test(name)
+  );
+}
+
+export async function readWorkbook(filePath: string): Promise<ExcelJS.Workbook> {
+  const workbook = new ExcelJS.Workbook();
+  const zip = await JSZip.loadAsync(fs.readFileSync(filePath));
+  let changed = false;
+
+  for (const name of Object.keys(zip.files)) {
+    if (!needsUnprefix(name)) continue;
+    const xml = await zip.files[name].async('string');
+    const fixed = unprefixXml(xml);
+    if (fixed !== xml) {
+      zip.file(name, fixed);
+      changed = true;
+    }
+  }
+
+  const buffer = changed
+    ? await zip.generateAsync({ type: 'nodebuffer' })
+    : fs.readFileSync(filePath);
+  await workbook.xlsx.load(buffer as any);
+  return workbook;
 }
 
 function backupFile(filePath: string) {
@@ -71,8 +179,7 @@ export async function syncInventoryToExcel(session: InventoryCheckSession, root?
  * Each block has 44 rows.
  */
 async function syncBakerySalesStatus(filePath: string, session: InventoryCheckSession): Promise<number> {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(filePath);
+  const workbook = await readWorkbook(filePath);
 
   const worksheet = findSheet(workbook, '서산나래 미니빵집 판매 현황');
 
@@ -176,11 +283,12 @@ async function syncBakerySalesStatus(filePath: string, session: InventoryCheckSe
  * 2. Sync '서산나래 판매지.xlsx'
  */
 async function syncSalePaper(filePath: string, session: InventoryCheckSession): Promise<string> {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.readFile(filePath);
+  const workbook = await readWorkbook(filePath);
 
-  const targetSheetName = session.storeName === '복지관' ? '복지관_판매지' : '서산나래_판매지';
-  const worksheet = findSheet(workbook, targetSheetName);
+  // The store sheet is the blank template; every stocktake gets its own copy so
+  // earlier ones are never overwritten.
+  const templateName = session.storeName === '복지관' ? '복지관_판매지' : '서산나래_판매지';
+  const worksheet = copySheet(workbook, findSheet(workbook, templateName), stocktakeSheetName(workbook, session));
 
   // G2 date header
   const dateHeader = `날짜: ${session.dateStr}${session.timeStr ? ` ${session.timeStr}` : ''}`;
@@ -198,16 +306,16 @@ async function syncSalePaper(filePath: string, session: InventoryCheckSession): 
     const leftName = row.getCell(2).value ? String(row.getCell(2).value).trim() : '';
     if (leftName && leftName !== '제빵류' && leftName !== '제과류' && leftName !== '기타') {
       const match = itemMap.get(normalizeName(leftName));
-      if (match && (match.soldQty ?? 0) > 0) {
-        row.getCell(5).value = match.soldQty; // Col E (판매량)
+      if (match) {
+        row.getCell(5).value = match.soldQty ?? 0; // Col E (판매량)
       }
     }
 
     const rightName = row.getCell(7).value ? String(row.getCell(7).value).trim() : '';
     if (rightName && rightName !== '기타' && rightName !== '동전쿠키' && rightName !== '제과류') {
       const match = itemMap.get(normalizeName(rightName));
-      if (match && (match.soldQty ?? 0) > 0) {
-        row.getCell(10).value = match.soldQty; // Col J (판매량)
+      if (match) {
+        row.getCell(10).value = match.soldQty ?? 0; // Col J (판매량)
       }
     }
   }
