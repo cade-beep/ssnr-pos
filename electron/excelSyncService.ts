@@ -294,6 +294,11 @@ async function syncSalePaper(filePath: string, session: InventoryCheckSession): 
   const dateHeader = `날짜: ${session.dateStr}${session.timeStr ? ` ${session.timeStr}` : ''}`;
   worksheet.getCell('G2').value = dateHeader;
 
+  // The '확인용' column now carries the counted stock. 판매량 is left blank on
+  // purpose: it is filled in by hand on the printed sheet after the count.
+  worksheet.getCell('C3').value = '재고량';
+  worksheet.getCell('H3').value = '재고량';
+
   const itemMap = new Map<string, typeof session.items[0]>();
   for (const it of session.items) {
     itemMap.set(normalizeName(it.name), it);
@@ -307,7 +312,8 @@ async function syncSalePaper(filePath: string, session: InventoryCheckSession): 
     if (leftName && leftName !== '제빵류' && leftName !== '제과류' && leftName !== '기타') {
       const match = itemMap.get(normalizeName(leftName));
       if (match) {
-        row.getCell(5).value = match.soldQty ?? 0; // Col E (판매량)
+        row.getCell(3).value = match.dispatchQty ?? 0; // Col C (재고량)
+        row.getCell(5).value = null; // Col E (판매량) — 인쇄 후 손으로 적는 칸
       }
     }
 
@@ -315,7 +321,8 @@ async function syncSalePaper(filePath: string, session: InventoryCheckSession): 
     if (rightName && rightName !== '기타' && rightName !== '동전쿠키' && rightName !== '제과류') {
       const match = itemMap.get(normalizeName(rightName));
       if (match) {
-        row.getCell(10).value = match.soldQty ?? 0; // Col J (판매량)
+        row.getCell(8).value = match.dispatchQty ?? 0; // Col H (재고량)
+        row.getCell(10).value = null; // Col J (판매량) — 인쇄 후 손으로 적는 칸
       }
     }
   }

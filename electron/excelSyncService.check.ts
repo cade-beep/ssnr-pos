@@ -108,13 +108,18 @@ async function verify(root: string, s: InventoryCheckSession, label: string, she
     s.storeName === '복지관' ? '복지관_판매지' : '서산나래_판매지',
     `${label}: 새 시트가 다른 매장 서식에서 복사됨`);
 
+  // 확인용 열이 재고량으로 바뀌고, 판매량 열은 손으로 적도록 비워 둔다
+  assert.strictEqual(cell(ws2, 3, 3), '재고량', `${label}: 왼쪽 머리글이 재고량이 아님`);
+  assert.strictEqual(cell(ws2, 3, 8), '재고량', `${label}: 오른쪽 머리글이 재고량이 아님`);
+
   let paperHits = 0;
   for (let r = 6; r <= 33; r++) {
-    for (const [nameCol, qtyCol] of [[2, 5], [7, 10]]) {
+    for (const [nameCol, stockCol, soldCol] of [[2, 3, 5], [7, 8, 10]]) {
       const name = String(cell(ws2, r, nameCol) ?? '').trim();
       const item = name ? byName.get(norm(name)) : undefined;
       if (!item) continue;
-      assert.strictEqual(cell(ws2, r, qtyCol), item.soldQty, `${label}: 새 시트 '${name}' 수량 불일치`);
+      assert.strictEqual(cell(ws2, r, stockCol), item.dispatchQty, `${label}: 새 시트 '${name}' 재고량 불일치`);
+      assert.strictEqual(cell(ws2, r, soldCol), null, `${label}: 새 시트 '${name}' 판매량 칸이 비어 있지 않음`);
       paperHits++;
     }
   }
